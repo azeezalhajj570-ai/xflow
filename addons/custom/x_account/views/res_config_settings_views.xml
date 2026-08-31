@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="action_x_account_settings" model="ir.actions.act_window">
+        <field name="name">X Account Settings</field>
+        <field name="res_model">res.config.settings</field>
+        <field name="view_mode">form</field>
+        <field name="context">{'module': 'x_account', 'bin_size': False}</field>
+    </record>
+
+    <record id="x_account_res_config_settings_view_form" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.inherit.x.account</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="social.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//block[hasclass('o_social_developer_settings')]" position="inside">
+                <setting string="X Account &amp; Session Platform">
+                    <div class="content-group">
+                        <div class="mt16">
+                            <label for="x_auth_method" string="Authentication Method" class="col-3 col-lg-3 o_form_label"/>
+                            <field name="x_auth_method"/>
+                        </div>
+                        <div class="mt16">
+                            <label for="x_provider" string="Provider" class="col-3 col-lg-3 o_form_label"/>
+                            <field name="x_provider"/>
+                        </div>
+                        <div class="mt16">
+                            <label for="x_omnix_api_key" string="OmniX API Key" class="col-3 col-lg-3 o_form_label"/>
+                            <field name="x_omnix_api_key" password="True"/>
+                        </div>
+                        <div class="mt16">
+                            <label for="x_web_api_base" string="Web API Base URL" class="col-3 col-lg-3 o_form_label"/>
+                            <field name="x_web_api_base"/>
+                        </div>
+                        <div class="mt16">
+                            <label for="x_encryption_key_configured" string="Session Encryption Key Configured" class="col-3 col-lg-3 o_form_label"/>
+                            <field name="x_encryption_key_configured"/>
+                        </div>
+                        <p class="text-muted mt16">
+                            The session encryption key is supplied via the
+                            <code>X_SESSION_ENCRYPTION_KEY</code> deployment environment
+                            variable. It is never stored in Odoo, logged, or returned by APIs.
+                        </p>
+                    </div>
+                </setting>
+            </xpath>
+        </field>
+    </record>
+</odoo>

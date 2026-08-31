@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="cron_validate_x_sessions" model="ir.cron">
+            <field name="name">X: Validate Sessions</field>
+            <field name="model_id" ref="model_social_account"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_validate_x_sessions()</field>
+            <field name="interval_number">30</field>
+            <field name="interval_type">minutes</field>
+            <field name="active">True</field>
+        </record>
+
+        <record id="cron_process_x_task_queue" model="ir.cron">
+            <field name="name">X: Process Task Queue</field>
+            <field name="model_id" ref="model_x_account_task"/>
+            <field name="state">code</field>
+            <field name="code">model._process_queue()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">minutes</field>
+            <field name="active">True</field>
+        </record>
+    </data>
+</odoo>

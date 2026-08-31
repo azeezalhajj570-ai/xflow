@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="x_account_social_account_view_form" model="ir.ui.view">
+        <field name="name">x.account.social.account.view.form</field>
+        <field name="model">social.account</field>
+        <field name="inherit_id" ref="social.social_account_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//group[@name='social_account_global']" position="after">
+                <group name="x_account" string="X Account &amp; Session">
+                    <field name="x_connection_status" groups="base.group_system"/>
+                    <field name="x_provider"/>
+                    <field name="x_auth_method"/>
+                    <field name="twitter_user_id" readonly="1"/>
+                    <field name="last_connected" readonly="1"/>
+                    <field name="last_validated" readonly="1"/>
+                    <field name="last_error" readonly="1"/>
+                    <field name="x_migration_status" groups="base.group_system"/>
+                    <field name="source_account_id" groups="base.group_system" readonly="1"/>
+                    <field name="source_user_id" groups="base.group_system" readonly="1"/>
+                    <field name="migration_batch_id" groups="base.group_system" readonly="1"/>
+                    <field name="migration_timestamp" groups="base.group_system" readonly="1"/>
+                </group>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="x_account_social_account_view_form_standalone" model="ir.ui.view">
+        <field name="name">x.account.social.account.view.form.standalone</field>
+        <field name="model">social.account</field>
+        <field name="arch" type="xml">
+            <form string="X Account">
+                <header>
+                    <button name="action_fetch_groups" string="Fetch Groups" type="object"
+                            icon="fa-users"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" placeholder="Account name"/></h1>
+                    </div>
+                    <group>
+                        <field name="social_account_handle" placeholder="@handle"/>
+                        <field name="x_provider"/>
+                        <field name="x_auth_method"/>
+                        <field name="twitter_user_id" readonly="1"/>
+                        <field name="x_connection_status"/>
+                        <field name="last_validated" readonly="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="x_account_social_account_view_list" model="ir.ui.view">
+        <field name="name">x.account.social.account.view.list</field>
+        <field name="model">social.account</field>
+        <field name="arch" type="xml">
+            <list string="X Accounts" create="false">
+                <field name="name"/>
+                <field name="social_account_handle"/>
+                <field name="x_provider"/>
+                <field name="x_connection_status"/>
+                <field name="last_validated"/>
+                <button name="action_fetch_groups" string="Fetch Groups" type="object"
+                        icon="fa-users"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_x_account_social_accounts" model="ir.actions.act_window">
+        <field name="name">X Accounts</field>
+        <field name="res_model">social.account</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('media_type', '=', 'twitter'), ('x_provider', '!=', False)]</field>
+        <field name="view_ids" eval="[(5, 0, 0),
+            (0, 0, {'view_mode': 'list', 'view_id': ref('x_account_social_account_view_list')}),
+            (0, 0, {'view_mode': 'form', 'view_id': ref('x_account_social_account_view_form_standalone')})]"/>
+    </record>
+</odoo>

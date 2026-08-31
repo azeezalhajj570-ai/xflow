@@ -1,0 +1,10 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_x_session_store_manager,x.session.store.manager,model_x_session_store,group_x_account_manager,1,1,1,1
+access_x_session_store_system,x.session.store.system,model_x_session_store,base.group_system,1,1,1,1
+access_x_account_group_user,x.account.group.user,model_x_account_group,social.group_social_user,1,0,0,0
+access_x_account_group_manager,x.account.group.manager,model_x_account_group,social.group_social_manager,1,1,1,1
+access_x_account_task_user,x.account.task.user,model_x_account_task,social.group_social_user,1,1,1,0
+access_x_account_task_manager,x.account.task.manager,model_x_account_task,social.group_social_manager,1,1,1,1
+access_x_message_user,x.message.user,model_x_message,social.group_social_user,1,1,1,1
+access_x_message_manager,x.message.manager,model_x_message,social.group_social_manager,1,1,1,1
+access_x_import_session_user,x.import.session.user,model_x_import_session,base.group_user,1,1,1,0

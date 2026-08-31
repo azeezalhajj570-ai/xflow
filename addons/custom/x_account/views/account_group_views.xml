@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="x_account_group_view_tree" model="ir.ui.view">
+        <field name="name">x.account.group.view.tree</field>
+        <field name="model">x.account.group</field>
+        <field name="arch" type="xml">
+            <list string="X Account Groups">
+                <field name="name"/>
+                <field name="account_ids" widget="many2many_tags"/>
+                <field name="actions"/>
+                <field name="auto_execute"/>
+                <field name="paused"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="x_account_group_view_form" model="ir.ui.view">
+        <field name="name">x.account.group.view.form</field>
+        <field name="model">x.account.group</field>
+        <field name="arch" type="xml">
+            <form string="X Account Group">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="description"/>
+                        </group>
+                        <group>
+                            <field name="actions"/>
+                            <field name="auto_execute"/>
+                            <field name="cooldown_sec"/>
+                            <field name="paused"/>
+                        </group>
+                    </group>
+                    <group string="X Accounts">
+                        <field name="account_ids" widget="many2many_tags"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_x_account_group" model="ir.actions.act_window">
+        <field name="name">X Account Groups</field>
+        <field name="res_model">x.account.group</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

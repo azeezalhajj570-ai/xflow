@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem
+        id="menu_x_account_root"
+        name="X Account"
+        web_icon="x_account,static/description/icon.png"
+        sequence="50"/>
+
+    <menuitem
+        id="menu_x_account_social_accounts"
+        name="X Accounts"
+        parent="menu_x_account_root"
+        action="action_x_account_social_accounts"
+        sequence="10"/>
+
+    <menuitem
+        id="menu_x_account_link_account"
+        name="Link Account"
+        parent="menu_x_account_root"
+        action="action_x_import_session"
+        sequence="15"/>
+
+    <menuitem
+        id="menu_x_account_x_groups"
+        name="X Groups"
+        parent="menu_x_account_root"
+        action="action_x_account_group_channels"
+        sequence="20"/>
+
+    <menuitem
+        id="menu_x_account_tasks"
+        name="Tasks"
+        parent="menu_x_account_root"
+        action="action_x_account_task"
+        sequence="40"/>
+
+    <menuitem
+        id="menu_x_account_settings"
+        name="Settings"
+        parent="menu_x_account_root"
+        action="action_x_account_settings"
+        sequence="50"/>
+</odoo>
