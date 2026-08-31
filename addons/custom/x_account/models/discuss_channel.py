@@ -94,6 +94,15 @@ class DiscussChannel(models.Model):
     def _save_x_message(self, direction, external_id, body, external_created_at,
                         author_partner=None, **kw):
         self.ensure_one()
+        # OmniX delivers ISO-8601 timestamps ("2026-08-31T12:00:00Z"); Odoo
+        # Datetime fields want "%Y-%m-%d %H:%M:%S". Normalize when needed.
+        if isinstance(external_created_at, str) and external_created_at:
+            ts = external_created_at.strip()
+            if 'T' in ts or ts.endswith('Z'):
+                ts = ts.replace('T', ' ').replace('Z', '')
+                if '.' in ts:
+                    ts = ts.split('.')[0]
+                external_created_at = ts
         existing = self.env['x.message'].sudo().search([
             ('channel_id', '=', self.id),
             ('external_id', '=', external_id),
