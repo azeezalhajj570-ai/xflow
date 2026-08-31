@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="whatsapp_account_view_tree" model="ir.ui.view">
+        <field name="name">whatsapp.account.view.list</field>
+        <field name="model">whatsapp.account</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="name"/>
+                <field name="instance_name"/>
+                <field name="base_url"/>
+                <field name="allowed_company_ids" widget="many2many_tags" groups="base.group_multi_company"/>
+            </list>
+        </field>
+    </record>
+    <record id="whatsapp_account_view_form" model="ir.ui.view">
+        <field name="name">whatsapp.account.view.form</field>
+        <field name="model">whatsapp.account</field>
+        <field name="arch" type="xml">
+            <form string="WhatsApp Business Account">
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                    </div>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                    <div class="oe_title" id='title'>
+                        <label for="name" string="Name"/>
+                        <h1 id="name"><field name="name" required="1" placeholder='e.g. "Evaluation Account"'/></h1>
+                    </div>
+                    <div class="o_horizontal_separator mt-4 mb-3 text-uppercase fw-bolder small">
+                        Sending Messages
+                    </div>
+                    <field name="active" invisible="1"/>
+                    <div class="row mt16 o_settings_container" id="app_setup">
+                        <group>
+                            <group>
+                                <field name="base_url" placeholder="https://api.yourdomain.com"/>
+                                <field name="instance_name" placeholder="Instance Name"/>
+                            </group>
+                            <group>
+                                <field name="api_key" password="True"/>
+                                <field name="instance_token" password="True" placeholder="Instance Token (optional)"/>
+                                <div class="text-muted small" colspan="2">
+                                    <i class="fa fa-info-circle"/> Find your <b>Global API Key</b> in the Evolution Manager under <i>API Security</i>.
+                                </div>
+                            </group>
+                        </group>
+
+                    <div class="content-group">
+                        <button name="button_test_connection" type="object" string="Test Credentials" icon="fa-key" class="btn-link p-1"/><br/>
+                    </div>
+                    </div>
+                    <div class="o_horizontal_separator mt-4 mb-3 text-uppercase fw-bolder small">
+                        Receiving Messages
+                    </div>
+                    <div class="row mt16 o_settings_container" id="toreceive_msg">
+                        <setting>
+                            <field name="callback_url" widget="CopyClipboardURL"/>
+                            <br/><button name="button_configure_webhook" type="object" string="Push to Evolution API" class="btn-link p-0"/>
+                        </setting>
+                        <setting>
+                            <field name="webhook_verify_token" widget="CopyClipboardChar"/>
+                        </setting>
+                    </div>
+                    <div class="o_horizontal_separator mt-4 mb-3 text-uppercase fw-bolder small">Notifications</div>
+                    <div class="row mt16 o_settings_container" id="tocontrol">
+                        <setting>
+                            <field name="notify_user_ids" string="Default Users" widget="many2many_tags" placeholder="Pick users to notify..."/>
+                        </setting>
+                        <setting>
+                            <field name="allowed_company_ids" string="Allowed companies" widget="many2many_tags" groups="base.group_multi_company" required="1"/>
+                        </setting>
+                    </div>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+    <record id="whatsapp_account_view_search" model="ir.ui.view">
+        <field name="name">whatsapp.account.view.search</field>
+        <field name="model">whatsapp.account</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="instance_name"/>
+                <field name="base_url"/>
+                <filter string="Archived" name="filter_archived" domain="[('active', '=', False)]"/>
+            </search>
+        </field>
+    </record>
+    <record id="whatsapp_account_action" model="ir.actions.act_window">
+        <field name="name">WhatsApp Account</field>
+        <field name="res_model">whatsapp.account</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Connect your first WhatsApp Instance.
+            </p>
+            <p>
+                You will need your <b>Evolution API Base URL</b> and <b>Global API Key</b>.
+            </p>
+        </field>
+    </record>
+
+
+
+</odoo>

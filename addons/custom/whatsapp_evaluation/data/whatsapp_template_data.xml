@@ -1,0 +1,174 @@
+<?xml version="1.0"?>
+<odoo noupdate="1"> <!-- Changed to 1 to prevent overwrite of user changes but allow initial load -->
+    <record id="whatsapp_template_sale_order_en" model="whatsapp.template">
+        <field name="name">Sale Order (EN)</field>
+        <field name="model_id" ref="sale.model_sale_order"/>
+        <field name="header_type">document</field>
+        <field name="report_id" ref="sale.action_report_saleorder"/>
+        <field name="lang_code">en_US</field>
+        <field name="body">Hello {{1}},
+
+Congratulations! Your order *{{2}}* from *{{3}}* has been confirmed for a total of *{{4}}{{5}}*.
+
+To track your order: {{6}}
+
+Thank you.</field>
+        <field name="variable_ids" eval="[
+            (5, 0, 0),
+            (0, 0, {'name': '{{1}}', 'demo_value': 'Azure Interior', 'line_type': 'body', 'field_type': 'field', 'field_name': 'partner_id'}),
+            (0, 0, {'name': '{{2}}', 'demo_value': 'SO00025', 'line_type': 'body', 'field_type': 'field', 'field_name': 'name'}),
+            (0, 0, {'name': '{{3}}', 'demo_value': 'My Company', 'line_type': 'body', 'field_type': 'field', 'field_name': 'company_id'}),
+            (0, 0, {'name': '{{4}}', 'demo_value': '$', 'line_type': 'body', 'field_type': 'field', 'field_name': 'currency_id.symbol'}),
+            (0, 0, {'name': '{{5}}', 'demo_value': '1000', 'line_type': 'body', 'field_type': 'field', 'field_name': 'amount_total'}),
+            (0, 0, {'name': '{{6}}', 'demo_value': 'https://...', 'line_type': 'body', 'field_type': 'portal_url'})
+        ]" />
+    </record>
+
+    <record id="whatsapp_template_sale_order_ar" model="whatsapp.template">
+        <field name="name">Sale Order (AR)</field>
+        <field name="model_id" ref="sale.model_sale_order"/>
+        <field name="header_type">document</field>
+        <field name="report_id" ref="sale.action_report_saleorder"/>
+        <field name="lang_code">ar_AA</field>
+        <field name="body">مرحباً {{1}}،
+
+تهانينا! تم تأكيد طلبك *{{2}}* من *{{3}}* بإجمالي مبلغ *{{4}}{{5}}*.
+
+لتتبع طلبك: {{6}}
+
+شكراً لك.</field>
+        <field name="variable_ids" eval="[
+             (5, 0, 0),
+            (0, 0, {'name': '{{1}}', 'demo_value': 'Azure Interior', 'line_type': 'body', 'field_type': 'field', 'field_name': 'partner_id'}),
+            (0, 0, {'name': '{{2}}', 'demo_value': 'SO00025', 'line_type': 'body', 'field_type': 'field', 'field_name': 'name'}),
+            (0, 0, {'name': '{{3}}', 'demo_value': 'شركتي', 'line_type': 'body', 'field_type': 'field', 'field_name': 'company_id'}),
+            (0, 0, {'name': '{{4}}', 'demo_value': '$', 'line_type': 'body', 'field_type': 'field', 'field_name': 'currency_id.symbol'}),
+            (0, 0, {'name': '{{5}}', 'demo_value': '1000', 'line_type': 'body', 'field_type': 'field', 'field_name': 'amount_total'}),
+            (0, 0, {'name': '{{6}}', 'demo_value': 'https://...', 'line_type': 'body', 'field_type': 'portal_url'})
+        ]" />
+    </record>
+
+    <record id="whatsapp_template_invoice_en" model="whatsapp.template">
+        <field name="name">Invoice (EN)</field>
+        <field name="model_id" ref="account.model_account_move"/>
+        <field name="header_type">document</field>
+        <field name="report_id" ref="account.account_invoices"/>
+        <field name="lang_code">en_US</field>
+        <field name="body">Hello {{1}},
+
+A new invoice *{{2}}* with a total amount of *{{3}}{{4}}* has been generated.
+
+Please find the details in the attachment.
+
+Thank you.</field>
+        <field name="variable_ids" eval="[
+            (5, 0, 0),
+            (0, 0, {'name': '{{1}}', 'demo_value': 'Partner Name', 'line_type': 'body', 'field_type': 'field', 'field_name': 'partner_id'}),
+            (0, 0, {'name': '{{2}}', 'demo_value': 'INV/2023/001', 'line_type': 'body', 'field_type': 'field', 'field_name': 'name'}),
+            (0, 0, {'name': '{{3}}', 'demo_value': '$', 'line_type': 'body', 'field_type': 'field', 'field_name': 'currency_id.symbol'}),
+            (0, 0, {'name': '{{4}}', 'demo_value': '100.00', 'line_type': 'body', 'field_type': 'field', 'field_name': 'amount_total'}),
+        ]" />
+    </record>
+
+    <record id="whatsapp_template_invoice_ar" model="whatsapp.template">
+        <field name="name">Invoice (AR)</field>
+        <field name="model_id" ref="account.model_account_move"/>
+        <field name="header_type">document</field>
+        <field name="report_id" ref="account.account_invoices"/>
+        <field name="lang_code">ar_AA</field>
+        <field name="body">مرحباً {{1}}،
+
+تم إصدار فاتورة جديدة *{{2}}* بمبلغ إجمالي *{{3}}{{4}}*.
+
+يرجى الاطلاع على التفاصيل في المرفق.
+
+شكراً لك.</field>
+        <field name="variable_ids" eval="[
+             (5, 0, 0),
+            (0, 0, {'name': '{{1}}', 'demo_value': 'Partner Name', 'line_type': 'body', 'field_type': 'field', 'field_name': 'partner_id'}),
+            (0, 0, {'name': '{{2}}', 'demo_value': 'INV/2023/001', 'line_type': 'body', 'field_type': 'field', 'field_name': 'name'}),
+             (0, 0, {'name': '{{3}}', 'demo_value': '$', 'line_type': 'body', 'field_type': 'field', 'field_name': 'currency_id.symbol'}),
+            (0, 0, {'name': '{{4}}', 'demo_value': '100.00', 'line_type': 'body', 'field_type': 'field', 'field_name': 'amount_total'}),
+        ]" />
+    </record>
+
+    <record id="whatsapp_template_payment_en" model="whatsapp.template">
+        <field name="name">Payment Receipt (EN)</field>
+        <!-- account.payment usually linked to account.model_account_payment -->
+        <field name="model_id" search="[('model', '=', 'account.payment')]" />
+        <field name="header_type">document</field>
+        <field name="report_id" ref="account.action_report_payment_receipt"/>
+        <field name="lang_code">en_US</field>
+        <field name="body">Hello {{1}},
+
+We have received your payment of *{{2}}{{3}}* for *{{4}}*.
+
+Thank you.</field>
+        <field name="variable_ids" eval="[
+            (5, 0, 0),
+            (0, 0, {'name': '{{1}}', 'demo_value': 'Partner Name', 'line_type': 'body', 'field_type': 'field', 'field_name': 'partner_id'}),
+            (0, 0, {'name': '{{2}}', 'demo_value': '$', 'line_type': 'body', 'field_type': 'field', 'field_name': 'currency_id.symbol'}),
+            (0, 0, {'name': '{{3}}', 'demo_value': '50.00', 'line_type': 'body', 'field_type': 'field', 'field_name': 'amount'}),
+            (0, 0, {'name': '{{4}}', 'demo_value': 'INV/2023/001', 'line_type': 'body', 'field_type': 'field', 'field_name': 'ref'}),
+        ]" />
+    </record>
+
+    <record id="whatsapp_template_payment_ar" model="whatsapp.template">
+        <field name="name">Payment Receipt (AR)</field>
+        <field name="model_id" search="[('model', '=', 'account.payment')]" />
+        <field name="header_type">document</field>
+        <field name="report_id" ref="account.action_report_payment_receipt"/>
+        <field name="lang_code">ar_AA</field>
+        <field name="body">مرحباً {{1}}،
+
+لقد استلمنا دفعتك بمبلغ *{{2}}{{3}}* عن *{{4}}*.
+
+شكراً لك.</field>
+        <field name="variable_ids" eval="[
+             (5, 0, 0),
+            (0, 0, {'name': '{{1}}', 'demo_value': 'Partner Name', 'line_type': 'body', 'field_type': 'field', 'field_name': 'partner_id'}),
+            (0, 0, {'name': '{{2}}', 'demo_value': '$', 'line_type': 'body', 'field_type': 'field', 'field_name': 'currency_id.symbol'}),
+            (0, 0, {'name': '{{3}}', 'demo_value': '50.00', 'line_type': 'body', 'field_type': 'field', 'field_name': 'amount'}),
+            (0, 0, {'name': '{{4}}', 'demo_value': 'INV/2023/001', 'line_type': 'body', 'field_type': 'field', 'field_name': 'ref'}),
+        ]" />
+    </record>
+
+    <record id="whatsapp_template_pos_en" model="whatsapp.template">
+        <field name="name">POS Order (EN)</field>
+        <field name="model_id" search="[('model', '=', 'pos.order')]" />
+        <field name="header_type">text</field>
+        <field name="lang_code">en_US</field>
+        <field name="body">Hello {{1}},
+
+Thank you for your purchase *{{2}}* amounting to *{{3}}{{4}}*.
+
+Have a great day!</field>
+        <field name="variable_ids" eval="[
+            (5, 0, 0),
+            (0, 0, {'name': '{{1}}', 'demo_value': 'Partner Name', 'line_type': 'body', 'field_type': 'field', 'field_name': 'partner_id'}),
+            (0, 0, {'name': '{{2}}', 'demo_value': 'Order 123', 'line_type': 'body', 'field_type': 'field', 'field_name': 'name'}),
+            (0, 0, {'name': '{{3}}', 'demo_value': '$', 'line_type': 'body', 'field_type': 'field', 'field_name': 'currency_id.symbol'}),
+            (0, 0, {'name': '{{4}}', 'demo_value': '15.50', 'line_type': 'body', 'field_type': 'field', 'field_name': 'amount_total'}),
+        ]" />
+    </record>
+
+    <record id="whatsapp_template_pos_ar" model="whatsapp.template">
+        <field name="name">POS Order (AR)</field>
+        <field name="model_id" search="[('model', '=', 'pos.order')]" />
+        <field name="header_type">text</field>
+        <field name="lang_code">ar_AA</field>
+        <field name="body">مرحباً {{1}}،
+
+شكراً لك على طلبك *{{2}}* بمبلغ إجمالي *{{3}}{{4}}*.
+
+أتمنى لك يوماً سعيداً!</field>
+        <field name="variable_ids" eval="[
+            (5, 0, 0),
+            (0, 0, {'name': '{{1}}', 'demo_value': 'Partner Name', 'line_type': 'body', 'field_type': 'field', 'field_name': 'partner_id'}),
+            (0, 0, {'name': '{{2}}', 'demo_value': 'Order 123', 'line_type': 'body', 'field_type': 'field', 'field_name': 'name'}),
+            (0, 0, {'name': '{{3}}', 'demo_value': '$', 'line_type': 'body', 'field_type': 'field', 'field_name': 'currency_id.symbol'}),
+            (0, 0, {'name': '{{4}}', 'demo_value': '15.50', 'line_type': 'body', 'field_type': 'field', 'field_name': 'amount_total'}),
+        ]" />
+    </record>
+
+</odoo>

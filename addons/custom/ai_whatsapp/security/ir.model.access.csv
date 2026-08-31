@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_chatbot_script_wa_admin,chatbot.script.wa.admin,im_livechat.model_chatbot_script,whatsapp_evaluation.group_whatsapp_admin,1,1,1,1
+access_chatbot_script_step_wa_admin,chatbot.script.step.wa.admin,im_livechat.model_chatbot_script_step,whatsapp_evaluation.group_whatsapp_admin,1,1,1,1
+access_chatbot_script_answer_wa_admin,chatbot.script.answer.wa.admin,im_livechat.model_chatbot_script_answer,whatsapp_evaluation.group_whatsapp_admin,1,1,1,1
+access_chatbot_message_wa_admin,chatbot.message.wa.admin,im_livechat.model_chatbot_message,whatsapp_evaluation.group_whatsapp_admin,1,1,1,1

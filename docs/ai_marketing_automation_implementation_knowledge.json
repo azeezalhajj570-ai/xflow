@@ -1,0 +1,383 @@
+{
+  "knowledge_base_version": "2.0",
+  "domain": "AI-Powered Marketing Automation",
+  "odoo_version": "19.0",
+  "source_base_paths": {
+    "community_enterprise": "/usr/lib/python3/dist-packages/odoo/addons/",
+    "custom_addons": "/mnt/custom-addons/",
+    "project_addons": "/root/odoo/project/addons/custom/"
+  },
+  "modules": {
+    "mass_mailing": {
+      "name": "Email Marketing",
+      "version": "2.7",
+      "location": "community_enterprise",
+      "application": true,
+      "license": "LGPL-3",
+      "category": "Marketing/Email Marketing",
+      "depends": ["contacts", "mail", "html_builder", "utm", "link_tracker", "social_media", "web_tour", "digest"],
+      "models": [
+        "mailing.mailing", "mailing.list", "mailing.contact", "mailing.trace",
+        "mailing.subscription", "mailing.subscription.optout", "mailing.filter",
+        "mailing.trace.report"
+      ],
+      "extended_models": [
+        "ir.http", "ir.mail_server", "ir.model", "link.tracker", "link.tracker.click",
+        "mail.blacklist", "mail.mail", "mail.render.mixin", "mail.thread",
+        "res.company", "res.config.settings", "res.partner", "res.users",
+        "utm.campaign", "utm.medium", "utm.source"
+      ],
+      "crons": [
+        {"id": "ir_cron_mass_mailing_queue", "method": "_process_mass_mailing_queue", "interval": "1 day"},
+        {"id": "ir_cron_mass_mailing_ab_testing", "method": "_cron_process_mass_mailing_ab_testing", "interval": "1 day"}
+      ],
+      "controllers": {
+        "MassMailController": {
+          "routes": [
+            "/mailing/<int:mailing_id>/unsubscribe", "/mailing/<int:mailing_id>/unsubscribe_oneclick",
+            "/mail/track/<mail_id>/<token>/blank.gif", "/r/<code>/m/<mailing_trace_id>",
+            "/mailing/<int:mailing_id>/view", "/mailing/blocklist/add", "/mailing/blocklist/remove"
+          ]
+        }
+      },
+      "key_business_logic": {
+        "sending": "action_launch -> action_put_in_queue -> _process_mass_mailing_queue -> _action_send_mail -> mail.compose.message -> mail.mail records with traces",
+        "ab_testing": "random sample split -> send variants -> compare metrics -> winner selection -> send to remaining",
+        "unsubscribe": "HMAC-token URL per recipient -> portal management page -> opt-out or blacklist",
+        "bounce_handling": "mail gateway -> _routing_handle_bounce -> trace set_bounced -> auto-blacklist after 5 bounces/3mo"
+      }
+    },
+    "crm": {
+      "name": "CRM",
+      "version": "1.9",
+      "location": "community_enterprise",
+      "application": true,
+      "license": "LGPL-3",
+      "category": "Sales/CRM",
+      "depends": ["base_setup", "sales_team", "mail", "calendar", "resource", "utm", "web_tour", "contacts", "digest", "phone_validation"],
+      "models": [
+        "crm.lead", "crm.stage", "crm.lost.reason", "crm.recurring.plan",
+        "crm.lead.scoring.frequency", "crm.lead.scoring.frequency.field",
+        "crm.activity.report", "crm.team", "crm.team.member"
+      ],
+      "crons": [
+        {"id": "ir_cron_crm_lead_assign", "method": "_cron_assign_leads", "interval": "1 day", "active": false},
+        {"id": "website_crm_score_cron", "method": "_cron_update_automated_probabilities", "interval": "1 day", "active": false}
+      ],
+      "pls_algorithm": {
+        "type": "Naive Bayes",
+        "per_team": true,
+        "frequency_model": "crm.lead.scoring.frequency",
+        "field_model": "crm.lead.scoring.frequency.field",
+        "default_fields": ["phone_state", "email_state", "state_id", "country_id", "source_id", "lang_id", "tag_ids"],
+        "always_included": ["stage_id", "team_id"],
+        "batch_compute_step": 50000,
+        "batch_update_step": 5000,
+        "increment": 0.1,
+        "probability_clamp": [0.01, 99.99],
+        "compute_method": "_pls_get_naive_bayes_probabilities",
+        "increment_method": "_pls_increment_frequencies",
+        "cron_rebuild_method": "_cron_update_automated_probabilities",
+        "training_trigger": "_handle_won_lost"
+      }
+    },
+    "marketing_automation": {
+      "name": "Marketing Automation",
+      "version": "19.0",
+      "location": "community_enterprise",
+      "application": true,
+      "license": "OEEL-1",
+      "category": "Marketing",
+      "depends": ["mass_mailing"],
+      "models": [
+        "marketing.campaign", "marketing.activity", "marketing.participant", "marketing.trace"
+      ],
+      "extended_models": [
+        "mailing.mailing", "mailing.trace", "utm.campaign", "utm.source",
+        "mailing.trace.report", "mail.compose.message"
+      ],
+      "crons": [
+        {"id": "ir_cron_campaign_sync_participants", "method": "sync_participants", "interval": "12 hours"},
+        {"id": "ir_cron_campaign_execute_activities", "method": "execute_activities", "interval": "1 hour"}
+      ],
+      "trigger_types": [
+        "begin", "activity", "mail_open", "mail_not_open", "mail_reply",
+        "mail_not_reply", "mail_click", "mail_not_click", "mail_bounce"
+      ],
+      "activity_types": ["email", "action"],
+      "campaign_templates": ["Tag Hot Contacts", "Welcome Flow", "Double Opt-in", "Commercial Prospection", "Schedule Calls", "Prioritize Hot Leads"]
+    },
+    "ai_core": {
+      "name": "AI Core",
+      "version": "19.0",
+      "location": "community_enterprise",
+      "license": "OEEL-1",
+      "depends": ["mail"],
+      "models": [
+        "ai.agent", "ai.agent.source", "ai.embedding", "ai.topic",
+        "ai.composer", "ai.prompt.button"
+      ],
+      "extended_models": [
+        "ir.actions.server", "ir.attachment", "mail.render.mixin",
+        "discuss.channel", "mail.thread", "mail.template", "res.config.settings"
+      ],
+      "llm_providers": ["OpenAI (gpt-4o, gpt-4.1, gpt-5)", "Google Gemini (gemini-2.5-pro, gemini-2.5-flash)"],
+      "api_endpoints": {
+        "openai": "api.openai.com/v1 (Responses API)",
+        "gemini": "generativelanguage.googleapis.com/v1beta/openai"
+      },
+      "rag": {
+        "embedding_model": "text-embedding-3-small (1536d)",
+        "top_k": 5,
+        "similarity": "cosine distance (<=> operator)",
+        "index_type": "ivfflat"
+      },
+      "key_methods": {
+        "response_generation": "_generate_response(prompt, chat_history, extra_system_context)",
+        "rag_context": "_build_rag_context(prompt) -> cosine distance on ai.embedding",
+        "tool_execution": "LLM function calling -> ir.actions.server with use_in_ai=True -> _ai_tool_run()",
+        "prompt_evaluation": "_eval_ai_prompts(html) -> in-HTML <div class='o_editor_prompt'> replacement"
+      }
+    },
+    "crm_iap_mine": {
+      "name": "Lead Mining",
+      "version": "19.0",
+      "location": "community_enterprise",
+      "license": "OEEL-1",
+      "depends": ["crm", "iap", "iap_crm", "mail"],
+      "model": "crm.iap.lead.mining.request"
+    },
+    "crm_iap_enrich": {
+      "name": "Lead Enrichment",
+      "version": "19.0",
+      "location": "community_enterprise",
+      "license": "OEEL-1",
+      "depends": ["crm", "iap", "iap_crm", "mail"],
+      "model": "crm.lead (extended)"
+    },
+    "partner_autocomplete": {
+      "name": "Partner Autocomplete",
+      "version": "19.0",
+      "location": "community_enterprise",
+      "license": "OEEL-1",
+      "depends": ["iap", "mail"]
+    },
+    "website_chatbot": {
+      "name": "Chatbot",
+      "version": "19.0",
+      "location": "community_enterprise",
+      "license": "OEEL-1"
+    },
+    "link_tracker": {
+      "name": "Link Tracker",
+      "version": "1.1",
+      "location": "community_enterprise",
+      "license": "LGPL-3",
+      "depends": ["utm", "mail"],
+      "models": ["link.tracker", "link.tracker.code", "link.tracker.click"]
+    },
+    "utm": {
+      "name": "UTM Tracking",
+      "version": "1.1",
+      "location": "community_enterprise",
+      "license": "LGPL-3",
+      "depends": ["web"],
+      "models": ["utm.campaign", "utm.source", "utm.medium", "utm.stage", "utm.tag", "utm.mixin"]
+    },
+    "whatsapp_evaluation": {
+      "name": "WhatsApp Integration",
+      "version": "19.0.0.1",
+      "location": "custom_addons",
+      "license": "OPL-1",
+      "depends": ["base", "web", "mail", "phone_validation", "sale", "account", "point_of_sale"],
+      "python_deps": ["phonenumbers"],
+      "models": [
+        "whatsapp.account", "whatsapp.message", "whatsapp.template",
+        "whatsapp.template.variable", "whatsapp.tag"
+      ],
+      "extended_models": ["discuss.channel", "mail.message", "mail.thread"]
+    },
+    "ai_whatsapp": {
+      "name": "AI WhatsApp",
+      "version": "19.0.2.0.0",
+      "location": "project_addons",
+      "license": "LGPL-3",
+      "depends": ["whatsapp_evaluation", "ai", "im_livechat"],
+      "extended_models": [
+        "whatsapp.account", "discuss.channel", "ai.agent"
+      ],
+      "routing_modes": ["ai", "chatbot", "human"],
+      "tests": 34
+    }
+  },
+  "dependency_graph": {
+    "edges": [
+      ["utm", "web"],
+      ["link_tracker", "utm"],
+      ["link_tracker", "mail"],
+      ["mass_mailing", "link_tracker"],
+      ["mass_mailing", "utm"],
+      ["mass_mailing", "mail"],
+      ["marketing_automation", "mass_mailing"],
+      ["crm", "utm"],
+      ["crm", "mail"],
+      ["crm_iap_mine", "crm"],
+      ["crm_iap_mine", "iap"],
+      ["crm_iap_enrich", "crm"],
+      ["crm_iap_enrich", "iap"],
+      ["partner_autocomplete", "iap"],
+      ["ai_core", "mail"],
+      ["whatsapp_evaluation", "mail"],
+      ["ai_whatsapp", "whatsapp_evaluation"],
+      ["ai_whatsapp", "ai_core"],
+      ["ai_whatsapp", "im_livechat"]
+    ]
+  },
+  "implementation_patterns": [
+    {
+      "id": "pattern_001",
+      "name": "AI Agent Message Routing",
+      "module": "ai_whatsapp",
+      "location": "models/discuss_channel.py",
+      "type": "override_chain",
+      "entry_point": "message_post",
+      "flow": "Inbound message -> channel_type check -> _get_whatsapp_handler() -> ai/chatbot/human dispatch -> response generation -> outbound posting",
+      "key_classes": ["discuss.channel", "ai.agent", "chatbot.script"],
+      "extension_method": "Add new routing_mode selection option + handler in message_post"
+    },
+    {
+      "id": "pattern_002",
+      "name": "Predictive Lead Scoring (Naive Bayes)",
+      "module": "crm",
+      "location": "models/crm_lead.py",
+      "type": "algorithm",
+      "entry_point": "_handle_won_lost",
+      "flow": "Lead won/lost -> _pls_increment_frequencies -> frequency table update -> cron full rebuild -> batch probability recompute",
+      "key_models": ["crm.lead.scoring.frequency", "crm.lead.scoring.frequency.field"],
+      "extension_method": "Add fields to PLS via crm.lead.scoring.frequency.field + crm.pls_fields config"
+    },
+    {
+      "id": "pattern_003",
+      "name": "Marketing Automation Campaign Engine",
+      "module": "marketing_automation",
+      "location": "models/marketing_activity.py",
+      "type": "state_machine",
+      "entry_point": "execute_activities (cron)",
+      "flow": "Cron -> execute_activities -> execute_on_traces per batch(500) -> _execute_email/_execute_action -> _generate_children_traces -> check_completed",
+      "key_models": ["marketing.campaign", "marketing.activity", "marketing.participant", "marketing.trace"],
+      "extension_method": "Add new activity_type + _execute_<type> method; add new trigger_type + process_event handler"
+    },
+    {
+      "id": "pattern_004",
+      "name": "IAP Credit Service Integration",
+      "module": "iap",
+      "location": "models/iap_account.py",
+      "type": "service_integration",
+      "flow": "Service request -> iap.account.get(service_name) -> _contact_iap(endpoint, params) -> credit validation -> external API call -> result processing -> credit deduction",
+      "extension_method": "Create new service module depending on iap, call iap_jsonrpc() or use iap.enrich.api abstract"
+    },
+    {
+      "id": "pattern_005",
+      "name": "OWL Real-time UI Extension (Take Over Button)",
+      "module": "ai_whatsapp",
+      "location": "static/src/",
+      "type": "frontend_patch",
+      "entry_point": "ChatWindow prototype patch",
+      "flow": "ChatWindow.showTakeOverButton getter -> takeOver() RPC call -> store update -> UI notification",
+      "extension_method": "Patch chat_window_patch.js or add new patch component"
+    }
+  ],
+  "recommended_ai_integration_points": [
+    {
+      "feature": "AI Lead Qualification",
+      "entry_point": "crm.lead.create/write + ai.agent._generate_response",
+      "implementation": "Override create() to auto-qualify via AI => set stage_id + probability + tag_ids",
+      "models_involved": ["crm.lead", "ai.agent"],
+      "security": "Ensure ai.agent read access for sales team"
+    },
+    {
+      "feature": "AI Marketing Content Generation",
+      "entry_point": "mass_mailing body_arch create + mail.render.mixin._render_template",
+      "implementation": "Insert AI prompt divs in email templates OR override _render_template to call LLM",
+      "models_involved": ["mailing.mailing", "ai.agent", "mail.render.mixin"],
+      "security": "Template rendering runs in sudo/elevated context"
+    },
+    {
+      "feature": "AI Customer Segmentation",
+      "entry_point": "marketing.campaign.sync_participants + domain building",
+      "implementation": "Call AI to generate campaign domain filters from natural-language descriptions",
+      "models_involved": ["marketing.campaign", "ai.agent"],
+      "security": "Read access to campaign target model"
+    },
+    {
+      "feature": "AI Chatbot Human-like Conversations",
+      "entry_point": "website_chatbot step execution OR AI Live Chat",
+      "implementation": "Use ai.agent._generate_response_for_channel() with AI Live Chat for open-ended WhatsApp conversations",
+      "models_involved": ["chatbot.script", "chatbot.script.step", "ai.agent", "discuss.channel"],
+      "security": "Channel member access control"
+    },
+    {
+      "feature": "AI Predictive Analytics for Campaigns",
+      "entry_point": "mailing.mailing._compute_statistics + AI prediction",
+      "implementation": "Use AI to predict open/click rates before sending by analyzing historical campaign data",
+      "models_involved": ["mailing.mailing", "mailing.trace", "utm.campaign", "ai.agent"],
+      "security": "Aggregate only (no PII) if using external LLM"
+    },
+    {
+      "feature": "AI Activity / Task Generation from Emails",
+      "entry_point": "mail.thread._message_route_process + mail.activity",
+      "implementation": "Use AI to parse customer email replies and auto-create follow-up activities",
+      "models_involved": ["mail.thread", "mail.activity", "crm.lead", "ai.agent"],
+      "security": "mail.activity CRUD for sales team"
+    },
+    {
+      "feature": "AI Server Action for Marketing Automation",
+      "entry_point": "ir.actions.server (use_in_ai=True) + marketing.activity (activity_type='action')",
+      "implementation": "Create server actions with ai_action_prompt for AI-powered decision steps in MA campaigns",
+      "models_involved": ["ir.actions.server", "marketing.activity", "marketing.trace"],
+      "security": "AI server actions execute with sudo automatically"
+    },
+    {
+      "feature": "WhatsApp AI Agent with Custom Tools",
+      "entry_point": "ai.agent.whatsapp_account_ids + ai.topic.tool_ids",
+      "implementation": "Create AI topics with custom ir.actions.server tools; link to AI agent; assign to WhatsApp account",
+      "models_involved": ["ai.agent", "ai.topic", "ir.actions.server", "whatsapp.account", "discuss.channel"],
+      "security": "AI tools run as superuser; validate tool inputs"
+    }
+  ],
+  "troubleshooting_guide": {
+    "pls_no_probabilities": ["No won/lost data in system", "Check crm.pls_start_date config", "Run _cron_update_automated_probabilities manually"],
+    "mass_mailing_not_sending": ["Mail server misconfigured", "No SPF/DKIM/DMARC records", "Recipient domain filter excludes all", "Blacklist/exclusion list catching all"],
+    "marketing_automation_not_firing": ["Campaign not in running state", "Participant filter domain excludes all", "Cron not running (ir_cron_campaign_execute_activities)", "Activity interval+validity expired"],
+    "ai_agent_not_responding": ["API key missing (ai.openai_key / ai.google_key)", "LLM model not available", "Agent has no topics/tools", "Cooldown period active (whatsapp_ai_cooldown_seconds)", "RAG sources not processed"],
+    "iap_insufficient_credits": ["No credits purchased for this service", "Wrong service name (credits not interchangeable)", "Account not registered with iap.odoo.com"],
+    "chatbot_not_firing": ["Script not assigned to channel via Channel Rules", "'Enabled only if no operator' blocking", "Script has no welcome steps"],
+    "whatsapp_webhook_failing": ["Evolution API base_url incorrect", "Instance name/API key invalid", "Webhook not configured (button_configure_webhook)"]
+  },
+  "performance_anti_patterns": [
+    "Iterating mailing.contact records in Python for large lists (use SQL)",
+    "Calling _pls_get_naive_bayes_probabilities per-lead (use batch cron)",
+    "Writing to mailing.trace individually for bulk operations (use create(records, batch=True))",
+    "Not using _trigger() on crons for near-real-time MA execution",
+    "Processing marketing.trace process_event for every email event without batch collection"
+  ],
+  "migration_risks": [
+    {
+      "from": "v18",
+      "to": "v19",
+      "risks": [
+        "_shorten_links moved to mail.render.mixin from link.tracker",
+        "link_tracker.search_or_create() now expects list[dict], not single dict",
+        "mailing.mailing._get_recipients_domain() returns Domain objects, not lists",
+        "crm.lead._handle_won_lost replaces older frequency update methods",
+        "ai_app module is entirely new; no migration path"
+      ]
+    }
+  ],
+  "mermaid_diagrams": {
+    "dependency_graph": "graph TD; utm-->web; link_tracker-->utm; link_tracker-->mail; mass_mailing-->link_tracker; mass_mailing-->mail; marketing_automation-->mass_mailing; crm-->mail; crm-->utm; crm_iap_mine-->crm; crm_iap_enrich-->crm; partner_autocomplete-->iap; ai_core-->mail; whatsapp_evaluation-->mail; ai_whatsapp-->whatsapp_evaluation; ai_whatsapp-->ai_core; ai_whatsapp-->im_livechat;",
+    "whatsapp_routing_flow": "sequenceDiagram; participant EvolutionAPI; participant Controller; participant Channel; participant Router; participant AI; participant Chatbot; participant Human; EvolutionAPI->>Controller: Webhook POST; Controller->>Channel: _get_whatsapp_channel(); Controller->>Channel: message_post(inbound); Channel->>Router: _get_whatsapp_handler(); alt routing_mode==ai; Router->>AI: _generate_response_for_channel(); AI->>Channel: _post_ai_response(); else routing_mode==chatbot; Router->>Chatbot: _process_chatbot_step(); Chatbot->>Channel: send numbered options; else routing_mode==human; Router->>Human: notify_user_ids; end;",
+    "pls_training_flow": "flowchart TD; A[Lead Won/Lost]-->B[_handle_won_lost]; B-->C[_pls_increment_frequencies]; C-->D[crm.lead.scoring.frequency]; D-- 0.1 fractional incr -->E[won_count/lost_count]; F[Cron/Manual]-->G[_rebuild_pls_frequency_table]; G-->H[TRUNCATE + full recompute]; H-->I[_update_automated_probabilities]; I-->J[Batch SQL UPDATE 5000/step]; J-->K[Lead.automated_probability];",
+    "ma_campaign_state_machine": "stateDiagram-v2; [*]-->Draft; Draft-->Running: action_start_campaign; Running-->Stopped: action_stop_campaign; Running-->Running: sync_participants (12h cron); Running-->Running: execute_activities (1h cron); Stopped-->Draft; note right of Running: Participant lifecycle: created->running->completed/unlinked"
+  }
+}

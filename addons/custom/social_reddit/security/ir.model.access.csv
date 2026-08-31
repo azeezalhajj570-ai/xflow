@@ -1,0 +1,15 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_social_reddit_account_user,social.reddit.account.user,social.model_social_account,social.group_social_user,1,0,0,0
+access_social_reddit_account_manager,social.reddit.account.manager,social.model_social_account,social.group_social_manager,1,1,1,1
+access_social_reddit_live_post_user,social.reddit.live.post.user,social.model_social_live_post,social.group_social_user,1,1,1,1
+access_social_reddit_live_post_manager,social.reddit.live.post.manager,social.model_social_live_post,social.group_social_manager,1,1,1,1
+access_social_reddit_post_user,social.reddit.post.user,social.model_social_post,social.group_social_user,1,1,1,1
+access_social_reddit_post_manager,social.reddit.post.manager,social.model_social_post,social.group_social_manager,1,1,1,1
+access_social_reddit_stream_user,social.reddit.stream.user,social.model_social_stream,social.group_social_user,1,1,1,1
+access_social_reddit_stream_manager,social.reddit.stream.manager,social.model_social_stream,social.group_social_manager,1,1,1,1
+access_social_reddit_stream_post_user,social.reddit.stream.post.user,social.model_social_stream_post,social.group_social_user,1,0,0,0
+access_social_reddit_stream_post_manager,social.reddit.stream.post.manager,social.model_social_stream_post,social.group_social_manager,1,1,1,1
+access_social_reddit_media_user,social.reddit.media.user,social.model_social_media,social.group_social_user,1,0,0,0
+access_social_reddit_media_manager,social.reddit.media.manager,social.model_social_media,social.group_social_manager,1,1,0,0
+access_social_reddit_stream_type_user,social.reddit.stream.type.user,social.model_social_stream_type,social.group_social_user,1,0,0,0
+access_social_reddit_stream_type_manager,social.reddit.stream.type.manager,social.model_social_stream_type,social.group_social_manager,1,0,0,0

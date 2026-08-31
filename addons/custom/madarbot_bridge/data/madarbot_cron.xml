@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo><data noupdate="1">
+
+    <record id="cron_madarbot_process_incoming" model="ir.cron">
+        <field name="name">MadarBot: Process incoming Telegram messages</field>
+        <field name="model_id" ref="model_madarbot_telegram_message"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_process_incoming()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">minutes</field>
+        <field name="numbercall">-1</field>
+        <field name="priority">10</field>
+        <field name="user_id" ref="base.user_root"/>
+    </record>
+
+    <record id="cron_madarbot_process_outgoing" model="ir.cron">
+        <field name="name">MadarBot: Process outgoing Telegram messages</field>
+        <field name="model_id" ref="model_madarbot_telegram_message"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_process_outgoing()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">minutes</field>
+        <field name="numbercall">-1</field>
+        <field name="priority">10</field>
+        <field name="user_id" ref="base.user_root"/>
+    </record>
+
+    <record id="cron_madarbot_cleanup_dead_letters" model="ir.cron">
+        <field name="name">MadarBot: Cleanup expired dead letters</field>
+        <field name="model_id" ref="model_madarbot_telegram_message"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_cleanup_dead_letters()</field>
+        <field name="interval_number">7</field>
+        <field name="interval_type">days</field>
+        <field name="numbercall">-1</field>
+        <field name="user_id" ref="base.user_root"/>
+    </record>
+
+    <record id="cron_madarbot_crop_update_ids" model="ir.cron">
+        <field name="name">MadarBot: Crop processed update IDs</field>
+        <field name="model_id" ref="model_madarbot_account"/>
+        <field name="state">code</field>
+        <field name="code">model._crop_processed_update_ids()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
+        <field name="numbercall">-1</field>
+        <field name="user_id" ref="base.user_root"/>
+    </record>
+
+</data></odoo>

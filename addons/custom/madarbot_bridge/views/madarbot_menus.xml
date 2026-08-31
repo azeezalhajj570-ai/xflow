@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo><data>
+
+    <menuitem id="menu_madarbot_root" name="MadarBot" sequence="100"/>
+
+    <menuitem id="menu_madarbot_configuration" name="Configuration"
+        parent="menu_madarbot_root" sequence="10"/>
+
+    <menuitem id="menu_madarbot_accounts" name="Bot Accounts"
+        parent="menu_madarbot_configuration" action="action_madarbot_accounts" sequence="10"/>
+
+    <menuitem id="menu_madarbot_messages" name="Messages"
+        parent="menu_madarbot_root" action="action_madarbot_telegram_messages" sequence="20"/>
+
+    <menuitem id="menu_madarbot_blacklist" name="Blacklist"
+        parent="menu_madarbot_configuration" action="action_madarbot_blacklist" sequence="30"/>
+
+    <menuitem id="menu_madarbot_monitoring" name="Monitoring"
+        parent="menu_madarbot_root" sequence="40">
+        <menuitem id="menu_madarbot_dead_letters" name="Dead Letters"
+            action="action_madarbot_dead_letters" sequence="10"/>
+    </menuitem>
+
+    <record id="action_madarbot_accounts" model="ir.actions.act_window">
+        <field name="name">Bot Accounts</field>
+        <field name="res_model">madarbot.account</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+    <record id="action_madarbot_telegram_messages" model="ir.actions.act_window">
+        <field name="name">Telegram Messages</field>
+        <field name="res_model">madarbot.telegram.message</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id" ref="madarbot_telegram_message_view_search"/>
+    </record>
+
+    <record id="action_madarbot_dead_letters" model="ir.actions.act_window">
+        <field name="name">Dead Letters</field>
+        <field name="res_model">madarbot.telegram.message</field>
+        <field name="view_mode">tree,form</field>
+        <field name="domain">[('state', '=', 'dead_letter')]</field>
+        <field name="search_view_id" ref="madarbot_telegram_message_view_search"/>
+    </record>
+
+    <record id="action_madarbot_blacklist" model="ir.actions.act_window">
+        <field name="name">Blacklist</field>
+        <field name="res_model">madarbot.blacklist</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+</data></odoo>

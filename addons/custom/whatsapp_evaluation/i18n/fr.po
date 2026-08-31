@@ -1,0 +1,175 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+# 	* whatsapp_evaluation
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 18.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-01-11 00:00+0000\n"
+"PO-Revision-Date: 2026-01-11 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+
+#. module: whatsapp_evaluation
+#: model:ir.actions.act_window,name:whatsapp_evaluation.whatsapp_evaluation_account_action
+#: model:ir.ui.menu,name:whatsapp_evaluation.whatsapp_evaluation_account_menu
+#: model:ir.ui.menu,name:whatsapp_evaluation.whatsapp_evaluation_menu_account
+msgid "WhatsApp Accounts"
+msgstr "Comptes WhatsApp"
+
+#. module: whatsapp_evaluation
+#: model:ir.actions.act_window,name:whatsapp_evaluation.whatsapp_evaluation_message_action
+#: model:ir.ui.menu,name:whatsapp_evaluation.whatsapp_evaluation_menu_msg
+#: model:ir.ui.menu,name:whatsapp_evaluation.whatsapp_evaluation_message_menu
+msgid "Messages"
+msgstr "Messages"
+
+#. module: whatsapp_evaluation
+#: model:ir.actions.act_window,name:whatsapp_evaluation.whatsapp_evaluation_template_action
+#: model:ir.ui.menu,name:whatsapp_evaluation.whatsapp_evaluation_template_menu
+msgid "Templates"
+msgstr "Modèles"
+
+#. module: whatsapp_evaluation
+#: model:ir.ui.menu,name:whatsapp_evaluation.whatsapp_evaluation_configuration_menu
+#: model:ir.ui.menu,name:whatsapp_evaluation.whatsapp_evaluation_menu_configuration
+msgid "Configuration"
+msgstr "Configuration"
+
+#. module: whatsapp_evaluation
+#: model:ir.ui.menu,name:whatsapp_evaluation.whatsapp_evaluation_menu_main
+#: model:ir.ui.menu,name:whatsapp_evaluation.whatsapp_evaluation_menu_root
+#: model_terms:ir.ui.view,arch_db:whatsapp_evaluation.whatsapp_evaluation_account_view_form
+msgid "WhatsApp"
+msgstr "WhatsApp"
+
+#. module: whatsapp_evaluation
+#: model:ir.model.fields,field_description:whatsapp_evaluation.field_whatsapp_evaluation_account__name
+#: model:ir.model.fields,field_description:whatsapp_evaluation.field_whatsapp_evaluation_template__name
+#: model:ir.model.fields,field_description:whatsapp_evaluation.field_whatsapp_evaluation_template_variable__name
+msgid "Name"
+msgstr "Nom"
+
+#. module: whatsapp_evaluation
+#: model:ir.model.fields,field_description:whatsapp_evaluation.field_whatsapp_evaluation_template__body
+#: model:ir.model.fields,field_description:whatsapp_evaluation.field_whatsapp_evaluation_message__body
+msgid "Body"
+msgstr "Corps"
+
+#. module: whatsapp_evaluation
+#: model:ir.model.fields,field_description:whatsapp_evaluation.field_whatsapp_evaluation_account__instance_name
+msgid "Instance Name"
+msgstr "Nom de l'instance"
+
+#. module: whatsapp_evaluation
+#: model:ir.model.fields,field_description:whatsapp_evaluation.field_whatsapp_evaluation_account__base_url
+msgid "Base URL"
+msgstr "URL de base"
+
+#. module: whatsapp_evaluation
+#: model:ir.model.fields,field_description:whatsapp_evaluation.field_whatsapp_evaluation_account__api_key
+msgid "API Key"
+msgstr "Clé API"
+
+#. module: whatsapp_evaluation
+#: model:ir.model.fields,field_description:whatsapp_evaluation.field_whatsapp_evaluation_message__state
+msgid "State"
+msgstr "État"
+
+#. module: whatsapp_evaluation
+#: model:ir.model.fields,field_description:whatsapp_evaluation.field_whatsapp_evaluation_message__mobile_number
+msgid "Mobile Number"
+msgstr "Numéro de mobile"
+
+#. module: whatsapp_evaluation
+#: model:ir.model.fields,field_description:whatsapp_evaluation.field_whatsapp_evaluation_template_variable__field_type
+msgid "Type"
+msgstr "Type"
+
+#. module: whatsapp_evaluation
+#: model:ir.model.fields,field_description:whatsapp_evaluation.field_whatsapp_evaluation_template_variable__field_name
+msgid "Field"
+msgstr "Champ"
+
+#. module: whatsapp_evaluation
+#: model:ir.model.fields,field_description:whatsapp_evaluation.field_whatsapp_evaluation_template_variable__demo_value
+msgid "Sample Value"
+msgstr "Valeur d'exemple"
+
+#. module: whatsapp_evaluation
+#: model:ir.model.fields,field_description:whatsapp_evaluation.field_whatsapp_evaluation_template__variable_ids
+#: model_terms:ir.ui.view,arch_db:whatsapp_evaluation.whatsapp_evaluation_template_view_form
+msgid "Variables"
+msgstr "Variables"
+
+#. module: whatsapp_evaluation
+#: model:ir.actions.act_window,name:whatsapp_evaluation.whatsapp_evaluation_composer_action
+msgid "Send WhatsApp"
+msgstr "Envoyer WhatsApp"
+
+#. module: whatsapp_evaluation
+#: model_terms:ir.ui.view,arch_db:whatsapp_evaluation.whatsapp_evaluation_account_view_form
+msgid "Test Credentials"
+msgstr "Tester les identifiants"
+
+#. module: whatsapp_evaluation
+#: model_terms:ir.ui.view,arch_db:whatsapp_evaluation.whatsapp_evaluation_message_view_tree
+#: model_terms:ir.ui.view,arch_db:whatsapp_evaluation.whatsapp_evaluation_message_view_form
+msgid "Retry"
+msgstr "Réessayer"
+
+#. module: whatsapp_evaluation
+#: model_terms:ir.ui.view,arch_db:whatsapp_evaluation.whatsapp_evaluation_account_view_search
+#: model_terms:ir.ui.view,arch_db:whatsapp_evaluation.whatsapp_evaluation_message_view_search
+msgid "Archived"
+msgstr "Archivé"
+
+#. module: whatsapp_evaluation
+#: selection:whatsapp_evaluation.message,state:0
+msgid "Outgoing"
+msgstr "Sortant"
+
+#. module: whatsapp_evaluation
+#: selection:whatsapp_evaluation.message,state:0
+msgid "Sent"
+msgstr "Envoyé"
+
+#. module: whatsapp_evaluation
+#: selection:whatsapp_evaluation.message,state:0
+msgid "Delivered"
+msgstr "Livré"
+
+#. module: whatsapp_evaluation
+#: selection:whatsapp_evaluation.message,state:0
+msgid "Read"
+msgstr "Lu"
+
+#. module: whatsapp_evaluation
+#: selection:whatsapp_evaluation.message,state:0
+msgid "Failed"
+msgstr "Échoué"
+
+#. module: whatsapp_evaluation
+#: selection:whatsapp_evaluation.message,state:0
+msgid "Error"
+msgstr "Erreur"
+
+#. module: whatsapp_evaluation
+#: model:ir.model.fields,field_description:whatsapp_evaluation.field_whatsapp_evaluation_account__instance_token
+msgid "Instance Token"
+msgstr "Jeton d'instance"
+
+#. module: whatsapp_evaluation
+#: model:ir.model.fields,field_description:whatsapp_evaluation.field_whatsapp_evaluation_account__allowed_company_ids
+msgid "Allowed companies"
+msgstr "Sociétés autorisées"
+
+#. module: whatsapp_evaluation
+#: model:ir.model.fields,field_description:whatsapp_evaluation.field_whatsapp_evaluation_account__api_key
+msgid "Global API Key"
+msgstr "Clé API Globale"

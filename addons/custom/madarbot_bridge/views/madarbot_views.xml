@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo><data>
+
+    <record id="madarbot_account_view_tree" model="ir.ui.view">
+        <field name="name">madarbot.account.tree</field>
+        <field name="model">madarbot.account</field>
+        <field name="arch" type="xml">
+            <tree>
+                <field name="name"/>
+                <field name="username"/>
+                <field name="active"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="madarbot_account_view_form" model="ir.ui.view">
+        <field name="name">madarbot.account.form</field>
+        <field name="model">madarbot.account</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="%(action_madarbot_telegram_messages)d" type="action"
+                            class="oe_stat_button" icon="fa-envelope"
+                            context="{'search_default_account_id': active_id}">
+                            <div class="o_stat_info">
+                                <field name="message_count" widget="statinfo"/>
+                            </div>
+                        </button>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="username"/>
+                            <field name="active"/>
+                        </group>
+                        <group>
+                            <field name="token" password="True"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page name="channels" string="Linked Channels">
+                            <field name="channel_ids">
+                                <tree>
+                                    <field name="name"/>
+                                    <field name="telegram_chat_id"/>
+                                </tree>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="madarbot_telegram_message_view_tree" model="ir.ui.view">
+        <field name="name">madarbot.telegram.message.tree</field>
+        <field name="model">madarbot.telegram.message</field>
+        <field name="arch" type="xml">
+            <tree>
+                <field name="direction"/>
+                <field name="state" widget="badge"/>
+                <field name="telegram_chat_id"/>
+                <field name="body"/>
+                <field name="account_id"/>
+                <field name="create_date"/>
+                <field name="scheduled_at"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="madarbot_telegram_message_view_form" model="ir.ui.view">
+        <field name="name">madarbot.telegram.message.form</field>
+        <field name="model">madarbot.telegram.message</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_cancel" type="object" string="Cancel"
+                        states="pending"/>
+                    <button name="action_retry" type="object" string="Retry"
+                        states="error,dead_letter"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="direction"/>
+                            <field name="telegram_chat_id"/>
+                            <field name="telegram_message_id"/>
+                            <field name="update_id"/>
+                        </group>
+                        <group>
+                            <field name="account_id"/>
+                            <field name="channel_id"/>
+                            <field name="guest_id"/>
+                            <field name="mail_message_id"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="body" nolabel="1"/>
+                    </group>
+                    <group>
+                        <group>
+                            <field name="retry_count"/>
+                            <field name="max_retries"/>
+                        </group>
+                        <group>
+                            <field name="error_code"/>
+                            <field name="error_description"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page name="tracking" string="Delivery Tracking">
+                            <field name="tracker_ids">
+                                <tree>
+                                    <field name="state"/>
+                                    <field name="error_code"/>
+                                    <field name="error_description"/>
+                                    <field name="tracked_at"/>
+                                </tree>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="madarbot_telegram_message_view_search" model="ir.ui.view">
+        <field name="name">madarbot.telegram.message.search</field>
+        <field name="model">madarbot.telegram.message</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="direction"/>
+                <field name="state"/>
+                <field name="account_id"/>
+                <field name="telegram_chat_id"/>
+                <filter name="pending" string="Pending"
+                    domain="[('state','=','pending')]"/>
+                <filter name="errors" string="Errors"
+                    domain="[('state','in',('error','dead_letter'))]"/>
+                <separator/>
+                <filter name="incoming" string="Incoming"
+                    domain="[('direction','=','incoming')]"/>
+                <filter name="outgoing" string="Outgoing"
+                    domain="[('direction','=','outgoing')]"/>
+                <group expand="0" string="Group By">
+                    <filter name="group_state" string="State"
+                        context="{'group_by':'state'}"/>
+                    <filter name="group_direction" string="Direction"
+                        context="{'group_by':'direction'}"/>
+                    <filter name="group_account" string="Bot Account"
+                        context="{'group_by':'account_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="madarbot_blacklist_view_tree" model="ir.ui.view">
+        <field name="name">madarbot.blacklist.tree</field>
+        <field name="model">madarbot.blacklist</field>
+        <field name="arch" type="xml">
+            <tree>
+                <field name="telegram_user_id"/>
+                <field name="telegram_username"/>
+                <field name="reason"/>
+                <field name="active"/>
+                <field name="blocked_at"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="madarbot_blacklist_view_form" model="ir.ui.view">
+        <field name="name">madarbot.blacklist.form</field>
+        <field name="model">madarbot.blacklist</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="telegram_user_id"/>
+                            <field name="telegram_username"/>
+                            <field name="active"/>
+                        </group>
+                        <group>
+                            <field name="reason"/>
+                            <field name="blocked_at"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+</data></odoo>

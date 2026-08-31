@@ -1,0 +1,402 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+# 	* openrouterai_connector
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 19.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-06-19 00:00+0000\n"
+"PO-Revision-Date: 2026-06-19 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Language: fr\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+
+#. module: openrouterai_connector
+#: model:ir.ui.menu,name:openrouterai_connector.menu_openrouter_root
+msgid "OpenRouter AI"
+msgstr "OpenRouter IA"
+
+#. module: openrouterai_connector
+#: model:ir.ui.menu,name:openrouterai_connector.menu_openrouter_provider
+msgid "Providers"
+msgstr "Fournisseurs"
+
+#. module: openrouterai_connector
+#: model:ir.ui.menu,name:openrouterai_connector.menu_openrouter_model
+msgid "Models"
+msgstr "Modèles"
+
+#. module: openrouterai_connector
+#: model:ir.ui.menu,name:openrouterai_connector.menu_openrouter_usage
+msgid "Usage"
+msgstr "Utilisation"
+
+#. module: openrouterai_connector
+#: model:ir.actions.act_window,name:openrouterai_connector.action_openrouter_provider
+msgid "OpenRouter Configurations"
+msgstr "Configurations OpenRouter"
+
+#. module: openrouterai_connector
+#: model:ir.actions.act_window,name:openrouterai_connector.action_openrouter_model
+msgid "OpenRouter Models"
+msgstr "Modèles OpenRouter"
+
+#. module: openrouterai_connector
+#: model:ir.actions.act_window,name:openrouterai_connector.action_openrouter_company
+msgid "OpenRouter Provider"
+msgstr "Fournisseur OpenRouter"
+
+#. module: openrouterai_connector
+#: model:ir.actions.act_window,name:openrouterai_connector.action_openrouter_request_log
+msgid "OpenRouter Usage Logs"
+msgstr "Journaux d'utilisation OpenRouter"
+
+#. module: openrouterai_connector
+#: model:ir.actions.act_window,name:openrouterai_connector.action_openrouter_modality
+msgid "OpenRouter Modalities"
+msgstr "Modalités OpenRouter"
+
+#. module: openrouterai_connector
+#: model:ir.model.fields,field_description:openrouterai_connector.field_ai_openrouter_provider__name
+msgid "Name"
+msgstr "Nom"
+
+#. module: openrouterai_connector
+#: model:ir.model.fields,field_description:openrouterai_connector.field_ai_openrouter_provider__api_key
+msgid "API Key"
+msgstr "Clé API"
+
+#. module: openrouterai_connector
+#: model:ir.model.fields,field_description:openrouterai_connector.field_ai_openrouter_provider__base_url
+msgid "Base URL"
+msgstr "URL de base"
+
+#. module: openrouterai_connector
+#: model:ir.model.fields,field_description:openrouterai_connector.field_ai_openrouter_provider__app_url
+msgid "App URL"
+msgstr "URL de l'application"
+
+#. module: openrouterai_connector
+#: model:ir.model.fields,field_description:openrouterai_connector.field_ai_openrouter_provider__app_name
+msgid "App Name"
+msgstr "Nom de l'application"
+
+#. module: openrouterai_connector
+#: model:ir.model.fields,field_description:openrouterai_connector.field_ai_openrouter_provider__default_route
+msgid "Default Route"
+msgstr "Routage par défaut"
+
+#. module: openrouterai_connector
+#: model:ir.model.fields,field_description:openrouterai_connector.field_ai_openrouter_provider__code
+msgid "Provider Code"
+msgstr "Code fournisseur"
+
+#. module: openrouterai_connector
+#: model:ir.model.fields,field_description:openrouterai_connector.field_ai_openrouter_provider__active
+msgid "Active"
+msgstr "Actif"
+
+#. module: openrouterai_connector
+#: model:ir.model,name:openrouterai_connector.model_ai_openrouter_provider
+msgid "OpenRouter AI Provider"
+msgstr "Fournisseur OpenRouter للذكاء الاصطناعي"
+
+#. module: openrouterai_connector
+#: model:ir.model,name:openrouterai_connector.model_ai_openrouter_model
+msgid "OpenRouter Model"
+msgstr "Modèle OpenRouter"
+
+#. module: openrouterai_connector
+#: model:ir.model,name:openrouterai_connector.model_ai_openrouter_company
+msgid "OpenRouter Model Provider"
+msgstr "مزود Modèle OpenRouter"
+
+#. module: openrouterai_connector
+#: model:ir.model,name:openrouterai_connector.model_ai_openrouter_modality
+msgid "OpenRouter Modality"
+msgstr "Modalité OpenRouter"
+
+#. module: openrouterai_connector
+#: model:ir.model,name:openrouterai_connector.model_ai_openrouter_request_log
+msgid "OpenRouter Request Log"
+msgstr "Journal des requêtes OpenRouter"
+
+#. module: openrouterai_connector
+#: model:ir.model,name:openrouterai_connector.model_ai_openrouter_sync_wizard
+msgid "Sync OpenRouter Models"
+msgstr "Synchroniser Modèles OpenRouter"
+
+#. module: openrouterai_connector
+#: model:ir.model,name:openrouterai_connector.model_ai_openrouter_chat_wizard
+msgid "OpenRouter Chat Wizard"
+msgstr "Assistant de chat OpenRouter"
+
+#. module: openrouterai_connector
+#: model:ir.model.fields,field_description:openrouterai_connector.field_ai_openrouter_model__external_id
+msgid "External ID"
+msgstr "ID externe"
+
+#. module: openrouterai_connector
+#: model:ir.model.fields,field_description:openrouterai_connector.field_ai_openrouter_model__description
+msgid "Description"
+msgstr "Description"
+
+#. module: openrouterai_connector
+#: model:ir.model.fields,field_description:openrouterai_connector.field_ai_openrouter_model__provider_name
+msgid "Provider Name"
+msgstr "Nom du fournisseur"
+
+#. module: openrouterai_connector
+#: model:ir.model.fields,field_description:openrouterai_connector.field_ai_openrouter_model__context_length
+msgid "Context Length"
+msgstr "Longueur de contexte"
+
+#. module: openrouterai_connector
+#: model:ir.model.fields,field_description:openrouterai_connector.field_ai_openrouter_model__prompt_price
+msgid "Prompt Price"
+msgstr "Prix du prompt"
+
+#. module: openrouterai_connector
+#: model:ir.model.fields,field_description:openrouterai_connector.field_ai_openrouter_model__completion_price
+msgid "Completion Price"
+msgstr "Prix de complétion"
+
+#. module: openrouterai_connector
+#: model:ir.model.fields,field_description:openrouterai_connector.field_ai_openrouter_model__image_price
+msgid "Image Price"
+msgstr "Prix de l'image"
+
+#. module: openrouterai_connector
+#: model:ir.model.fields,field_description:openrouterai_connector.field_ai_openrouter_model__request_price
+msgid "Request Price"
+msgstr "Prix de la requête"
+
+#. module: openrouterai_connector
+#: model:ir.model.fields,field_description:openrouterai_connector.field_ai_openrouter_model__modality
+msgid "Modality"
+msgstr "Modalité"
+
+#. module: openrouterai_connector
+#: model:ir.model.fields,field_description:openrouterai_connector.field_ai_openrouter_model__input_modality_ids
+msgid "Input Modalities"
+msgstr "Modalités d'entrée"
+
+#. module: openrouterai_connector
+#: model:ir.model.fields,field_description:openrouterai_connector.field_ai_openrouter_model__output_modality_ids
+msgid "Output Modalities"
+msgstr "Modalités de sortie"
+
+#. module: openrouterai_connector
+#: model:ir.model.fields,field_description:openrouterai_connector.field_ai_openrouter_model__is_free
+msgid "Free"
+msgstr "Gratuit"
+
+#. module: openrouterai_connector
+#: model:ir.model.fields,field_description:openrouterai_connector.field_ai_openrouter_model__raw_payload
+msgid "Raw Payload"
+msgstr "Charge utile brute"
+
+#. module: openrouterai_connector
+#: model:ir.model.fields,field_description:openrouterai_connector.field_ai_openrouter_model__active
+msgid "Active"
+msgstr "Actif"
+
+#. module: openrouterai_connector
+#: model:ir.model.fields,field_description:openrouterai_connector.field_ai_openrouter_model__company_provider_id
+msgid "Company Provider"
+msgstr "Fournisseur de société"
+
+#. module: openrouterai_connector
+#: model:ir.model.fields,field_description:openrouterai_connector.field_ai_openrouter_request_log__request_ts
+msgid "Request Time"
+msgstr "Heure de la requête"
+
+#. module: openrouterai_connector
+#: model:ir.model.fields,field_description:openrouterai_connector.field_ai_openrouter_request_log__model_id
+msgid "Model"
+msgstr "Modèle"
+
+#. module: openrouterai_connector
+#: model:ir.model.fields,field_description:openrouterai_connector.field_ai_openrouter_request_log__generation_id
+msgid "Generation ID"
+msgstr "ID de génération"
+
+#. module: openrouterai_connector
+#: model:ir.model.fields,field_description:openrouterai_connector.field_ai_openrouter_request_log__prompt_tokens
+msgid "Prompt Tokens"
+msgstr "Jetons du prompt"
+
+#. module: openrouterai_connector
+#: model:ir.model.fields,field_description:openrouterai_connector.field_ai_openrouter_request_log__completion_tokens
+msgid "Completion Tokens"
+msgstr "Jetons de complétion"
+
+#. module: openrouterai_connector
+#: model:ir.model.fields,field_description:openrouterai_connector.field_ai_openrouter_request_log__total_tokens
+msgid "Total Tokens"
+msgstr "Total de jetons"
+
+#. module: openrouterai_connector
+#: model:ir.model.fields,field_description:openrouterai_connector.field_ai_openrouter_request_log__total_cost
+msgid "Total Cost"
+msgstr "Coût total"
+
+#. module: openrouterai_connector
+#: model:ir.model.fields,field_description:openrouterai_connector.field_ai_openrouter_request_log__response_text
+msgid "Response Text"
+msgstr "Texte de réponse"
+
+#. module: openrouterai_connector
+#: model:ir.model.fields,field_description:openrouterai_connector.field_ai_openrouter_request_log__request_payload
+msgid "Request Payload"
+msgstr "Charge utile de requête"
+
+#. module: openrouterai_connector
+#: model:ir.model.fields,field_description:openrouterai_connector.field_ai_openrouter_request_log__response_payload
+msgid "Response Payload"
+msgstr "Charge utile de réponse"
+
+#. module: openrouterai_connector
+#: model:ir.model.fields,field_description:openrouterai_connector.field_ai_openrouter_request_log__state
+msgid "State"
+msgstr "État"
+
+#. module: openrouterai_connector
+#: model:ir.model.fields,field_description:openrouterai_connector.field_ai_openrouter_request_log__usage_payload
+msgid "Usage Payload"
+msgstr "حمولة Utilisation"
+
+#. module: openrouterai_connector
+#: model:ir.model.fields,field_description:openrouterai_connector.field_ai_openrouter_request_log__reasoning_tokens
+msgid "Reasoning Tokens"
+msgstr "Jetons de raisonnement"
+
+#. module: openrouterai_connector
+#: model:ir.model.fields,field_description:openrouterai_connector.field_ai_openrouter_request_log__cached_tokens
+msgid "Cached Tokens"
+msgstr "Jetons en cache"
+
+#. module: openrouterai_connector
+#: model:ir.model.fields,field_description:openrouterai_connector.field_ai_openrouter_request_log__audio_tokens
+msgid "Audio Tokens"
+msgstr "Jetons audio"
+
+#. module: openrouterai_connector
+#: model:ir.model.fields,field_description:openrouterai_connector.field_ai_openrouter_request_log__upstream_inference_cost
+msgid "Upstream Inference Cost"
+msgstr "Coût d'inférence amont"
+
+#. module: openrouterai_connector
+#: model:ir.model.fields,field_description:openrouterai_connector.field_ai_openrouter_request_log__cache_write_tokens
+msgid "Cache Write Tokens"
+msgstr "Jetons d'écriture du cache"
+
+#. module: openrouterai_connector
+#: model:ir.model.fields,field_description:openrouterai_connector.field_ai_openrouter_request_log__response_payload_preview
+msgid "Response Payload (Preview)"
+msgstr "معاينة Charge utile de réponse"
+
+#. module: openrouterai_connector
+#: model:ir.model.fields,field_description:openrouterai_connector.field_ai_openrouter_request_log__request_payload_preview
+msgid "Request Payload (Preview)"
+msgstr "معاينة Charge utile de requête"
+
+#. module: openrouterai_connector
+#: model:ir.model.fields,field_description:openrouterai_connector.field_ai_openrouter_request_log__response_attachment_id
+msgid "Response Payload (File)"
+msgstr "Charge utile de réponse (ملف)"
+
+#. module: openrouterai_connector
+#: model:ir.model.fields,field_description:openrouterai_connector.field_ai_openrouter_request_log__request_attachment_id
+msgid "Request Payload (File)"
+msgstr "Charge utile de requête (ملف)"
+
+#. module: openrouterai_connector
+#: model:ir.model.fields,field_description:openrouterai_connector.field_ai_openrouter_chat_wizard__openrouter_model_id
+msgid "OpenRouter Model"
+msgstr "Modèle OpenRouter"
+
+#. module: openrouterai_connector
+#: model:ir.model.fields,field_description:openrouterai_connector.field_ai_openrouter_chat_wizard__user_prompt
+msgid "Prompt"
+msgstr "Prompt"
+
+#. module: openrouterai_connector
+#: model:ir.model.fields,field_description:openrouterai_connector.field_ai_openrouter_chat_wizard__res_model
+msgid "Record Model"
+msgstr "Modèle d'enregistrement"
+
+#. module: openrouterai_connector
+#: model:ir.model.fields,field_description:openrouterai_connector.field_ai_openrouter_chat_wizard__res_id
+msgid "Record ID"
+msgstr "ID d'enregistrement"
+
+#. module: openrouterai_connector
+#: model:ir.cron,name:openrouterai_connector.ir_cron_openrouter_reconcile_usage
+msgid "OpenRouter: Reconcile Usage"
+msgstr "OpenRouter: تسوية Utilisation"
+
+#. module: openrouterai_connector
+#: model:ir.model.fields,field_description:openrouterai_connector.field_ai_openrouter_sync_wizard__deactivate_missing
+msgid "Deactivate Missing Models"
+msgstr "تعطيل Modèles المفقودة"
+
+#. module: openrouterai_connector
+#: model:ir.model.fields,field_description:openrouterai_connector.field_ai_openrouter_sync_wizard__provider_id
+msgid "Provider"
+msgstr "Fournisseur"
+
+#. module: openrouterai_connector
+#: model:ir.model.fields.selection,name:openrouterai_connector.selection__ai_openrouter_provider__default_route__auto
+msgid "Auto"
+msgstr "Auto"
+
+#. module: openrouterai_connector
+#: model:ir.model.fields.selection,name:openrouterai_connector.selection__ai_openrouter_provider__default_route__low_cost
+msgid "Lowest Cost"
+msgstr "Coût le plus bas"
+
+#. module: openrouterai_connector
+#: model:ir.model.fields.selection,name:openrouterai_connector.selection__ai_openrouter_provider__default_route__low_latency
+msgid "Lowest Latency"
+msgstr "Latence la plus faible"
+
+#. module: openrouterai_connector
+#: model:ir.model.fields.selection,name:openrouterai_connector.selection__ai_openrouter_request_log__state__success
+msgid "Success"
+msgstr "Succès"
+
+#. module: openrouterai_connector
+#: model:ir.model.fields.selection,name:openrouterai_connector.selection__ai_openrouter_request_log__state__error
+msgid "Error"
+msgstr "Erreur"
+
+#. module: openrouterai_connector
+#: model:ir.ui.view,arch_db:openrouterai_connector.view_openrouter_provider_form
+msgid "Sync Models"
+msgstr "Synchroniser Modèles"
+
+#. module: openrouterai_connector
+#: model:ir.ui.view,arch_db:openrouterai_connector.view_openrouter_sync_wizard_form
+msgid "Sync"
+msgstr "Synchroniser"
+
+#. module: openrouterai_connector
+#: model:ir.ui.view,arch_db:openrouterai_connector.view_openrouter_chat_wizard_form
+msgid "Chat with OpenRouter Model"
+msgstr "دردشة مع Modèle OpenRouter"
+
+#. module: openrouterai_connector
+#: model:ir.ui.view,arch_db:openrouterai_connector.view_openrouter_chat_wizard_form
+msgid "Open Chat"
+msgstr "Ouvrir le chat"
+
+#. module: openrouterai_connector
+#: model:ir.ui.view,arch_db:openrouterai_connector.view_openrouter_chat_wizard_form
+msgid "Cancel"
+msgstr "Annuler"

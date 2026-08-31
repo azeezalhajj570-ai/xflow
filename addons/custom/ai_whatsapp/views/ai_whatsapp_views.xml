@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- ================================================================
+             AI WHATSAPP - CONVERSATION VIEWS (discuss.channel, whatsapp only)
+             ================================================================ -->
+
+        <!-- Action: All WhatsApp Conversations -->
+        <record id="ai_whatsapp_conversation_action" model="ir.actions.act_window">
+            <field name="name">Conversations</field>
+            <field name="res_model">discuss.channel</field>
+            <field name="view_mode">kanban,list,form</field>
+            <field name="domain">[('channel_type', '=', 'whatsapp')]</field>
+            <field name="context">{'default_channel_type': 'whatsapp'}</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    No WhatsApp conversations yet
+                </p><p>
+                    Incoming WhatsApp messages will appear here as new conversations.
+                </p>
+            </field>
+        </record>
+
+        <!-- Kanban view: WhatsApp Conversations -->
+        <record id="ai_whatsapp_conversation_view_kanban" model="ir.ui.view">
+            <field name="name">ai.whatsapp.conversation.kanban</field>
+            <field name="model">discuss.channel</field>
+            <field name="arch" type="xml">
+                <kanban class="o_kanban_mobile" sample="1" quick_create="false" default_order="create_date desc">
+                    <field name="id"/>
+                    <field name="name"/>
+                    <field name="create_date"/>
+                    <field name="whatsapp_partner_id"/>
+                    <field name="wa_account_id"/>
+                    <field name="current_handler_type"/>
+                    <field name="whatsapp_number"/>
+                    <field name="message_ids"/>
+                    <templates>
+                        <t t-name="menu">
+                            <a type="open" class="dropdown-item">View</a>
+                        </t>
+                        <t t-name="card" class="p-0">
+                            <div class="d-flex flex-column gap-1 p-2">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div class="d-flex flex-column">
+                                        <span class="fw-bold fs-5">
+                                            <field name="whatsapp_number"/>
+                                        </span>
+                                        <span class="text-muted small">
+                                            <field name="wa_account_id"/>
+                                        </span>
+                                    </div>
+                                    <div class="d-flex flex-column align-items-end">
+                                        <span class="badge"
+                                              t-att-class="{
+                                                  'bg-success': record.current_handler_type.raw_value == 'human',
+                                                  'bg-primary': record.current_handler_type.raw_value == 'ai',
+                                                  'bg-info': record.current_handler_type.raw_value == 'chatbot',
+                                                  'bg-secondary': !record.current_handler_type.raw_value
+                                              }">
+                                            <field name="current_handler_type"/>
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="d-flex justify-content-between text-muted small">
+                                    <span>
+                                        <i class="fa fa-clock-o me-1"/>
+                                        <field name="create_date"/>
+                                    </span>
+                                    <span>
+                                        <i class="fa fa-comment me-1"/>
+                                        <field name="message_ids" widget="statinfo" string="Messages"/>
+                                    </span>
+                                </div>
+                            </div>
+                            <footer class="pt-0">
+                                <field name="whatsapp_partner_id" widget="many2one_avatar"/>
+                                <field name="name" class="ms-1 text-muted"/>
+                            </footer>
+                        </t>
+                    </templates>
+                </kanban>
+            </field>
+        </record>
+
+        <!-- List view: WhatsApp Conversations -->
+        <record id="ai_whatsapp_conversation_view_tree" model="ir.ui.view">
+            <field name="name">ai.whatsapp.conversation.list</field>
+            <field name="model">discuss.channel</field>
+            <field name="arch" type="xml">
+                <list string="WhatsApp Conversations" sample="1"
+                      default_order="create_date desc" create="false">
+                    <field name="create_date" string="Date" optional="show"/>
+                    <field name="whatsapp_number" string="Phone" optional="show"/>
+                    <field name="whatsapp_partner_id" string="Customer" widget="many2one_avatar" optional="show"/>
+                    <field name="wa_account_id" string="Account" optional="show"/>
+                    <field name="current_handler_type" widget="badge"
+                           decoration-danger="current_handler_type == 'ai'"
+                           decoration-success="current_handler_type == 'human'"
+                           decoration-info="current_handler_type == 'chatbot'"
+                           optional="show"/>
+                    <field name="message_ids" widget="statinfo" string="Messages" optional="show"/>
+                </list>
+            </field>
+        </record>
+
+        <!-- Form view: WhatsApp Conversation -->
+        <record id="ai_whatsapp_conversation_view_form" model="ir.ui.view">
+            <field name="name">ai.whatsapp.conversation.form</field>
+            <field name="model">discuss.channel</field>
+            <field name="arch" type="xml">
+                <form string="WhatsApp Conversation" create="false">
+                    <sheet>
+                        <div class="oe_title">
+                            <h1>
+                                <field name="name" readonly="1"/>
+                            </h1>
+                        </div>
+                        <group>
+                            <group>
+                                <field name="whatsapp_number" readonly="1"/>
+                                <field name="whatsapp_partner_id" readonly="1"/>
+                            </group>
+                            <group>
+                                <field name="wa_account_id" readonly="1"/>
+                                <field name="current_handler_type" widget="badge"/>
+                            </group>
+                        </group>
+                        <separator string="Messages"/>
+                        <field name="message_ids" readonly="1"/>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <!-- Search view: WhatsApp Conversations -->
+        <record id="ai_whatsapp_conversation_view_search" model="ir.ui.view">
+            <field name="name">ai.whatsapp.conversation.search</field>
+            <field name="model">discuss.channel</field>
+            <field name="arch" type="xml">
+                <search string="Search WhatsApp Conversations">
+                    <field name="whatsapp_number" string="Phone"/>
+                    <field name="name" string="Customer"/>
+                    <field name="wa_account_id" string="Account"/>
+                    <separator/>
+                    <filter name="filter_ai" string="AI Handler" domain="[('current_handler_type', '=', 'ai')]"/>
+                    <filter name="filter_chatbot" string="Chatbot Handler" domain="[('current_handler_type', '=', 'chatbot')]"/>
+                    <filter name="filter_human" string="Human Handler" domain="[('current_handler_type', '=', 'human')]"/>
+                </search>
+            </field>
+        </record>
+
+        <!-- ================================================================
+             MENU STRUCTURE - following livechat pattern
+             ================================================================ -->
+
+        <!-- Top-level menu -->
+        <menuitem
+            id="menu_ai_whatsapp_root"
+            name="AI WhatsApp"
+            sequence="250"/>
+
+        <!-- Conversations sub-menu -->
+        <menuitem
+            id="menu_ai_whatsapp_conversations"
+            name="Conversations"
+            parent="menu_ai_whatsapp_root"
+            action="ai_whatsapp_conversation_action"
+            sequence="5"/>
+
+        <!-- Configuration sub-menu -->
+        <menuitem
+            id="menu_ai_whatsapp_configuration"
+            name="Configuration"
+            parent="menu_ai_whatsapp_root"
+            sequence="20"/>
+
+        <!-- Configuration > Accounts -->
+        <menuitem
+            id="menu_ai_whatsapp_accounts"
+            name="Accounts"
+            parent="menu_ai_whatsapp_configuration"
+            action="whatsapp_evaluation.whatsapp_account_action"
+            sequence="5"/>
+
+        <!-- Configuration > Chatbot Scripts -->
+        <menuitem
+            id="menu_ai_whatsapp_chatbot_scripts"
+            name="Chatbot Scripts"
+            parent="menu_ai_whatsapp_configuration"
+            action="im_livechat.chatbot_script_action"
+            sequence="10"/>
+
+    </data>
+</odoo>

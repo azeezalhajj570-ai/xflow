@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo><data>
+
+    <record id="mailing_mailing_view_form_telegram" model="ir.ui.view">
+        <field name="name">mailing.mailing.view.form.inherit.telegram</field>
+        <field name="model">mailing.mailing</field>
+        <field name="inherit_id" ref="mass_mailing.view_mail_mass_mailing_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//button[@name='action_launch']" position="attributes">
+                <attribute name="invisible">mailing_type != 'mail' or state in ('in_queue', 'sending', 'processing', 'done')</attribute>
+            </xpath>
+            <xpath expr="//button[@name='action_schedule']" position="before">
+                <field name="telegram_force_send" invisible="1"/>
+                <button name="action_put_in_queue" type="object"
+                    string="Send" class="oe_highlight" data-hotkey="v"
+                    invisible="mailing_type == 'mail' or state in ('in_queue', 'sending', 'processing', 'done') or telegram_force_send"/>
+                <button name="action_send_mail" type="object"
+                    string="Send Now" class="oe_highlight" data-hotkey="g"
+                    invisible="mailing_type == 'mail' or state in ('in_queue', 'processing', 'done') or not telegram_force_send"/>
+            </xpath>
+            <xpath expr="//span[@name='canceled_text']" position="after">
+                <span name="canceled_text_telegram" invisible="mailing_type != 'telegram'">Telegram messages have been cancelled and will not be sent.</span>
+            </xpath>
+            <xpath expr="//span[@name='scheduled_text']" position="after">
+                <span name="scheduled_text_telegram" invisible="mailing_type != 'telegram'">Telegram messages are in queue and will be sent soon.</span>
+            </xpath>
+            <xpath expr="//span[@name='sent']" position="after">
+                <span name="sent_telegram" invisible="mailing_type != 'telegram'">Telegram messages have been sent.</span>
+            </xpath>
+            <xpath expr="//span[@name='failed_text']" position="after">
+                <span name="failed_text_telegram" invisible="mailing_type != 'telegram'">Telegram messages could not be delivered.</span>
+            </xpath>
+        </field>
+    </record>
+
+</data></odoo>

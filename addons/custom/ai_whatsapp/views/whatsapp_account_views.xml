@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record id="whatsapp_account_view_form_inherit_ai" model="ir.ui.view">
+            <field name="name">whatsapp.account.view.form.inherit.ai</field>
+            <field name="model">whatsapp.account</field>
+            <field name="inherit_id" ref="whatsapp_evaluation.whatsapp_account_view_form"/>
+            <field name="arch" type="xml">
+                <!-- Routing in a separate notebook page -->
+                <xpath expr="//div[@id='tocontrol']" position="after">
+                    <notebook>
+                        <page name="routing" string="Routing">
+                            <group col="1" class="mt16">
+                                <group>
+                                    <field name="routing_mode" widget="radio" options="{'horizontal': True}"/>
+                                </group>
+                                <group invisible="routing_mode != 'ai'">
+                                    <field name="ai_agent_id" options="{'no_create': True, 'no_open': True}"/>
+                                    <field name="whatsapp_ai_cooldown_seconds"/>
+                                    <field name="ai_respond_domain"
+                                           widget="domain"
+                                           options="{'model': 'discuss.channel', 'in_dialog': False}"/>
+                                </group>
+                                <group invisible="routing_mode != 'chatbot'">
+                                    <field name="chatbot_script_id" options="{'no_create': True, 'no_open': True}"/>
+                                </group>
+                            </group>
+                        </page>
+                    </notebook>
+                </xpath>
+            </field>
+        </record>
+    </data>
+</odoo>

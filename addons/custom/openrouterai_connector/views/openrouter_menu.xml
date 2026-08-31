@@ -1,0 +1,9 @@
+<odoo>
+    <data>
+        <menuitem id="menu_openrouter_root" name="OpenRouter" parent="ai_app.ai_config_menu" sequence="30"/>
+        <menuitem id="menu_openrouter_provider" name="Configurations" parent="menu_openrouter_root" action="action_openrouter_provider" sequence="10"/>
+        <menuitem id="menu_openrouter_company" name="Providers" parent="menu_openrouter_root" action="action_openrouter_company" sequence="20"/>
+        <menuitem id="menu_openrouter_model" name="Models" parent="menu_openrouter_root" action="action_openrouter_model" sequence="30"/>
+        <menuitem id="menu_openrouter_usage" name="Usage" parent="menu_openrouter_root" action="action_openrouter_request_log" sequence="40"/>
+    </data>
+</odoo>

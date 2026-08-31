@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="social_reddit_post_view_form" model="ir.ui.view">
+        <field name="name">social.post.reddit.form</field>
+        <field name="model">social.post</field>
+        <field name="inherit_id" ref="social.social_post_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//group[@name='social_post_global']" position="inside">
+                <field name="reddit_accounts_count" invisible="1"/>
+                <field name="reddit_accounts_other_count" invisible="1"/>
+                <div name="reddit_options_div" colspan="2" class="o_horizontal_separator mt-5"
+                    invisible="state in ['posting', 'posted'] or reddit_accounts_count == 0 or is_split_per_media">
+                    Reddit Options
+                </div>
+                <field name="reddit_subreddit"
+                    placeholder="e.g. python"
+                    invisible="state in ['posting', 'posted'] or reddit_accounts_count == 0 or is_split_per_media"
+                    readonly="state != 'draft'"/>
+                <field name="reddit_title"
+                    placeholder="Post title (required)"
+                    invisible="state in ['posting', 'posted'] or reddit_accounts_count == 0 or is_split_per_media"
+                    readonly="state != 'draft'"/>
+                <field name="reddit_flair_text"
+                    placeholder="e.g. Discussion"
+                    invisible="state in ['posting', 'posted'] or reddit_accounts_count == 0 or is_split_per_media"
+                    readonly="state != 'draft'"/>
+            </xpath>
+            <xpath expr="//notebook[@name='media_customization']" position="inside">
+                <page string="Reddit" name="reddit_content"
+                    invisible="reddit_accounts_count == 0 or state in ['posting', 'posted']">
+                    <group>
+                        <group>
+                            <field name="reddit_subreddit"
+                                placeholder="e.g. python"
+                                readonly="state != 'draft'"/>
+                            <field name="reddit_title"
+                                placeholder="Post title"
+                                readonly="state != 'draft'"/>
+                            <field name="reddit_flair_text"
+                                placeholder="e.g. Discussion"
+                                readonly="state != 'draft'"/>
+                            <field name="reddit_message"
+                                placeholder="Post body (markdown)"
+                                readonly="state != 'draft'"/>
+                        </group>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>

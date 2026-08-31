@@ -1,0 +1,12 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_whatsapp_account_user,access.whatsapp.account.user,model_whatsapp_account,base.group_user,1,0,0,0
+access_whatsapp_account_admin,access.whatsapp.account.admin,model_whatsapp_account,group_whatsapp_admin,1,1,1,1
+access_whatsapp_message_user,access.whatsapp.message.user,model_whatsapp_message,base.group_user,1,1,1,0
+access_whatsapp_message_admin,access.whatsapp.message.admin,model_whatsapp_message,group_whatsapp_admin,1,1,1,1
+access_whatsapp_template_user,access.whatsapp.template.user,model_whatsapp_template,base.group_user,1,0,0,0
+access_whatsapp_template_admin,access.whatsapp.template.admin,model_whatsapp_template,group_whatsapp_admin,1,1,1,1
+access_whatsapp_template_variable_user,access.whatsapp.template.variable.user,model_whatsapp_template_variable,base.group_user,1,0,0,0
+access_whatsapp_template_variable_admin,access.whatsapp.template.variable.admin,model_whatsapp_template_variable,group_whatsapp_admin,1,1,1,1
+access_whatsapp_composer_user,access.whatsapp.composer.user,model_whatsapp_composer,base.group_user,1,1,1,1
+access_whatsapp_tag_user,access.whatsapp.tag.user,model_whatsapp_tag,base.group_user,1,1,1,0
+access_whatsapp_tag_admin,access.whatsapp.tag.admin,model_whatsapp_tag,group_whatsapp_admin,1,1,1,1

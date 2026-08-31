@@ -1,0 +1,635 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+
+        <!-- ================================================================
+             CUSTOMER SUPPORT TOPICS
+             ================================================================ -->
+
+        <!-- Topic: Product Inquiries -->
+        <record id="ai_topic_product_inquiries" model="ai.topic">
+            <field name="name">Product Inquiries</field>
+            <field name="instructions">
+Before responding, review the full conversation history and customer data
+(name, phone, account) provided in your context. Use this to personalize
+your response.
+
+You are handling product-related customer inquiries. Your responsibilities:
+
+1. Search the database for products when customers ask about availability, pricing, or specific items
+2. Use the Search Products tool to find matching products by name or category
+3. Use Get Product Details when a customer wants in-depth info on a specific product
+4. Present product information clearly — name, price, and stock status
+5. Suggest alternative products if the requested item is unavailable
+6. Never invent product details — use the tools to get real data
+            </field>
+        </record>
+
+        <!-- Topic: Order Support -->
+        <record id="ai_topic_order_support" model="ai.topic">
+            <field name="name">Order Support</field>
+            <field name="instructions">
+Before responding, review the full conversation history and customer data
+(name, phone, account) provided in your context. Use this to personalize
+your response.
+
+You are handling order-related customer inquiries. Your responsibilities:
+
+1. Explain the general order process and typical timelines
+2. Inform customers that order-specific details require a human agent
+3. Offer to transfer to a human for order modifications or cancellations
+4. Escalate all order issues to a human agent with full context
+5. Remain empathetic — order issues can be stressful for customers
+6. Do not say you will check, look up, or retrieve order information
+            </field>
+        </record>
+
+        <!-- Topic: Returns &amp; Refunds -->
+        <record id="ai_topic_returns_refunds" model="ai.topic">
+            <field name="name">Returns &amp; Refunds</field>
+            <field name="instructions">
+Before responding, review the full conversation history and customer data
+(name, phone, account) provided in your context. Use this to personalize
+your response.
+
+You are handling return and refund inquiries. Your responsibilities:
+
+1. Explain general return policy information
+2. Guide customers on how to request a return through the proper channel
+3. Provide general refund timeline information
+4. Offer to transfer to a human agent to process actual return requests
+5. Escalate disputes or exceptions to a human agent
+6. Stay calm and professional even if the customer is frustrated
+            </field>
+        </record>
+
+        <!-- Topic: Account &amp; Billing -->
+        <record id="ai_topic_account_billing" model="ai.topic">
+            <field name="name">Account &amp; Billing</field>
+            <field name="instructions">
+Before responding, review the full conversation history and customer data
+(name, phone, account) provided in your context. Use this to personalize
+your response.
+
+You are handling account and billing inquiries. Your responsibilities:
+
+1. Answer general questions about account features
+2. Provide guidance on how to update account settings
+3. Explain billing cycles and general payment processes
+4. Offer to transfer to a human agent for specific billing issues or invoice requests
+5. Never share sensitive payment information
+6. Redirect to a human agent for any security-related concerns
+            </field>
+        </record>
+
+        <!-- Topic: Technical Support -->
+        <record id="ai_topic_technical_support" model="ai.topic">
+            <field name="name">Technical Support</field>
+            <field name="instructions">
+Before responding, review the full conversation history and customer data
+(name, phone, account) provided in your context. Use this to personalize
+your response.
+
+You are handling technical support inquiries. Your responsibilities:
+
+1. Provide general troubleshooting guidance for common issues
+2. Offer setup advice and configuration tips from your knowledge
+3. Document the issue details for escalation when needed
+4. Use clear, non-technical language unless the customer is technical
+5. Confirm if the guidance resolved the issue
+6. Escalate unresolved issues to a human agent with full context
+            </field>
+        </record>
+
+        <!-- ================================================================
+             AI TOOLS
+             ================================================================ -->
+
+        <!-- Tool: Search Products -->
+        <record id="ir_actions_server_product_search" model="ir.actions.server">
+            <field name="name">AI: Search Products</field>
+            <field name="state">code</field>
+            <field name="use_in_ai" eval="True"/>
+            <field name="model_id" ref="model_ai_agent"/>
+            <field name="code">
+search_term = search_term or ''
+category_name = category_name or ''
+limit = limit or 10
+try:
+    domain = [('sale_ok', '=', True)]
+    if search_term:
+        domain += [('name', 'ilike', search_term)]
+    if category_name:
+        domain += [('categ_id.name', 'ilike', category_name)]
+    products = env['product.product'].sudo().search(domain, limit=limit)
+    lines = []
+    for p in products:
+        lines.append(f"- {p.display_name}: ${p.list_price}")
+    ai['result'] = '\n'.join(lines) if lines else 'No products found.'
+except Exception as e:
+    ai['result'] = f'Error searching products: {e}'
+            </field>
+            <field name="ai_tool_description">
+Searches for products available for sale. Returns product names, prices, and stock quantities.
+Use when customer asks about products, pricing, inventory, or specific items.
+            </field>
+            <field name="ai_tool_schema">
+{
+    "type": "object",
+    "properties": {
+        "search_term": {
+            "type": "string",
+            "description": "Search term to find products by name (e.g., 'laptop', 'chair', 'phone')"
+        },
+        "category_name": {
+            "type": "string",
+            "description": "Filter by product category name (e.g., 'Office Furniture', 'Electronics')"
+        },
+        "limit": {
+            "type": "number",
+            "description": "Maximum number of products to return (default 10, max 20)"
+        }
+    },
+    "required": []
+}
+            </field>
+        </record>
+
+        <!-- Tool: Get Product Details -->
+        <record id="ir_actions_server_product_details" model="ir.actions.server">
+            <field name="name">AI: Get Product Details</field>
+            <field name="state">code</field>
+            <field name="use_in_ai" eval="True"/>
+            <field name="model_id" ref="model_ai_agent"/>
+            <field name="code">
+product_name = product_name or ''
+try:
+    product = env['product.product'].sudo().search([('name', 'ilike', product_name)], limit=1)
+    if not product:
+        ai['result'] = 'Product not found.'
+    else:
+        p = product
+        fields = [f"Product: {p.display_name}", f"Price: ${p.list_price}"]
+        if p.description_sale:
+            fields.append(f"Description: {p.description_sale}")
+        if p.categ_id:
+            fields.append(f"Category: {p.categ_id.name}")
+        ai['result'] = '\n'.join(fields)
+except Exception as e:
+    ai['result'] = f'Error getting product details: {e}'
+            </field>
+            <field name="ai_tool_description">
+Gets detailed information about a specific product by name. Returns price, stock, description, and category.
+            </field>
+            <field name="ai_tool_schema">
+{
+    "type": "object",
+    "properties": {
+        "product_name": {
+            "type": "string",
+            "description": "The name of the product to look up"
+        }
+    },
+    "required": ["product_name"]
+}
+            </field>
+        </record>
+
+        <!-- Tool: Web Search -->
+        <record id="ir_actions_server_web_search" model="ir.actions.server">
+            <field name="name">AI: Web Search</field>
+            <field name="state">code</field>
+            <field name="use_in_ai" eval="True"/>
+            <field name="model_id" ref="model_ai_agent"/>
+            <field name="code">
+ai['result'] = record._tool_web_search(ai, query, retrieval_mode, context_hint)
+            </field>
+            <field name="ai_tool_description">
+Use this tool to delegate research to a specialized search agent.
+            </field>
+            <field name="ai_tool_schema">
+{
+    "type": "object",
+    "properties": {
+        "query": {
+            "type": "string",
+            "description": "A comprehensive search query containing all necessary context to find a factual answer. Use specific names, dates, or technical terms so the search agent can work independently."
+        },
+        "retrieval_mode": {
+            "type": "string",
+            "enum": ["fact", "summary", "deep"],
+            "description": "Controls the depth of results returned. Use 'fact' for simple lookups (addresses, dates, names), 'summary' for understanding a topic, and 'deep' for content generation or in-depth research requiring multiple perspectives and rich detail."
+        },
+        "context_hint": {
+            "type": "string",
+            "description": "Optional. A short description of how the result will be used (e.g. 'writing a 800-word news article' or 'answering a quick user question'). Helps the search agent calibrate source selection and framing."
+        }
+    },
+    "required": ["query", "retrieval_mode"]
+}
+            </field>
+        </record>
+
+        <!-- ================================================================
+             PRODUCT SEARCH TOPIC
+             ================================================================ -->
+
+        <record id="ai_topic_product_search" model="ai.topic">
+            <field name="name">Product Search</field>
+            <field name="description">Search and query products from the database in real time</field>
+            <field name="instructions">
+You can search for real products in the database. When a customer asks about:
+- Available products or what you sell
+- Product prices and pricing
+- Specific items by name or category
+- Stock availability
+
+Use the Search Products tool to find matching products. If they want more detail on a specific product, use Get Product Details.
+
+Be concise in your response. List products with name and price. Offer to help find more details.
+            </field>
+            <field name="tool_ids" eval="[
+                (4, ref('ir_actions_server_product_search')),
+                (4, ref('ir_actions_server_product_details')),
+            ]"/>
+        </record>
+
+        <!-- Topic: Web Search -->
+        <record id="ai_topic_web_search" model="ai.topic">
+            <field name="name">Web Search</field>
+            <field name="description">Empower your Agent to explore the internet in real time.</field>
+            <field name="instructions">
+You have access to a web browsing tool that allows you to search and retrieve real-time information from the internet.
+Use it whenever a question requires up-to-date data, recent events, or information that may have changed over time.
+Prefer browsing the web over relying solely on your training knowledge when accuracy and freshness matter.
+
+When the Web Search tool returns results, it includes source references in the format [WEB_SOURCE:source_id].
+You MUST include these references in your response so the customer can verify the information.
+
+Response format for web search results:
+1. Start with a brief greeting if appropriate.
+2. Present the key findings as short paragraphs (not bullet lists).
+3. After each paragraph, append the source citations exactly as they appear in the tool result, in the format [WEB_SOURCE:source_id].
+4. Copy source ids character for character — never rephrase, reindex, or summarize them.
+5. At the end, add a "Sources:" section listing each unique source id on its own line.
+6. Keep the response concise but informative — aim for 3-6 short paragraphs maximum.
+7. Never present web search information without citations — uncited claims violate trust.
+
+Example response format:
+
+Here are the current trends in AI:
+
+Large-scale generative models continue to advance rapidly, with growing capabilities in text, image, and video generation.[WEB_SOURCE:abc123]
+
+AI tools are becoming more accessible to a broader audience, democratizing AI development and usage.[WEB_SOURCE:def456][WEB_SOURCE:ghi789]
+
+Significant impact on the job market is expected, creating new roles while displacing others.[WEB_SOURCE:jkl012]
+
+Is there anything else I can help you with?
+
+Sources:
+[WEB_SOURCE:abc123]
+[WEB_SOURCE:def456]
+[WEB_SOURCE:ghi789]
+[WEB_SOURCE:jkl012]
+
+If a claim cannot be matched to a source id present in the tool result, do not include that claim.
+            </field>
+            <field name="tool_ids" eval="[
+                (4, ref('ir_actions_server_web_search')),
+            ]"/>
+        </record>
+
+        <!-- ================================================================
+             AI AGENT
+             ================================================================ -->
+
+        <record id="ai_agent_whatsapp" model="ai.agent">
+            <field name="name">WhatsApp AI Agent</field>
+            <field name="subtitle">Handles WhatsApp conversations automatically — professional customer support.</field>
+            <field name="system_prompt">
+You are a world-class WhatsApp customer support agent for our company.
+Your mission is to deliver exceptional service that achieves 100% customer loyalty.
+
+## Core Principles
+
+1. **Be Professional &amp; Warm** — Greet customers politely, use their name when available, and maintain a professional tone at all times.
+
+2. **Be Concise** — WhatsApp messages should be brief and to the point. Use short paragraphs and line breaks for readability. Avoid markdown formatting.
+
+3. **Be Helpful** — Understand the customer's need fully before responding. Ask clarifying questions if needed. Provide complete, accurate answers.
+
+4. **Be Empathetic** — Acknowledge the customer's feelings. If they're frustrated, apologize sincerely and take ownership of the issue.
+
+5. **Be Honest About Capabilities** — You can search products and get product details using your tools. Use them whenever a customer asks about products, pricing, or availability. For anything beyond products (orders, accounts, billing), you cannot access live data — offer to transfer to a human.
+
+6. **Take Ownership** — If you cannot resolve something, say so clearly and offer a path forward. Say "I'll connect you with a specialist who can help with that."
+
+7. **Confirm Resolution** — Always verify the customer's issue is fully resolved before ending the conversation.
+
+8. **Match the Customer's Language** — Always respond in the same language the customer uses. If they write in English, reply in English. If they write in Arabic, reply in Arabic. If they write in any other language, reply in that same language. This applies to all communication.
+
+9. **Maintain Context Awareness** — Always consider the full conversation history before responding. Understand what the customer is referring to, even if they don't repeat details. Reference previous messages naturally (e.g., "As we discussed earlier..." or "Following up on your request about..."). Never treat each message in isolation — connect the dots across the conversation to provide coherent, contextually relevant responses.
+
+10. **Cite Web Sources** — When you use the Web Search tool, always include the source references (in [WEB_SOURCE:source_id] format) from the tool result in your response. Never present web-sourced information without citing where it came from. Add a "Sources:" section at the end listing each unique source id. This builds trust and lets the customer verify the information.
+
+## Response Guidelines
+
+- Keep each message under 200 characters when possible
+- Use line breaks between ideas, not bullet points
+- Never use asterisks (*), bold, italics, or any markdown — plain text only
+- Use dashes (-) if you must list items, but prefer natural sentences
+- Avoid technical jargon unless the customer uses it
+- Never use HTML or markdown in WhatsApp messages
+- Always end with a clear call to action or question
+- Never make up information about orders, products, or policies
+
+Remember: every interaction is an opportunity to turn a customer into a loyal advocate for our brand.
+            </field>
+            <field name="response_style">balanced</field>
+            <field name="llm_model">gpt-4o</field>
+            <field name="topic_ids" eval="[
+                Command.link(ref('ai_topic_product_inquiries')),
+                Command.link(ref('ai_topic_product_search')),
+                Command.link(ref('ai_topic_order_support')),
+                Command.link(ref('ai_topic_returns_refunds')),
+                Command.link(ref('ai_topic_account_billing')),
+                Command.link(ref('ai_topic_technical_support')),
+                Command.link(ref('ai_topic_web_search')),
+            ]"/>
+            <field name="create_uid" ref="base.user_admin"/>
+        </record>
+
+
+        <!-- ================================================================
+             RECEIPT OCR TOOLS
+             ================================================================ -->
+
+        <!-- Tool: OCR Detect Provider (searches ir.config_parameter receipt_ocr.providers) -->
+        <record id="ir_actions_server_detect_provider" model="ir.actions.server">
+            <field name="name">AI: OCR Detect Provider</field>
+            <field name="state">code</field>
+            <field name="use_in_ai" eval="True"/>
+            <field name="model_id" ref="model_ai_agent"/>
+            <field name="code">
+transaction_number = transaction_number or ''
+try:
+    tn = str(transaction_number).strip()
+    if not tn:
+        ai['result'] = 'No transaction number provided.'
+    else:
+        raw = env['ir.config_parameter'].sudo().get_param('receipt_ocr.providers', '')
+        matched = None
+        for line in raw.split('|'):
+            parts = [x.strip() for x in line.split(',')]
+            if len(parts) >= 3 and tn.startswith(parts[0]) and len(tn) == int(parts[1]):
+                matched = parts[2]
+                break
+        if matched:
+            ai['result'] = f"Detected provider: {matched}"
+        else:
+            ai['result'] = 'No matching provider found.'
+except Exception as e:
+    ai['result'] = f'Error detecting provider: {e}'
+            </field>
+            <field name="ai_tool_description">
+Identifies the transfer provider from a transaction number by matching known prefixes and number lengths.
+            </field>
+            <field name="ai_tool_schema">
+{
+    "type": "object",
+    "properties": {
+        "transaction_number": {
+            "type": "string",
+            "description": "The transaction or receipt number from the transfer receipt"
+        }
+    },
+    "required": ["transaction_number"]
+}
+            </field>
+        </record>
+
+        <!-- Tool: OCR Manage Providers (uses ir.config_parameter receipt_ocr.providers) -->
+        <record id="ir_actions_server_manage_providers" model="ir.actions.server">
+            <field name="name">AI: OCR Manage Providers</field>
+            <field name="state">code</field>
+            <field name="use_in_ai" eval="True"/>
+            <field name="model_id" ref="model_ai_agent"/>
+            <field name="code">
+action = action or 'list'
+name = name or ''
+prefix = prefix or ''
+number_length = number_length or 0
+try:
+    param = env['ir.config_parameter'].sudo()
+    raw = param.get_param('receipt_ocr.providers', '')
+    items = [p for p in raw.split('|') if p.strip()] if raw else []
+    result = ''
+    if action == 'list':
+        if items:
+            lines = []
+            for item in items:
+                parts = [x.strip() for x in item.split(',')]
+                if len(parts) >= 3:
+                    lines.append(f"- {parts[2]} (prefix: {parts[0]}, {parts[1]} digits)")
+            result = 'Providers:\n' + '\n'.join(lines)
+        else:
+            result = 'No providers configured.'
+    elif action == 'create':
+        if not name or not prefix or not number_length:
+            result = 'Error: name, prefix, and number_length are required.'
+        else:
+            entry = f"{prefix.strip()},{int(number_length)},{name.strip()}"
+            exists = any(entry == e for e in items)
+            if exists:
+                result = f'Provider "{name}" already exists.'
+            else:
+                items.append(entry)
+                param.set_param('receipt_ocr.providers', '|'.join(items))
+                result = f'Provider "{name}" created.'
+    elif action == 'update':
+        if not name:
+            result = 'Error: name is required.'
+        else:
+            found = False
+            for i, item in enumerate(items):
+                parts = [x.strip() for x in item.split(',')]
+                if len(parts) >= 3 and parts[2] == name.strip():
+                    new_prefix = prefix.strip() if prefix else parts[0]
+                    new_length = str(int(number_length)) if number_length else parts[1]
+                    items[i] = f"{new_prefix},{new_length},{name.strip()}"
+                    found = True
+                    break
+            if found:
+                param.set_param('receipt_ocr.providers', '|'.join(items))
+                result = f'Provider "{name}" updated.'
+            else:
+                result = f'Provider "{name}" not found.'
+    elif action == 'delete':
+        if not name:
+            result = 'Error: name is required.'
+        else:
+            filtered = [e for e in items if not (e.split(',')[-1].strip() == name.strip())]
+            if len(filtered) != len(items):
+                param.set_param('receipt_ocr.providers', '|'.join(filtered))
+                result = f'Provider "{name}" deleted.'
+            else:
+                result = f'Provider "{name}" not found.'
+    else:
+        result = f'Unknown action: {action}. Use: list, create, update, delete'
+    ai['result'] = result
+except Exception as e:
+    ai['result'] = f'Error: {e}'
+            </field>
+            <field name="ai_tool_description">
+Manages transfer providers: list, create, update, or delete. Each provider has a name, transaction number prefix, and total digit length.
+            </field>
+            <field name="ai_tool_schema">
+{
+    "type": "object",
+    "properties": {
+        "action": {
+            "type": "string",
+            "enum": ["list", "create", "update", "delete"],
+            "description": "What to do: list all, create new, update, or delete a provider"
+        },
+        "name": {
+            "type": "string",
+            "description": "Provider name (required for create, update, delete)"
+        },
+        "prefix": {
+            "type": "string",
+            "description": "Transaction number prefix (required for create)"
+        },
+        "number_length": {
+            "type": "number",
+            "description": "Total digit length of transaction numbers (required for create)"
+        }
+    },
+    "required": ["action"]
+}
+            </field>
+        </record>
+
+        <!-- Tool: OCR Store Receipt (creates account.payment + attachment) -->
+        <record id="ir_actions_server_store_receipt" model="ir.actions.server">
+            <field name="name">AI: OCR Store Receipt</field>
+            <field name="state">code</field>
+            <field name="use_in_ai" eval="True"/>
+            <field name="model_id" ref="model_ai_agent"/>
+            <field name="code">
+try:
+    channel = env.context.get('discuss_channel')
+    data = data_json if isinstance(data_json, dict) else (json.loads(data_json) if data_json else {})
+    partner = channel.whatsapp_partner_id if channel and channel.channel_type == 'whatsapp' else False
+    if not partner:
+        partner = channel and channel.whatsapp_partner_id
+    amt = float(data.get('total_amount', data.get('amount', 0)) or 0)
+    tx_date = data.get('date', datetime.datetime.now().strftime('%Y-%m-%d'))
+    tx_type = data.get('transaction_type', '')
+    is_send = 'ارس' in tx_type or 'إرس' in tx_type or 'ارسل' in tx_type or 'حوال' in tx_type
+    payment_type = 'outbound' if is_send else 'inbound'
+    partner_type = 'supplier' if is_send else 'customer'
+    journal = env['account.journal'].sudo().search([('type', '=', 'general'), ('company_id', '=', env.company.id)], limit=1)
+    method = env['account.payment.method'].sudo().search([('code', '=', 'manual')], limit=1)
+    payment = env['account.payment'].sudo().create({
+        'partner_id': partner.id if partner else False,
+        'amount': amt,
+        'payment_type': payment_type,
+        'partner_type': partner_type,
+        'date': tx_date,
+        'journal_id': journal.id if journal else False,
+        'payment_method_id': method.id if method else False,
+        'memo': ' | '.join(filter(None, [
+            data.get('transaction_number', ''),
+            data.get('sender_name', ''),
+            data.get('recipient_name', ''),
+            data.get('notes', ''),
+        ])),
+    })
+    env['ir.attachment'].sudo().create({
+        'name': f'receipt_ocr_{data.get("transaction_number", data.get("receipt_number", "receipt"))}.json',
+        'res_model': 'account.payment',
+        'res_id': payment.id,
+        'mimetype': 'application/json',
+        'raw': json.dumps(data, ensure_ascii=False),
+        'description': ' | '.join(filter(None, [
+            data.get('date', ''),
+            data.get('sender_name', ''),
+            data.get('recipient_name', ''),
+            str(amt),
+            data.get('amount_currency', ''),
+        ])),
+    })
+    ai['result'] = f'Receipt stored as payment #{payment.id} ({payment_type}, {amt}).'
+except Exception as e:
+    ai['result'] = f'Error storing receipt: {e}'
+            </field>
+            <field name="ai_tool_description">
+Stores extracted receipt data as an account.payment in the accounting journal for tracking and reconciliation.
+            </field>
+            <field name="ai_tool_schema">
+{
+    "type": "object",
+    "properties": {
+        "data_json": {
+            "type": "string",
+            "description": "JSON string with receipt data: date, receipt_number, transaction_number, sender_name, recipient_name, entity, agent, amount, amount_currency, transfer_fee, transfer_fee_currency, total_amount, total_amount_currency, notes, transaction_type"
+        }
+    },
+    "required": ["data_json"]
+}
+            </field>
+        </record>
+
+        <!-- Tool: OCR Search Receipts (searches account.payment records) -->
+        <record id="ir_actions_server_search_receipts" model="ir.actions.server">
+            <field name="name">AI: OCR Search Receipts</field>
+            <field name="state">code</field>
+            <field name="use_in_ai" eval="True"/>
+            <field name="model_id" ref="model_ai_agent"/>
+            <field name="code">
+query = query or ''
+limit = limit or 10
+try:
+    domain = []
+    if query:
+        q = query.strip()
+        domain = ['|', ('memo', 'ilike', q), ('ref', 'ilike', q)]
+    payments = env['account.payment'].sudo().search(domain, limit=min(int(limit), 50), order='create_date desc')
+    if payments:
+        lines = []
+        for p in payments:
+            when = p.date.strftime('%Y-%m-%d') if p.date else ''
+            amt = f"{p.amount} {p.currency_id.name if p.currency_id else ''}"
+            memo = (p.memo or '')[:60]
+            line = f"#{p.id} | {when} | {p.partner_id.name or ''} | {amt} | {memo}"
+            lines.append(line)
+        ai['result'] = f"Found {len(payments)} receipt(s):\n" + '\n'.join(lines)
+    else:
+        ai['result'] = 'No receipts found.'
+except Exception as e:
+    ai['result'] = f'Error searching receipts: {e}'
+            </field>
+            <field name="ai_tool_description">
+Searches stored receipt payments by memo or reference.
+            </field>
+            <field name="ai_tool_schema">
+{
+    "type": "object",
+    "properties": {
+        "query": {
+            "type": "string",
+            "description": "Search term to find receipts by memo or reference"
+        },
+        "limit": {
+            "type": "number",
+            "description": "Maximum results to return (max 50)"
+        }
+    },
+    "required": ["query"]
+}
+            </field>
+        </record>
+    </data>
+</odoo>

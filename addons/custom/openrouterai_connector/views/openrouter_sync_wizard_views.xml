@@ -1,0 +1,18 @@
+<odoo>
+    <record id="view_openrouter_sync_wizard_form" model="ir.ui.view">
+        <field name="name">ai.openrouter.sync.wizard.form</field>
+        <field name="model">ai.openrouter.sync.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Sync OpenRouter Models">
+                <group>
+                    <field name="provider_id" readonly="1"/>
+                    <field name="deactivate_missing"/>
+                </group>
+                <footer>
+                    <button name="action_sync" string="Sync" type="object" class="oe_highlight"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

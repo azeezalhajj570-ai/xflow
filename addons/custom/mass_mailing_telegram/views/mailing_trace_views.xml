@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo><data>
+
+    <record id="mailing_trace_view_tree_telegram" model="ir.ui.view">
+        <field name="name">mailing.trace.telegram.tree</field>
+        <field name="model">mailing.trace</field>
+        <field name="inherit_id" ref="mass_mailing.mailing_trace_view_tree"/>
+        <field name="arch" type="xml">
+            <field name="trace_type" position="after">
+                <field name="telegram_message_id"/>
+            </field>
+        </field>
+    </record>
+
+    <record id="mailing_trace_view_form_telegram" model="ir.ui.view">
+        <field name="name">mailing.trace.telegram.form</field>
+        <field name="model">mailing.trace</field>
+        <field name="inherit_id" ref="mass_mailing.mailing_trace_view_form"/>
+        <field name="arch" type="xml">
+            <field name="trace_type" position="after">
+                <field name="telegram_message_id"/>
+            </field>
+        </field>
+    </record>
+
+</data></odoo>

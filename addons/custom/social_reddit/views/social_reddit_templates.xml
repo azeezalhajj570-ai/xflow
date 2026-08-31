@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="social_reddit_post_preview" name="Reddit Post Preview">
+        <div class="o_social_reddit_preview">
+            <t t-if="widget and widget.live_post_link">
+                <a t-att-href="widget.live_post_link" target="_blank" class="o_social_post_link">
+                    View on Reddit
+                </a>
+            </t>
+        </div>
+    </template>
+</odoo>

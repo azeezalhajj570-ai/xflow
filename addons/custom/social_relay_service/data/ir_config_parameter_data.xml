@@ -1,0 +1,58 @@
+<odoo>
+    <data noupdate="1">
+        <record id="social_relay_facebook_add_accounts_url" model="ir.config_parameter">
+            <field name="key">social_relay_service.facebook_add_accounts_url</field>
+            <field name="value">{base_url}/oauth/facebook?returning_url={returning_url}&amp;db_uuid={db_uuid}</field>
+        </record>
+        <record id="social_relay_instagram_add_accounts_url" model="ir.config_parameter">
+            <field name="key">social_relay_service.instagram_add_accounts_url</field>
+            <field name="value">{base_url}/oauth/instagram?returning_url={returning_url}&amp;db_uuid={db_uuid}</field>
+        </record>
+        <record id="social_relay_youtube_add_accounts_url" model="ir.config_parameter">
+            <field name="key">social_relay_service.youtube_add_accounts_url</field>
+            <field name="value">{base_url}/oauth/youtube?returning_url={returning_url}&amp;db_uuid={db_uuid}</field>
+        </record>
+        <record id="social_relay_twitter_add_accounts_url" model="ir.config_parameter">
+            <field name="key">social_relay_service.twitter_add_accounts_url</field>
+            <field name="value">{base_url}/oauth/twitter?returning_url={returning_url}&amp;db_uuid={db_uuid}</field>
+        </record>
+        <record id="social_relay_linkedin_add_accounts_url" model="ir.config_parameter">
+            <field name="key">social_relay_service.linkedin_add_accounts_url</field>
+            <field name="value">{base_url}/oauth/linkedin?returning_url={returning_url}&amp;db_uuid={db_uuid}</field>
+        </record>
+        <record id="social_relay_youtube_client_id" model="ir.config_parameter">
+            <field name="key">social_relay_service.youtube_client_id</field>
+            <field name="value"></field>
+        </record>
+        <record id="social_relay_youtube_client_secret" model="ir.config_parameter">
+            <field name="key">social_relay_service.youtube_client_secret</field>
+            <field name="value"></field>
+        </record>
+        <record id="social_relay_twitter_consumer_secret" model="ir.config_parameter">
+            <field name="key">social_relay_service.twitter_consumer_secret</field>
+            <field name="value"></field>
+        </record>
+        <record id="social_relay_firebase_project_id" model="ir.config_parameter">
+            <field name="key">social_relay_service.firebase_project_id</field>
+            <field name="value"></field>
+        </record>
+        <record id="social_relay_firebase_web_api_key" model="ir.config_parameter">
+            <field name="key">social_relay_service.firebase_web_api_key</field>
+            <field name="value"></field>
+        </record>
+        <record id="social_relay_firebase_push_certificate_key" model="ir.config_parameter">
+            <field name="key">social_relay_service.firebase_push_certificate_key</field>
+            <field name="value"></field>
+        </record>
+        <record id="social_relay_firebase_sender_id" model="ir.config_parameter">
+            <field name="key">social_relay_service.firebase_sender_id</field>
+            <field name="value"></field>
+        </record>
+        <record id="social_relay_firebase_web_app_id" model="ir.config_parameter">
+            <field name="key">social_relay_service.firebase_web_app_id</field>
+            <field name="value"></field>
+        </record>
+    </data>
+</odoo>
+
+

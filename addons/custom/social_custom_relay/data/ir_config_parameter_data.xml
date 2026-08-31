@@ -1,0 +1,9 @@
+<odoo>
+    <data noupdate="1">
+        <record id="social_custom_relay_endpoint" model="ir.config_parameter">
+            <field name="key">social.custom_relay_endpoint</field>
+            <field name="value">http://localhost:8069</field>
+        </record>
+    </data>
+</odoo>
+

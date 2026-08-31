@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo><data>
+
+    <record id="mailing_mailing_action_telegram" model="ir.actions.act_window">
+        <field name="name">Telegram Marketing</field>
+        <field name="res_model">mailing.mailing</field>
+        <field name="view_mode">tree,form</field>
+        <field name="domain">[('mailing_type', '=', 'telegram')]</field>
+        <field name="context">{'default_mailing_type': 'telegram'}</field>
+    </record>
+
+    <menuitem id="menu_mass_mailing_telegram_root" name="Telegram Marketing"
+        parent="mass_mailing.mass_mailing_menu_root" sequence="50"/>
+
+    <menuitem id="menu_mass_mailing_telegram_mailings" name="Mailings"
+        parent="menu_mass_mailing_telegram_root" action="mailing_mailing_action_telegram" sequence="10"/>
+
+</data></odoo>

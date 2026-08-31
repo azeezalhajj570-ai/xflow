@@ -1,0 +1,8 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_ai_openrouter_provider,access.ai.openrouter.provider,model_ai_openrouter_provider,base.group_system,1,1,1,1
+access_ai_openrouter_model,access.ai.openrouter.model,model_ai_openrouter_model,base.group_system,1,1,1,1
+access_ai_openrouter_company,access.ai.openrouter.company,model_ai_openrouter_company,base.group_system,1,1,1,1
+access_ai_openrouter_request_log,access.ai.openrouter.request.log,model_ai_openrouter_request_log,base.group_system,1,1,1,1
+access_ai_openrouter_sync_wizard,access.ai.openrouter.sync.wizard,model_ai_openrouter_sync_wizard,base.group_system,1,1,1,1
+access_ai_openrouter_modality,access.ai.openrouter.modality,model_ai_openrouter_modality,base.group_system,1,1,1,1
+access_ai_openrouter_chat_wizard,access.ai.openrouter.chat.wizard,model_ai_openrouter_chat_wizard,base.group_system,1,1,1,1

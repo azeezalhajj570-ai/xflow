@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="social_media_reddit" model="social.media">
+            <field name="name">Reddit</field>
+            <field name="media_type">reddit</field>
+            <field name="media_description">Manage your Reddit accounts and schedule text, link, and image posts</field>
+            <field name="image" type="base64" file="social_reddit/static/src/img/reddit.svg"/>
+            <field name="has_streams" eval="True"/>
+            <field name="can_link_accounts" eval="True"/>
+            <field name="max_post_length">40000</field>
+        </record>
+
+        <record id="stream_type_my_posts" model="social.stream.type">
+            <field name="name">My Posts</field>
+            <field name="stream_type">reddit_my_posts</field>
+            <field name="media_id" ref="social_media_reddit"/>
+        </record>
+
+        <record id="stream_type_subreddit_hot" model="social.stream.type">
+            <field name="name">Subreddit Hot</field>
+            <field name="stream_type">reddit_subreddit_hot</field>
+            <field name="media_id" ref="social_media_reddit"/>
+        </record>
+
+        <record id="stream_type_subreddit_new" model="social.stream.type">
+            <field name="name">Subreddit New</field>
+            <field name="stream_type">reddit_subreddit_new</field>
+            <field name="media_id" ref="social_media_reddit"/>
+        </record>
+    </data>
+</odoo>

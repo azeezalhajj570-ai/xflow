@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="social_reddit.StreamPostReddit">
+        <div class="o_social_stream_post_reddit">
+            <t t-if="widget and widget.record">
+                <div class="o_social_post_header">
+                    <span class="o_social_post_author">
+                        <t t-esc="widget.record.author_name.raw_value"/>
+                    </span>
+                    <span class="o_social_post_subreddit" t-if="widget.record.reddit_flair_text.raw_value">
+                        <t t-esc="widget.record.reddit_flair_text.raw_value"/>
+                    </span>
+                </div>
+                <div class="o_social_post_body">
+                    <t t-esc="widget.record.message.raw_value"/>
+                </div>
+                <div class="o_social_post_meta">
+                    <span class="o_social_post_score">
+                        <t t-esc="widget.record.reddit_score.raw_value"/> points
+                    </span>
+                    <span class="o_social_post_comments">
+                        <t t-esc="widget.record.reddit_num_comments.raw_value"/> comments
+                    </span>
+                </div>
+            </t>
+        </div>
+    </t>
+</templates>

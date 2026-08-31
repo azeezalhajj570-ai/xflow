@@ -1,0 +1,109 @@
+<odoo>
+    <record id="view_openrouter_model_list" model="ir.ui.view">
+        <field name="name">ai.openrouter.model.list</field>
+        <field name="model">ai.openrouter.model</field>
+        <field name="arch" type="xml">
+            <list decoration-success="is_free == True">
+                <field name="name_with_badge"/>
+                <field name="external_id"/>
+                <field name="company_provider_id"/>
+                <field name="provider_name" optional="hide"/>
+                <field name="context_length"/>
+                <field name="prompt_price"/>
+                <field name="completion_price"/>
+                <field name="image_price" optional="hide"/>
+                <field name="request_price" optional="hide"/>
+                <field name="modality" optional="hide"/>
+                <field name="input_modality_ids" widget="many2many_tags" optional="show"/>
+                <field name="output_modality_ids" widget="many2many_tags" optional="show"/>
+                <field name="architecture_modality" optional="hide"/>
+                <field name="architecture_tokenizer" optional="hide"/>
+                <field name="architecture_instruct_type" optional="hide"/>
+                <field name="top_provider_context_length" optional="hide"/>
+                <field name="top_provider_max_completion_tokens" optional="hide"/>
+                <field name="top_provider_is_moderated" optional="hide"/>
+                <field name="per_request_prompt_tokens" optional="hide"/>
+                <field name="per_request_completion_tokens" optional="hide"/>
+                <field name="is_free" decoration-success="is_free == True"/>
+                <field name="is_embedding_model" optional="show"/>
+                <field name="active"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_openrouter_model_form" model="ir.ui.view">
+        <field name="name">ai.openrouter.model.form</field>
+        <field name="model">ai.openrouter.model</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_open_chat" type="object" string="Open Chat" class="oe_highlight"/>
+                </header>
+                <sheet>
+                    <group>
+                        <field name="name"/>
+                        <field name="external_id"/>
+                        <field name="description"/>
+                        <field name="provider_id"/>
+                        <field name="company_provider_id"/>
+                        <field name="provider_name"/>
+                        <field name="context_length"/>
+                        <field name="prompt_price"/>
+                        <field name="completion_price"/>
+                        <field name="image_price"/>
+                        <field name="request_price"/>
+                        <field name="modality"/>
+                        <field name="input_modality_ids" widget="many2many_tags"/>
+                        <field name="output_modality_ids" widget="many2many_tags"/>
+                        <field name="architecture_modality"/>
+                        <field name="architecture_tokenizer"/>
+                        <field name="architecture_instruct_type"/>
+                        <field name="top_provider_context_length"/>
+                        <field name="top_provider_max_completion_tokens"/>
+                        <field name="top_provider_is_moderated"/>
+                        <field name="per_request_prompt_tokens"/>
+                        <field name="per_request_completion_tokens"/>
+                        <field name="is_free"/>
+                        <field name="active"/>
+                        <field name="raw_payload" widget="json" colspan="2"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_openrouter_model_search" model="ir.ui.view">
+        <field name="name">ai.openrouter.model.search</field>
+        <field name="model">ai.openrouter.model</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="external_id"/>
+                <field name="company_provider_id"/>
+                <field name="provider_name"/>
+                <field name="modality"/>
+                <field name="input_modality_ids"/>
+                <field name="output_modality_ids"/>
+                <separator/>
+                <filter name="filter_active" string="Active" domain="[('active','=',True)]"/>
+                <filter name="filter_inactive" string="Archived" domain="[('active','=',False)]"/>
+                <filter name="filter_free" string="Free" domain="[('is_free','=',True)]"/>
+                <filter name="filter_paid" string="Paid" domain="[('is_free','=',False)]"/>
+                <filter name="filter_has_pricing" string="Has Pricing" domain="['|',('prompt_price','>',0),('completion_price','>',0)]"/>
+                <filter name="filter_ctx_8k" string="Context ≥ 8K" domain="[('context_length','>=',8192)]"/>
+                <filter name="filter_ctx_32k" string="Context ≥ 32K" domain="[('context_length','>=',32768)]"/>
+                <separator/>
+                <filter name="group_provider" string="Provider" context="{'group_by':'company_provider_id'}"/>
+                <filter name="group_free" string="Free" context="{'group_by':'is_free'}"/>
+                <filter name="group_active" string="Active" context="{'group_by':'active'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_openrouter_model" model="ir.actions.act_window">
+        <field name="name">OpenRouter Models</field>
+        <field name="res_model">ai.openrouter.model</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_openrouter_model_search"/>
+    </record>
+</odoo>

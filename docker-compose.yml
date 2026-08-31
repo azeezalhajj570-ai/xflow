@@ -1,0 +1,98 @@
+services:
+  # PostgreSQL + pgvector.  Odoo module installation and tests are heavy,
+  # so the DB container needs more than the default 256 MB to avoid OOM kills.
+  db:
+    image: pgvector/pgvector:pg17
+    container_name: ${COMPOSE_PROJECT_NAME:-odoo19-dev}-db
+    restart: unless-stopped
+    networks:
+      - odoo-network
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: ${DB_MEMORY_LIMIT:-1G}
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Odoo 19 Enterprise.  Memory limits are configured via .env.
+  # The entrypoint (/entrypoint.sh) appends DB credentials to the Odoo command
+  # when the container starts, but for direct `docker exec` commands the
+  # credentials in config/odoo.conf are used.  Keep those two in sync.
+  odoo:
+    image: kerbi/odoo19e-202604:latest
+    container_name: ${COMPOSE_PROJECT_NAME:-odoo19-dev}-odoo
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - odoo-network
+      - madarbot_default
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_HOST: ${POSTGRES_HOST}
+      POSTGRES_PORT: ${POSTGRES_PORT}
+      ODOO_ADMIN_PASSWD: ${ODOO_ADMIN_PASSWD}
+      ODOO_DATABASE: ${ODOO_DATABASE}
+      ODOO_DBFILTER: ${ODOO_DBFILTER}
+      ODOO_RC: /etc/odoo/odoo.conf
+      ODOO_PROXY_MODE: ${ODOO_PROXY_MODE}
+      PYTHONOPTIMIZE: "0"
+      TZ: ${TZ}
+    volumes:
+      - ./config/odoo.conf:/etc/odoo/odoo.conf
+      - ./addons/enterprise:/mnt/enterprise-addons
+      - ./addons/third_party:/mnt/third-party-addons
+      - ./addons/custom:/mnt/custom-addons
+      - ./data/filestore:/var/lib/odoo/filestore
+      - ./logs:/var/log/odoo
+      - ./backups:/mnt/backups
+      - ./scripts:/mnt/scripts
+    ports:
+      - "${ODOO_PORT}:8069"
+      - "${ODOO_LONGPOLLING_PORT}:8072"
+      - "127.0.0.1:5678:5678"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8069/web/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: ${ODOO_MEMORY_LIMIT:-3G}
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  odoo-network:
+    name: ${NETWORK_NAME:-odoo19-dev-network}
+    driver: bridge
+  madarbot_default:
+    external: true

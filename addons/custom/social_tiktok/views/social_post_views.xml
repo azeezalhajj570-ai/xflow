@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+<data>
+    <record id="social_post_view_form" model="ir.ui.view">
+        <field name="name">social.post.view.form.inherit.tiktok</field>
+        <field name="model">social.post</field>
+        <field name="inherit_id" ref="social.social_post_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//group[@name='social_post_global']" position="inside">
+                <field name="tiktok_accounts_count" invisible="1"/>
+                <div name="tiktok_options_div" colspan="2" class="o_horizontal_separator mt-5"
+                    invisible="state in ['posting', 'posted'] or tiktok_accounts_count == 0 or is_split_per_media">
+                    TikTok Options
+                </div>
+                <field name="tiktok_title"
+                    placeholder="e.g. Check out my new video!"
+                    invisible="state in ['posting', 'posted'] or tiktok_accounts_count != 1 or is_split_per_media"
+                    readonly="state != 'draft'"/>
+                <field name="tiktok_video_ids" widget="many2many_binary"
+                    invisible="state in ['posting', 'posted'] or tiktok_accounts_count != 1 or is_split_per_media"
+                    readonly="state != 'draft'"
+                    options="{'accepted_file_extensions': '.mp4,.mov,.avi,.webm,.mkv'}"/>
+                <field name="tiktok_privacy_level"
+                    invisible="state in ['posting', 'posted'] or tiktok_accounts_count != 1 or is_split_per_media"
+                    readonly="state != 'draft'"/>
+            </xpath>
+            <xpath expr="//notebook[@name='media_customization']" position="inside">
+                <page string="TikTok" name="tiktok_content"
+                    invisible="tiktok_accounts_count == 0 or state in ['posting', 'posted']">
+                    <group>
+                        <group>
+                            <field name="tiktok_title"
+                                placeholder="e.g. Check out my new video!"
+                                invisible="tiktok_accounts_count != 1"
+                                readonly="state != 'draft'"/>
+                            <field name="tiktok_video_ids" widget="many2many_binary"
+                                invisible="tiktok_accounts_count != 1"
+                                readonly="state != 'draft'"
+                                options="{'accepted_file_extensions': '.mp4,.mov,.avi,.webm,.mkv'}"/>
+                            <field name="tiktok_privacy_level"
+                                invisible="tiktok_accounts_count != 1"
+                                readonly="state != 'draft'"/>
+                        </group>
+                    </group>
+                </page>
+            </xpath>
+            <xpath expr="//field[@name='message']" position="attributes">
+                <attribute name="invisible">state in ['posting', 'posted'] or tiktok_accounts_other_count == 0 and tiktok_accounts_count != 0 or is_split_per_media</attribute>
+            </xpath>
+            <xpath expr="//field[@name='image_ids']" position="attributes">
+                <attribute name="invisible">state in ['posting', 'posted'] or tiktok_accounts_other_count == 0 and tiktok_accounts_count != 0 or is_split_per_media</attribute>
+            </xpath>
+            <xpath expr="//header" position="after">
+                <div class="alert alert-danger text-center" role="alert"
+                    invisible="tiktok_accounts_count &lt;= 1">
+                    Please select a single TikTok account at a time.
+                </div>
+            </xpath>
+        </field>
+    </record>
+</data>
+</odoo>

@@ -1,0 +1,9 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_madarbot_account_user,madarbot.account.user,model_madarbot_account,base.group_user,1,0,0,0
+access_madarbot_account_system,madarbot.account.system,model_madarbot_account,base.group_system,1,1,1,1
+access_madarbot_telegram_message_user,madarbot.telegram.message.user,model_madarbot_telegram_message,base.group_user,1,0,0,0
+access_madarbot_telegram_message_system,madarbot.telegram.message.system,model_madarbot_telegram_message,base.group_system,1,1,1,1
+access_madarbot_telegram_tracker_user,madarbot.telegram.tracker.user,model_madarbot_telegram_tracker,base.group_user,1,0,0,0
+access_madarbot_telegram_tracker_system,madarbot.telegram.tracker.system,model_madarbot_telegram_tracker,base.group_system,1,1,1,1
+access_madarbot_blacklist_user,madarbot.blacklist.user,model_madarbot_blacklist,base.group_user,1,0,0,0
+access_madarbot_blacklist_system,madarbot.blacklist.system,model_madarbot_blacklist,base.group_system,1,1,1,1

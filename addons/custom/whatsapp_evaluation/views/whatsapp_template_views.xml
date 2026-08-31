@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="whatsapp_template_view_form" model="ir.ui.view">
+        <field name="name">whatsapp.template.view.form</field>
+        <field name="model">whatsapp.template</field>
+        <field name="arch" type="xml">
+            <form string="WhatsApp Template">
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" required="1" placeholder='e.g. "Send Order Document"'/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="model_id"/>
+                            <field name="model" invisible="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page id="body" name="Body">
+                            <field name="body" placeholder="Hello {{1}}, here is your order with the reference {{2}} ..." required="1"/>
+                        </page>
+                        <page id="variables" name="Variables">
+                            <field name="variable_ids">
+                                <list editable="bottom" create="false" delete="false">
+                                    <field name="name"/>
+                                    <field name="line_type" invisible="1"/>
+                                    <field name="field_type"/>
+                                    <field name="field_name" invisible="field_type != 'field'" required="field_type == 'field'"/>
+                                    <field name="demo_value" required="1"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="whatsapp_template_view_list" model="ir.ui.view">
+        <field name="name">whatsapp.template.view.list</field>
+        <field name="model">whatsapp.template</field>
+        <field name="arch" type="xml">
+            <list string="WhatsApp Templates">
+                <field name="name"/>
+                <field name="model"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="whatsapp_template_view_kanban" model="ir.ui.view">
+        <field name="name">whatsapp.template.view.kanban</field>
+        <field name="model">whatsapp.template</field>
+        <field name="arch" type="xml">
+            <kanban>
+                <templates>
+                    <t t-name="card">
+                        <div class="d-flex">
+                            <div class="d-flex flex-column">
+                                <field name="name" class="fw-bold fs-5"/>
+                                <field name="model" class="text-muted o_row"/>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="whatsapp_template_view_search" model="ir.ui.view">
+        <field name="name">whatsapp.template.view.search</field>
+        <field name="model">whatsapp.template</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="model_id"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="whatsapp_template_action" model="ir.actions.act_window">
+        <field name="name">WhatsApp Templates</field>
+        <field name="res_model">whatsapp.template</field>
+        <field name="view_mode">list,kanban,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No Templates Found!
+            </p>
+            <p>
+                Create a new template to send WhatsApp messages from Odoo records.
+            </p>
+        </field>
+    </record>
+</odoo>

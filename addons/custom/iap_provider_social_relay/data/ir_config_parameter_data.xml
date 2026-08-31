@@ -1,0 +1,13 @@
+<odoo>
+    <data noupdate="1">
+        <record id="iap_provider_social_relay_endpoint" model="ir.config_parameter">
+            <field name="key">iap_provider_social_relay.endpoint</field>
+            <field name="value">http://localhost:8069</field>
+        </record>
+        <record id="iap_provider_social_relay_default_service" model="ir.config_parameter">
+            <field name="key">iap_provider_social_relay.default_service</field>
+            <field name="value">reveal</field>
+        </record>
+    </data>
+</odoo>
+

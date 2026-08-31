@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="social_reddit_account_view_form" model="ir.ui.view">
+        <field name="name">social.account.reddit.form</field>
+        <field name="model">social.account</field>
+        <field name="inherit_id" ref="social.social_account_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='media_id']" position="after">
+                <field name="reddit_user_id" invisible="1"/>
+                <field name="reddit_access_token" invisible="1"/>
+                <field name="reddit_refresh_token" invisible="1"/>
+                <field name="reddit_token_expiry" invisible="1"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

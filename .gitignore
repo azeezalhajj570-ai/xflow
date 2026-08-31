@@ -1,0 +1,58 @@
+# =============================================================================
+# Odoo 19 Development - Git Ignore
+# =============================================================================
+
+# Environment
+.env
+
+# IDE / Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+*.egg
+.venv/
+venv/
+env/
+
+# Docker
+data/postgres/*
+!data/postgres/.gitkeep
+data/filestore/*
+!data/filestore/.gitkeep
+
+# Logs
+logs/*
+!logs/.gitkeep
+
+# Backups
+backups/*
+!backups/.gitkeep
+
+# Odoo
+addons/enterprise/*
+!addons/enterprise/.gitkeep
+
+# Third-party addons (tracked via requirements or submodules)
+addons/third_party/*
+!addons/third_party/.gitkeep
+
+# Custom addons are tracked, but keep placeholder
+addons/custom/.gitkeep
+
+# Docker
+.docker/
+docker-compose.override.yml
+
+# Built-in addons extracted from image (reference only)
+addons/builtin/
