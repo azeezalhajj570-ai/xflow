@@ -30,19 +30,16 @@
         <field name="arch" type="xml">
             <form string="X Account">
                 <header>
-                    <button name="action_fetch_groups" string="Fetch Groups" type="object"
-                            icon="fa-users"/>
-                    <button name="action_register_webhook" string="Register Webhook"
-                            type="object" icon="fa-bolt"
-                            invisible="x_webhook_id"/>
-                    <button name="action_validate_webhook" string="Validate Webhook"
-                            type="object" icon="fa-check"
-                            invisible="not x_webhook_id"/>
-                    <button name="action_delete_webhook" string="Delete Webhook"
-                            type="object" icon="fa-trash"
-                            invisible="not x_webhook_id"/>
                 </header>
                 <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="%(action_server_groups_by_account)d" type="action"
+                            class="oe_stat_button" icon="fa-users" string="Groups">
+                            <div class="o_stat_info">
+                                <field name="x_group_count" widget="statinfo"/>
+                            </div>
+                        </button>
+                    </div>
                     <div class="oe_title">
                         <h1><field name="name" placeholder="Account name"/></h1>
                     </div>
@@ -52,13 +49,14 @@
                         <field name="x_auth_method"/>
                         <field name="twitter_user_id" readonly="1"/>
                         <field name="x_connection_status"/>
-                        <field name="last_validated" readonly="1"/>
+                        <field name="last_validated"/>
                     </group>
                     <group string="Webhook">
                         <field name="x_webhook_url"/>
                         <field name="x_webhook_id"/>
                         <field name="x_webhook_valid"/>
                         <field name="x_webhook_secret" password="True"/>
+                        <field name="x_encryption_code" password="True"/>
                     </group>
                 </sheet>
             </form>
@@ -75,8 +73,6 @@
                 <field name="x_provider"/>
                 <field name="x_connection_status"/>
                 <field name="last_validated"/>
-                <button name="action_fetch_groups" string="Fetch Groups" type="object"
-                        icon="fa-users"/>
             </list>
         </field>
     </record>

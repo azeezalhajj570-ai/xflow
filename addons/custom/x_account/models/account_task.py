@@ -73,8 +73,6 @@ class XAccountTask(models.Model):
     @api.model
     def _process_queue(self, limit=100):
         """Claim and run due tasks (per-account single-flight)."""
-        import json as _json
-
         now = fields.Datetime.now()
         domain = [
             ('status', 'in', ('pending',)),
@@ -93,22 +91,42 @@ class XAccountTask(models.Model):
             task.write({'status': 'running', 'claimed_at': now})
             claimed |= task
         for task in claimed:
-            try:
-                from odoo.addons.x_account.services.x_service import XService
-                provider = XService.get_provider(task.account_id)
-                fn = getattr(provider, task.operation, None)
-                if not fn or not callable(fn):
-                    task._schedule_retry('Unknown operation %s' % task.operation)
-                    continue
-                try:
-                    ctx = _json.loads(task.task_context or '{}')
-                except ValueError:
-                    ctx = {}
-                result = fn(**{k: v for k, v in ctx.items() if k != 'self'})
-                task.write({'status': 'success', 'result': result})
-            except Exception as exc:
-                task._schedule_retry(str(exc))
+            task._execute_operation()
         return len(claimed)
+
+    def _execute_operation(self, operation=None, **extra_ctx):
+        """Execute one task's operation via the account provider.
+
+        Used by both the cron worker and the automation rule so a task can be
+        run immediately when created (auto-execute) or later by the queue.
+        """
+        self.ensure_one()
+        import json as _json
+        if self.status == 'cancelled':
+            return None
+        account = self.account_id
+        if not account:
+            self._schedule_retry('Missing account')
+            return None
+        try:
+            from odoo.addons.x_account.services.x_service import XService
+            provider = XService.get_provider(account)
+            op = operation or self.operation
+            fn = getattr(provider, op, None)
+            if not fn or not callable(fn):
+                self._schedule_retry('Unknown operation %s' % op)
+                return None
+            try:
+                ctx = _json.loads(self.task_context or '{}')
+            except ValueError:
+                ctx = {}
+            ctx.update(extra_ctx)
+            result = fn(**{k: v for k, v in ctx.items() if k != 'self'})
+            self.write({'status': 'success', 'result': result})
+            return result
+        except Exception as exc:
+            self._schedule_retry(str(exc))
+            return None
 
     def _schedule_retry(self, message):
         self.ensure_one()

@@ -28,6 +28,13 @@
         sequence="20"/>
 
     <menuitem
+        id="menu_x_account_messages"
+        name="Messages"
+        parent="menu_x_account_root"
+        action="action_x_account_messages"
+        sequence="25"/>
+
+    <menuitem
         id="menu_x_account_tasks"
         name="Tasks"
         parent="menu_x_account_root"

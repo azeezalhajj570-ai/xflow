@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="x_message_view_list" model="ir.ui.view">
+        <field name="name">x.message.view.list</field>
+        <field name="model">x.message</field>
+        <field name="arch" type="xml">
+            <list string="X Messages" create="false" delete="false" edit="false">
+                <field name="direction"/>
+                <field name="channel_id"/>
+                <field name="account_id"/>
+                <field name="author_partner_id"/>
+                <field name="body_plain"/>
+                <field name="external_created_at"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="x_message_view_form" model="ir.ui.view">
+        <field name="name">x.message.view.form</field>
+        <field name="model">x.message</field>
+        <field name="arch" type="xml">
+            <form string="X Message" create="false" edit="false">
+                <sheet>
+                    <group>
+                        <field name="direction"/>
+                        <field name="channel_id"/>
+                        <field name="account_id"/>
+                        <field name="author_partner_id"/>
+                        <field name="author_x_id"/>
+                        <field name="author_x_username"/>
+                        <field name="external_id"/>
+                        <field name="external_created_at"/>
+                    </group>
+                    <group string="Message">
+                        <field name="body_plain" readonly="1"/>
+                    </group>
+                    <group string="Delivery">
+                        <field name="acked"/>
+                        <field name="delivered"/>
+                        <field name="participant_joined"/>
+                        <field name="participant_left"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_x_account_messages" model="ir.actions.act_window">
+        <field name="name">X Messages</field>
+        <field name="res_model">x.message</field>
+        <field name="view_mode">list,form</field>
+        <field name="view_ids" eval="[(5, 0, 0),
+            (0, 0, {'view_mode': 'list', 'view_id': ref('x_message_view_list')}),
+            (0, 0, {'view_mode': 'form', 'view_id': ref('x_message_view_form')})]"/>
+    </record>
+</odoo>

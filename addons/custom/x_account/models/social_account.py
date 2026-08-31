@@ -80,6 +80,13 @@ class SocialAccount(models.Model):
         readonly=True,
         help='True once the OmniX webhook passed the CRC handshake.',
     )
+    x_encryption_code = fields.Char(
+        string='XChat Encryption Code',
+        groups='base.group_system',
+        help='Your XChat PIN — the code you set when enabling encrypted chats on '
+             'X. Used to recover your key so encrypted DM messages can be '
+             'decrypted and outgoing events signed.',
+    )
 
     x_migration_status = fields.Selection(
         [
@@ -94,6 +101,20 @@ class SocialAccount(models.Model):
     source_user_id = fields.Char(string='Source User ID', help='XAction User.id')
     migration_batch_id = fields.Char(string='Migration Batch ID')
     migration_timestamp = fields.Datetime(string='Migration Timestamp')
+    x_group_count = fields.Integer(
+        string='X Groups',
+        compute='_compute_x_group_count',
+        help='Number of X group-DM channels for this account.',
+    )
+
+    @api.depends('x_session_store_id')
+    def _compute_x_group_count(self):
+        group_model = self.env['discuss.channel'].sudo()
+        for account in self:
+            account.x_group_count = group_model.search_count([
+                ('channel_type', '=', 'x_group'),
+                ('x_account_id', '=', account.id),
+            ])
 
     def _filter_x_accounts(self):
         return self.filtered(lambda a: a.media_type == 'twitter')
@@ -108,6 +129,20 @@ class SocialAccount(models.Model):
             'target': 'new',
             'context': {'default_media_id': self.env['social.media'].search(
                 [('media_type', '=', 'twitter')], limit=1).id},
+        }
+
+    def action_x_account_groups_by_account(self):
+        """Open the X Groups list filtered to this account (stat button)."""
+        self.ensure_one()
+        return {
+            'name': 'X Groups',
+            'type': 'ir.actions.act_window',
+            'res_model': 'discuss.channel',
+            'view_mode': 'list,form',
+            'domain': [('channel_type', '=', 'x_group'),
+                       ('x_account_id', '=', self.id)],
+            'context': dict(self.env.context,
+                            default_x_account_id=self.id),
         }
 
     def action_fetch_groups(self):
@@ -137,6 +172,37 @@ class SocialAccount(models.Model):
             }
         return result
 
+    def action_fetch_group_messages(self):
+        """Fetch group-DM messages via the account's provider into discuss."""
+        self.ensure_one()
+        if not self._filter_x_accounts():
+            raise ValueError('Fetch group messages is only available on X accounts.')
+        if not self.x_encryption_code:
+            raise ValueError(
+                'Set the XChat Encryption Code on this account first — it is '
+                'required to read encrypted group DMs.')
+        from odoo.addons.x_account.services.x_service import XService
+        provider = XService.get_provider(self)
+        fetch = getattr(provider, 'fetch_group_messages', None)
+        if not fetch:
+            raise NotImplementedError(
+                'Provider %s does not support fetching group messages' % self.x_provider)
+        result = fetch(self, limit=100)
+        if self.env.context.get('dialog'):
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': 'Fetch Group Messages',
+                    'message': 'Groups: %s, messages: %s, failures: %s' % (
+                        result.get('groups', 0), result.get('messages', 0),
+                        result.get('failures', 0)),
+                    'type': 'success' if not result.get('failures') else 'warning',
+                    'sticky': False,
+                },
+            }
+        return result
+
     def _webhook_receiver_url(self):
         """Public receiver URL for this account's webhook endpoint."""
         base = self.env['ir.config_parameter'].sudo().get_param(
@@ -149,16 +215,31 @@ class SocialAccount(models.Model):
         return '%s/x_account/webhook/%s' % (base, self.id)
 
     def action_register_webhook(self):
-        """Register an OmniX webhook for this account (and store the secret)."""
+        """Register an OmniX webhook for this account (and store the secret).
+
+        Requires the XChat Encryption Code: it opts the webhook into DM event
+        delivery, which is the purpose of this integration.
+        """
         self.ensure_one()
         if not self._filter_x_accounts():
             raise ValueError('Webhooks are only available on X accounts.')
+        if not self.x_encryption_code:
+            raise ValueError(
+                'Set the XChat Encryption Code on this account first — it is '
+                'required to receive DM events.')
         from odoo.addons.x_account.services.x_service import XService
         provider = XService.get_provider(self)
         register = getattr(provider, 'register_webhook', None)
         if not register:
             raise NotImplementedError(
                 'Provider %s does not support webhooks' % self.x_provider)
+        # If a webhook already exists it was registered without the code;
+        # delete it first so OmniX re-registers with DM events enabled.
+        if self.x_webhook_id:
+            try:
+                provider.delete_webhook(self.x_webhook_id)
+            except Exception:
+                _logger.exception('Failed to delete old webhook %s', self.x_webhook_id)
         secret = self.x_webhook_secret or self.env['ir.config_parameter'].sudo().get_param(
             'x_account.webhook_secret') or secrets.token_hex(32)
         # Persist the secret BEFORE calling OmniX: it runs the CRC handshake

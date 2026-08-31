@@ -38,6 +38,7 @@ class OmniXProvider:
         self.cookies = cookies or {}
         self._api_key = env['ir.config_parameter'].sudo().get_param(
             'x_account.omnix_api_key')
+        self._encryption_code = account.x_encryption_code or ''
 
     # ------------------------------------------------------------- validation
     def validate_session(self):
@@ -126,7 +127,9 @@ class OmniXProvider:
         }
 
     def get_dms(self, conversation_id, limit=100, cursor=None):
-        body = {'conversation_id': conversation_id, 'limit': int(limit)}
+        body = {'conversation_id': conversation_id, 'count': int(limit)}
+        if self._encryption_code:
+            body['encryption_code'] = self._encryption_code
         if cursor:
             body['cursor'] = cursor
         data = self._request('POST', '/dm/conversation', body=body)
@@ -145,6 +148,48 @@ class OmniXProvider:
             ],
             'cursor': conv.get('next_cursor'),
         }
+
+    def fetch_group_messages(self, account, limit=100):
+        """Fetch messages from X group-DM conversations and store them in the
+        discuss.channel (channel_type 'x_group') as x.message records.
+
+        OmniX's /dm/conversation requires the account's XChat encryption code
+        to read encrypted group DMs; without it the call fails (authentication
+        or 502). Returns a summary of messages stored per group.
+        """
+        # Resolve the group channels (they must exist; use fetch_groups first).
+        channels = self.env['discuss.channel'].sudo().search([
+            ('channel_type', '=', 'x_group'),
+            ('x_account_id', '=', account.id),
+        ])
+        per_group = int(limit)
+        total = 0
+        failures = 0
+        for channel in channels:
+            conv_id = channel.x_conversation_id
+            if not conv_id:
+                continue
+            try:
+                result = self.get_dms(conv_id, limit=per_group)
+                for msg in result['messages']:
+                    author_partner = False
+                    sender_id = msg.get('sender_id')
+                    if sender_id:
+                        author_partner = self.env['res.partner'].sudo().search(
+                            [('x_user_id', '=', str(sender_id))], limit=1)
+                    channel._save_x_message(
+                        direction='outbound' if msg.get('from_me') else 'inbound',
+                        external_id=msg['id'],
+                        body=msg.get('text', ''),
+                        external_created_at=msg.get('created_at'),
+                        author_partner=author_partner,
+                        author_x_id=sender_id,
+                    )
+                    total += 1
+            except Exception:
+                _LOGGER.exception('Failed to fetch messages for group %s', conv_id)
+                failures += 1
+        return {'groups': len(channels), 'messages': total, 'failures': failures}
 
     # ------------------------------------------------------- group members
     def fetch_groups(self, account, limit=100):
@@ -313,12 +358,30 @@ class OmniXProvider:
 
         Returns {id, url, valid, secret}. OmniX runs a CRC handshake on
         registration; the webhook only becomes valid once the receiver answers.
+        Passing the account's XChat encryption code opts the webhook into DM
+        (direct message) events, which are otherwise not delivered. The
+        account's auth_token is required by OmniX at registration.
         """
         body = {'url': url}
+        auth_token = self.cookies.get('auth_token')
+        if auth_token:
+            body['auth_token'] = auth_token
         if secret:
             body['secret'] = secret
+        if self._encryption_code:
+            body['encryption_code'] = self._encryption_code
+        # Explicit allowlist: all message (DM) + tweet + follow events. Without
+        # it OmniX may deliver only a default subset.
         if events:
             body['events'] = events
+        else:
+            body['events'] = [
+                'message.received', 'message.sent', 'message.edited',
+                'message.deleted', 'message.reactionAdded',
+                'message.reactionRemoved',
+                'tweet.mention', 'tweet.reply', 'tweet.quote', 'tweet.like',
+                'tweet.retweet', 'user.follow',
+            ]
         data = self._request('POST', '/webhooks', body=body)
         wh = data.get('data') or {}
         return {
@@ -343,6 +406,25 @@ class OmniXProvider:
         data = self._request('DELETE', '/webhooks/%s' % webhook_id)
         return data.get('data') or {}
 
+    def replay_webhook(self, webhook_id, from_date=None, to_date=None):
+        """Ask OmniX to re-send a webhook's events from a time window.
+
+        Re-delivers events for the webhook (up to the past 24h). from_date /
+        to_date are UTC 'yyyymmddhhmm' strings; both default to the last 24h.
+        Delivery is async — returns a job_id.
+        """
+        from datetime import datetime, timedelta, timezone
+        if not from_date:
+            from_date = (datetime.now(timezone.utc) - timedelta(hours=24)).strftime('%Y%m%d%H%M')
+        if not to_date:
+            to_date = datetime.now(timezone.utc).strftime('%Y%m%d%H%M')
+        data = self._request('POST', '/webhooks/replay', body={
+            'webhook_id': str(webhook_id),
+            'from_date': from_date,
+            'to_date': to_date,
+        })
+        return data.get('data') or {}
+
     # --------------------------------------------------------------- internals
     def _headers(self):
         return {
@@ -355,6 +437,10 @@ class OmniXProvider:
         """Call an OmniX endpoint and return the parsed envelope data.
 
         Raises RuntimeError with a classified error code on failure.
+
+        OmniX expects the account auth_token in the query string for GET
+        endpoints and in the JSON body for POST endpoints (per the OpenAPI
+        spec), so it is placed accordingly.
         """
         if not self._api_key:
             raise RuntimeError('omnix_api_key_missing')
@@ -365,10 +451,14 @@ class OmniXProvider:
         if path_args:
             url = url % path_args
         req_params = dict(params or {})
-        req_params['auth_token'] = auth_token
+        req_body = dict(body or {})
+        if method == 'GET':
+            req_params['auth_token'] = auth_token
+        else:
+            req_body['auth_token'] = auth_token
         try:
             resp = requests.request(
-                method, url, params=req_params, json=body,
+                method, url, params=req_params, json=req_body,
                 headers=self._headers(), timeout=20)
         except requests.RequestException as exc:
             raise RuntimeError('network_error: %s' % exc)

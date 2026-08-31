@@ -19,5 +19,87 @@
             <field name="code">records._enqueue_group_operation()</field>
             <field name="base_automation_id" ref="base_automation_x_group_action"/>
         </record>
+
+        <!--
+             Task execution as automation rules. One rule per operation; each
+             rule fires when an x.account.task is created with the matching
+             operation and runs the operation as a server action. The cron
+             worker remains as the retry/backlog fallback for tasks that fail
+             or are created in bulk.
+        -->
+        <record id="base_automation_x_task_like" model="base.automation">
+            <field name="name">X: Run Like Task</field>
+            <field name="model_id" ref="model_x_account_task"/>
+            <field name="trigger">on_create</field>
+            <field name="active" eval="True"/>
+            <field name="filter_domain">[('operation', '=', 'like'), ('status', '=', 'pending')]</field>
+        </record>
+        <record id="ir_actions_server_x_task_like" model="ir.actions.server">
+            <field name="name">X: Task Like</field>
+            <field name="model_id" ref="model_x_account_task"/>
+            <field name="state">code</field>
+            <field name="code">records._execute_operation(operation='like')</field>
+            <field name="base_automation_id" ref="base_automation_x_task_like"/>
+        </record>
+
+        <record id="base_automation_x_task_repost" model="base.automation">
+            <field name="name">X: Run Repost Task</field>
+            <field name="model_id" ref="model_x_account_task"/>
+            <field name="trigger">on_create</field>
+            <field name="active" eval="True"/>
+            <field name="filter_domain">[('operation', '=', 'repost'), ('status', '=', 'pending')]</field>
+        </record>
+        <record id="ir_actions_server_x_task_repost" model="ir.actions.server">
+            <field name="name">X: Task Repost</field>
+            <field name="model_id" ref="model_x_account_task"/>
+            <field name="state">code</field>
+            <field name="code">records._execute_operation(operation='repost')</field>
+            <field name="base_automation_id" ref="base_automation_x_task_repost"/>
+        </record>
+
+        <record id="base_automation_x_task_comment" model="base.automation">
+            <field name="name">X: Run Comment Task</field>
+            <field name="model_id" ref="model_x_account_task"/>
+            <field name="trigger">on_create</field>
+            <field name="active" eval="True"/>
+            <field name="filter_domain">[('operation', '=', 'comment'), ('status', '=', 'pending')]</field>
+        </record>
+        <record id="ir_actions_server_x_task_comment" model="ir.actions.server">
+            <field name="name">X: Task Comment</field>
+            <field name="model_id" ref="model_x_account_task"/>
+            <field name="state">code</field>
+            <field name="code">records._execute_operation(operation='comment')</field>
+            <field name="base_automation_id" ref="base_automation_x_task_comment"/>
+        </record>
+
+        <record id="base_automation_x_task_follow" model="base.automation">
+            <field name="name">X: Run Follow Task</field>
+            <field name="model_id" ref="model_x_account_task"/>
+            <field name="trigger">on_create</field>
+            <field name="active" eval="True"/>
+            <field name="filter_domain">[('operation', '=', 'follow'), ('status', '=', 'pending')]</field>
+        </record>
+        <record id="ir_actions_server_x_task_follow" model="ir.actions.server">
+            <field name="name">X: Task Follow</field>
+            <field name="model_id" ref="model_x_account_task"/>
+            <field name="state">code</field>
+            <field name="code">records._execute_operation(operation='follow')</field>
+            <field name="base_automation_id" ref="base_automation_x_task_follow"/>
+        </record>
+
+        <record id="base_automation_x_task_send_dm" model="base.automation">
+            <field name="name">X: Run Send DM Task</field>
+            <field name="model_id" ref="model_x_account_task"/>
+            <field name="trigger">on_create</field>
+            <field name="active" eval="True"/>
+            <field name="filter_domain">[('operation', '=', 'send_dm'), ('status', '=', 'pending')]</field>
+        </record>
+        <record id="ir_actions_server_x_task_send_dm" model="ir.actions.server">
+            <field name="name">X: Task Send DM</field>
+            <field name="model_id" ref="model_x_account_task"/>
+            <field name="state">code</field>
+            <field name="code">records._execute_operation(operation='send_dm')</field>
+            <field name="base_automation_id" ref="base_automation_x_task_send_dm"/>
+        </record>
     </data>
 </odoo>

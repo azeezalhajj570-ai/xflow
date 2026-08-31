@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="action_server_fetch_groups" model="ir.actions.server">
+            <field name="name">Fetch Groups</field>
+            <field name="model_id" ref="social.model_social_account"/>
+            <field name="binding_model_id" ref="social.model_social_account"/>
+            <field name="state">code</field>
+            <field name="code">action = False
+for rec in records:
+    action = rec.with_context(dialog=True).action_fetch_groups()</field>
+        </record>
+
+        <record id="action_server_register_webhook" model="ir.actions.server">
+            <field name="name">Register Webhook</field>
+            <field name="model_id" ref="social.model_social_account"/>
+            <field name="binding_model_id" ref="social.model_social_account"/>
+            <field name="state">code</field>
+            <field name="code">action = False
+for rec in records:
+    action = rec.with_context(dialog=True).action_register_webhook()</field>
+        </record>
+
+        <record id="action_server_validate_webhook" model="ir.actions.server">
+            <field name="name">Validate Webhook</field>
+            <field name="model_id" ref="social.model_social_account"/>
+            <field name="binding_model_id" ref="social.model_social_account"/>
+            <field name="state">code</field>
+            <field name="code">action = False
+for rec in records:
+    action = rec.with_context(dialog=True).action_validate_webhook()</field>
+        </record>
+
+        <record id="action_server_delete_webhook" model="ir.actions.server">
+            <field name="name">Delete Webhook</field>
+            <field name="model_id" ref="social.model_social_account"/>
+            <field name="binding_model_id" ref="social.model_social_account"/>
+            <field name="state">code</field>
+            <field name="code">action = False
+for rec in records:
+    action = rec.with_context(dialog=True).action_delete_webhook()</field>
+        </record>
+
+        <record id="action_server_fetch_group_messages" model="ir.actions.server">
+            <field name="name">Fetch Group Messages</field>
+            <field name="model_id" ref="mail.model_discuss_channel"/>
+            <field name="binding_model_id" ref="mail.model_discuss_channel"/>
+            <field name="state">code</field>
+            <field name="code">action = False
+for rec in records:
+    action = rec.with_context(dialog=True).action_fetch_group_messages()</field>
+        </record>
+
+        <record id="action_server_groups_by_account" model="ir.actions.server">
+            <field name="name">Groups by Account</field>
+            <field name="model_id" ref="social.model_social_account"/>
+            <field name="state">code</field>
+            <field name="code">action = False
+if records:
+    action = records[:1].action_x_account_groups_by_account()</field>
+        </record>
+    </data>
+</odoo>

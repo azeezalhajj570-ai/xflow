@@ -1,6 +1,10 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
+import logging
+
 from odoo import api, fields, models
+
+_logger = logging.getLogger(__name__)
 
 
 class DiscussChannel(models.Model):
@@ -94,15 +98,25 @@ class DiscussChannel(models.Model):
     def _save_x_message(self, direction, external_id, body, external_created_at,
                         author_partner=None, **kw):
         self.ensure_one()
-        # OmniX delivers ISO-8601 timestamps ("2026-08-31T12:00:00Z"); Odoo
+        # OmniX delivers timestamps in several shapes: ISO-8601 strings
+        # ("2026-08-31T12:00:00Z") or Unix epoch milliseconds (ints). Odoo
         # Datetime fields want "%Y-%m-%d %H:%M:%S". Normalize when needed.
-        if isinstance(external_created_at, str) and external_created_at:
-            ts = external_created_at.strip()
-            if 'T' in ts or ts.endswith('Z'):
-                ts = ts.replace('T', ' ').replace('Z', '')
-                if '.' in ts:
-                    ts = ts.split('.')[0]
-                external_created_at = ts
+        if external_created_at:
+            if isinstance(external_created_at, str):
+                ts = external_created_at.strip()
+                if ts.isdigit():
+                    external_created_at = int(ts)
+                elif 'T' in ts or ts.endswith('Z'):
+                    ts = ts.replace('T', ' ').replace('Z', '')
+                    if '.' in ts:
+                        ts = ts.split('.')[0]
+                    external_created_at = ts
+            if isinstance(external_created_at, (int, float)):
+                from datetime import datetime
+                external_created_at = fields.Datetime.to_string(
+                    datetime.fromtimestamp(external_created_at / 1000))
+            if isinstance(external_created_at, str) and not external_created_at.strip():
+                external_created_at = False
         existing = self.env['x.message'].sudo().search([
             ('channel_id', '=', self.id),
             ('external_id', '=', external_id),
@@ -134,6 +148,58 @@ class DiscussChannel(models.Model):
             xm.write({'mail_message_id': msg.id})
             self.write({'last_x_mail_message_id': msg.id})
         return xm
+
+    def action_fetch_group_messages(self, limit=100):
+        """Fetch this group channel's messages via the owning account's
+        provider and store them as x.message records in this channel."""
+        self.ensure_one()
+        if self.channel_type != 'x_group':
+            raise ValueError('Fetch group messages is only available on X groups.')
+        account = self.x_account_id
+        if not account:
+            raise ValueError('This group has no linked X account.')
+        if not account.x_encryption_code:
+            raise ValueError(
+                'Set the XChat Encryption Code on the account first — it is '
+                'required to read encrypted group DMs.')
+        from odoo.addons.x_account.services.x_service import XService
+        provider = XService.get_provider(account)
+        get_dms = getattr(provider, 'get_dms', None)
+        if not get_dms:
+            raise NotImplementedError(
+                'Provider %s does not support fetching messages' % account.x_provider)
+        conv_id = self.x_conversation_id
+        if not conv_id:
+            raise ValueError('This group has no conversation id.')
+        result = get_dms(conv_id, limit=int(limit))
+        count = 0
+        for msg in result['messages']:
+            author_partner = False
+            sender_id = msg.get('sender_id')
+            if sender_id:
+                author_partner = self.env['res.partner'].sudo().search(
+                    [('x_user_id', '=', str(sender_id))], limit=1)
+            self._save_x_message(
+                direction='outbound' if msg.get('from_me') else 'inbound',
+                external_id=msg['id'],
+                body=msg.get('text', ''),
+                external_created_at=msg.get('created_at'),
+                author_partner=author_partner,
+                author_x_id=sender_id,
+            )
+            count += 1
+        if self.env.context.get('dialog'):
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': 'Fetch Group Messages',
+                    'message': 'Stored %s message(s) in this group.' % count,
+                    'type': 'success',
+                    'sticky': False,
+                },
+            }
+        return {'messages': count}
 
     @api.model
     def _handle_x_inbound_event(self, event):
@@ -179,6 +245,7 @@ class DiscussChannel(models.Model):
         if not account or not event:
             return False
         etype = event.get('type') or event.get('event') or ''
+        _logger.info('Webhook event type=%r full=%r', etype, event)
 
         # Direct-message events: message.received / message.sent / edited / deleted
         if etype.startswith('message.'):
@@ -216,9 +283,10 @@ class DiscussChannel(models.Model):
         if etype.startswith('tweet.'):
             conversation_id = event.get('conversationId') or event.get('conversation_id')
             author_x_id = event.get('author_id') or event.get('user_id')
-            body = event.get('text', '')
-            if not conversation_id and event.get('tweet_id'):
-                conversation_id = 'tweet-%s' % event['tweet_id']
+            body = event.get('text', '') or event.get('message', '')
+            tweet_id = event.get('tweet_id') or event.get('target_tweet_id')
+            if not conversation_id and tweet_id:
+                conversation_id = 'tweet-%s' % tweet_id
             if not conversation_id:
                 return False
             channel = self._get_x_channel(
@@ -229,22 +297,35 @@ class DiscussChannel(models.Model):
             )
             return channel._save_x_message(
                 direction='inbound',
-                external_id=event.get('tweet_id') or event.get('message_id'),
+                external_id=tweet_id or event.get('message_id'),
                 body=body or '%s' % etype,
-                external_created_at=event.get('created_at'),
+                external_created_at=event.get('created_at') or event.get('time'),
                 author_x_id=author_x_id,
                 author_x_username=event.get('author_screen_name'),
             )
 
-        # user.follow events: log to the account's chatter.
+        # user.follow events: OmniX delivers a batch of actors per delivery.
+        # Store one x.message per actor (deduped by actor id).
         if etype == 'user.follow':
+            actor_ids = event.get('actor_ids') or []
             actor_names = event.get('actor_screen_names') or []
-            if actor_names:
-                account.message_post(
-                    body='Followed by: %s' % ', '.join(actor_names),
-                    message_type='comment',
-                    subtype_xmlid='mail.mt_comment',
-                )
+            if actor_ids:
+                for i, actor_id in enumerate(actor_ids):
+                    name = actor_names[i] if i < len(actor_names) else actor_id
+                    channel = self._get_x_channel(
+                        account,
+                        conversation_id='follow-%s' % actor_id,
+                        channel_type='x',
+                        create_if_not_found=True,
+                    )
+                    channel._save_x_message(
+                        direction='inbound',
+                        external_id='follow-%s' % actor_id,
+                        body='Followed by: %s' % name,
+                        external_created_at=event.get('time'),
+                        author_x_id=actor_id,
+                        author_x_username=name,
+                    )
             return True
 
         return False
