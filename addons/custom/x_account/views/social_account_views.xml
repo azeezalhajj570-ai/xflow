@@ -32,6 +32,15 @@
                 <header>
                     <button name="action_fetch_groups" string="Fetch Groups" type="object"
                             icon="fa-users"/>
+                    <button name="action_register_webhook" string="Register Webhook"
+                            type="object" icon="fa-bolt"
+                            invisible="x_webhook_id"/>
+                    <button name="action_validate_webhook" string="Validate Webhook"
+                            type="object" icon="fa-check"
+                            invisible="not x_webhook_id"/>
+                    <button name="action_delete_webhook" string="Delete Webhook"
+                            type="object" icon="fa-trash"
+                            invisible="not x_webhook_id"/>
                 </header>
                 <sheet>
                     <div class="oe_title">
@@ -44,6 +53,12 @@
                         <field name="twitter_user_id" readonly="1"/>
                         <field name="x_connection_status"/>
                         <field name="last_validated" readonly="1"/>
+                    </group>
+                    <group string="Webhook">
+                        <field name="x_webhook_url"/>
+                        <field name="x_webhook_id"/>
+                        <field name="x_webhook_valid"/>
+                        <field name="x_webhook_secret" password="True"/>
                     </group>
                 </sheet>
             </form>

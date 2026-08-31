@@ -10,38 +10,91 @@
     <record id="x_account_res_config_settings_view_form" model="ir.ui.view">
         <field name="name">res.config.settings.view.form.inherit.x.account</field>
         <field name="model">res.config.settings</field>
-        <field name="inherit_id" ref="social.res_config_settings_view_form"/>
+        <field name="inherit_id" ref="base.res_config_settings_view_form"/>
         <field name="arch" type="xml">
-            <xpath expr="//block[hasclass('o_social_developer_settings')]" position="inside">
-                <setting string="X Account &amp; Session Platform">
-                    <div class="content-group">
-                        <div class="mt16">
-                            <label for="x_auth_method" string="Authentication Method" class="col-3 col-lg-3 o_form_label"/>
-                            <field name="x_auth_method"/>
+            <xpath expr="//form" position="inside">
+                <div class="app_settings_block" id="x_account_settings_block"
+                     data-string="X Account" string="X Account"
+                     data-key="x_account" groups="base.group_system">
+                    <h2>X Account &amp; Session Platform</h2>
+                    <div class="row mt16 o_settings_container">
+                        <div class="col-12 col-lg-6 o_setting_box">
+                            <div class="o_setting_left_pane">
+                                <label for="x_provider" string="Provider"/>
+                            </div>
+                            <div class="o_setting_right_pane">
+                                <field name="x_provider"/>
+                                <div class="text-muted">
+                                    Provider implementation used for X HTTP operations.
+                                </div>
+                            </div>
                         </div>
-                        <div class="mt16">
-                            <label for="x_provider" string="Provider" class="col-3 col-lg-3 o_form_label"/>
-                            <field name="x_provider"/>
+                        <div class="col-12 col-lg-6 o_setting_box">
+                            <div class="o_setting_left_pane">
+                                <label for="x_auth_method" string="Authentication Method"/>
+                            </div>
+                            <div class="o_setting_right_pane">
+                                <field name="x_auth_method"/>
+                                <div class="text-muted">
+                                    Authentication method used when adding X accounts.
+                                </div>
+                            </div>
                         </div>
-                        <div class="mt16">
-                            <label for="x_omnix_api_key" string="OmniX API Key" class="col-3 col-lg-3 o_form_label"/>
-                            <field name="x_omnix_api_key" password="True"/>
-                        </div>
-                        <div class="mt16">
-                            <label for="x_web_api_base" string="Web API Base URL" class="col-3 col-lg-3 o_form_label"/>
-                            <field name="x_web_api_base"/>
-                        </div>
-                        <div class="mt16">
-                            <label for="x_encryption_key_configured" string="Session Encryption Key Configured" class="col-3 col-lg-3 o_form_label"/>
-                            <field name="x_encryption_key_configured"/>
-                        </div>
-                        <p class="text-muted mt16">
-                            The session encryption key is supplied via the
-                            <code>X_SESSION_ENCRYPTION_KEY</code> deployment environment
-                            variable. It is never stored in Odoo, logged, or returned by APIs.
-                        </p>
                     </div>
-                </setting>
+                    <div class="row mt16 o_settings_container">
+                        <div class="col-12 col-lg-6 o_setting_box">
+                            <div class="o_setting_left_pane">
+                                <label for="x_omnix_api_key" string="OmniX API Key"/>
+                            </div>
+                            <div class="o_setting_right_pane">
+                                <field name="x_omnix_api_key" password="True"/>
+                                <div class="text-muted">
+                                    OmniX API key (Authorization: Bearer). Used only by the
+                                    optional OmniX provider.
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-lg-6 o_setting_box">
+                            <div class="o_setting_left_pane">
+                                <label for="x_webhook_base_url" string="Webhook Base URL"/>
+                            </div>
+                            <div class="o_setting_right_pane">
+                                <field name="x_webhook_base_url" placeholder="https://azeez-tech.com"/>
+                                <div class="text-muted">
+                                    Public https base URL of this Odoo instance. OmniX webhooks
+                                    are registered at &lt;base&gt;/x_account/webhook/&lt;account&gt;.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row mt16 o_settings_container">
+                        <div class="col-12 col-lg-6 o_setting_box">
+                            <div class="o_setting_left_pane">
+                                <label for="x_web_api_base" string="Web API Base URL"/>
+                            </div>
+                            <div class="o_setting_right_pane">
+                                <field name="x_web_api_base"/>
+                                <div class="text-muted">
+                                    Base URL used by the undocumented web-session provider.
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-lg-6 o_setting_box">
+                            <div class="o_setting_left_pane">
+                                <label for="x_encryption_key_configured"
+                                       string="Session Encryption Key Configured"/>
+                            </div>
+                            <div class="o_setting_right_pane">
+                                <field name="x_encryption_key_configured"/>
+                                <div class="text-muted">
+                                    The session encryption key is supplied via the
+                                    <code>X_SESSION_ENCRYPTION_KEY</code> deployment environment
+                                    variable. It is never stored in Odoo, logged, or returned by APIs.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </xpath>
         </field>
     </record>

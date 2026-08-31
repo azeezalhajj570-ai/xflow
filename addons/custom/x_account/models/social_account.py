@@ -1,6 +1,7 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 import logging
+import secrets
 
 from odoo import _, api, fields, models
 
@@ -56,6 +57,28 @@ class SocialAccount(models.Model):
         string='X Session Store',
         ondelete='set null',
         help='Encrypted session credentials vault record.',
+    )
+    x_webhook_id = fields.Char(
+        string='X Webhook ID',
+        readonly=True,
+        help='OmniX webhook id registered for this account.',
+    )
+    x_webhook_secret = fields.Char(
+        string='X Webhook Secret',
+        readonly=True,
+        groups='base.group_system',
+        help='HMAC secret used to verify OmniX webhook deliveries. '
+             'Returned once by OmniX at registration.',
+    )
+    x_webhook_url = fields.Char(
+        string='X Webhook URL',
+        readonly=True,
+        help='Receiver URL this account\'s OmniX webhook posts to.',
+    )
+    x_webhook_valid = fields.Boolean(
+        string='X Webhook Valid',
+        readonly=True,
+        help='True once the OmniX webhook passed the CRC handshake.',
     )
 
     x_migration_status = fields.Selection(
@@ -113,6 +136,113 @@ class SocialAccount(models.Model):
                 },
             }
         return result
+
+    def _webhook_receiver_url(self):
+        """Public receiver URL for this account's webhook endpoint."""
+        base = self.env['ir.config_parameter'].sudo().get_param(
+            'x_account.webhook_base_url', '')
+        base = (base or '').rstrip('/')
+        if not base:
+            raise ValueError(
+                'Set the X Webhook Base URL in X Account Settings first '
+                '(the public https URL of this Odoo instance).')
+        return '%s/x_account/webhook/%s' % (base, self.id)
+
+    def action_register_webhook(self):
+        """Register an OmniX webhook for this account (and store the secret)."""
+        self.ensure_one()
+        if not self._filter_x_accounts():
+            raise ValueError('Webhooks are only available on X accounts.')
+        from odoo.addons.x_account.services.x_service import XService
+        provider = XService.get_provider(self)
+        register = getattr(provider, 'register_webhook', None)
+        if not register:
+            raise NotImplementedError(
+                'Provider %s does not support webhooks' % self.x_provider)
+        secret = self.x_webhook_secret or self.env['ir.config_parameter'].sudo().get_param(
+            'x_account.webhook_secret') or secrets.token_hex(32)
+        # Persist the secret BEFORE calling OmniX: it runs the CRC handshake
+        # (GET ?crc_token) immediately on registration, so the receiver must
+        # already know the secret or the handshake fails.
+        self.write({'x_webhook_secret': secret})
+        result = register(self._webhook_receiver_url(), secret=secret)
+        vals = {
+            'x_webhook_id': result.get('id') or self.x_webhook_id,
+            'x_webhook_url': result.get('url') or self._webhook_receiver_url(),
+            'x_webhook_valid': bool(result.get('valid')),
+        }
+        if result.get('secret'):
+            vals['x_webhook_secret'] = result['secret']
+        self.write(vals)
+        if self.env.context.get('dialog'):
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': 'Register Webhook',
+                    'message': 'Webhook registered (valid=%s).' % vals['x_webhook_valid'],
+                    'type': 'success',
+                    'sticky': False,
+                },
+            }
+        return True
+
+    def action_validate_webhook(self):
+        """Re-run OmniX's CRC handshake for this account's webhook."""
+        self.ensure_one()
+        if not self.x_webhook_id:
+            raise ValueError('No webhook registered for this account.')
+        from odoo.addons.x_account.services.x_service import XService
+        provider = XService.get_provider(self)
+        validate = getattr(provider, 'validate_webhook', None)
+        if not validate:
+            raise NotImplementedError(
+                'Provider %s does not support webhooks' % self.x_provider)
+        result = validate(self.x_webhook_id)
+        self.write({'x_webhook_valid': bool(result.get('valid'))})
+        if self.env.context.get('dialog'):
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': 'Validate Webhook',
+                    'message': 'Webhook CRC result: valid=%s' % self.x_webhook_valid,
+                    'type': 'success',
+                    'sticky': False,
+                },
+            }
+        return True
+
+    def action_delete_webhook(self):
+        """Delete this account's OmniX webhook and clear the local state."""
+        self.ensure_one()
+        if not self.x_webhook_id:
+            raise ValueError('No webhook registered for this account.')
+        from odoo.addons.x_account.services.x_service import XService
+        provider = XService.get_provider(self)
+        delete = getattr(provider, 'delete_webhook', None)
+        if not delete:
+            raise NotImplementedError(
+                'Provider %s does not support webhooks' % self.x_provider)
+        delete(self.x_webhook_id)
+        self.write({
+            'x_webhook_id': False,
+            'x_webhook_secret': False,
+            'x_webhook_url': False,
+            'x_webhook_valid': False,
+        })
+        if self.env.context.get('dialog'):
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': 'Delete Webhook',
+                    'message': 'Webhook deleted.',
+                    'type': 'success',
+                    'sticky': False,
+                },
+            }
+        return True
 
     def _skip_oauth_stats(self):
         """Accounts managed by x_account (omnix / session_web) have no OAuth

@@ -307,6 +307,42 @@ class OmniXProvider:
         data = self._request('POST', '/tweet/create', body={'text': text})
         return {'tweet_id': (data.get('data') or {}).get('id', '')}
 
+    # ---------------------------------------------------------------- webhooks
+    def register_webhook(self, url, secret=None, events=None):
+        """Register an OmniX webhook for this account.
+
+        Returns {id, url, valid, secret}. OmniX runs a CRC handshake on
+        registration; the webhook only becomes valid once the receiver answers.
+        """
+        body = {'url': url}
+        if secret:
+            body['secret'] = secret
+        if events:
+            body['events'] = events
+        data = self._request('POST', '/webhooks', body=body)
+        wh = data.get('data') or {}
+        return {
+            'id': str(wh.get('id', '')),
+            'url': wh.get('url', url),
+            'valid': bool(wh.get('valid')),
+            'secret': wh.get('secret') or '',
+        }
+
+    def list_webhooks(self):
+        """Return the webhooks registered for this account."""
+        data = self._request('GET', '/webhooks')
+        return ((data.get('data') or {}).get('webhooks') or [])
+
+    def validate_webhook(self, webhook_id):
+        """Re-run the CRC handshake for a webhook id."""
+        data = self._request('PUT', '/webhooks/%s' % webhook_id)
+        return data.get('data') or {}
+
+    def delete_webhook(self, webhook_id):
+        """Delete a webhook. The watcher stops and no further events arrive."""
+        data = self._request('DELETE', '/webhooks/%s' % webhook_id)
+        return data.get('data') or {}
+
     # --------------------------------------------------------------- internals
     def _headers(self):
         return {

@@ -33,6 +33,13 @@ class ResConfigSettings(models.TransientModel):
         help='OmniX API key (Authorization: Bearer). Used only by the optional '
              'OmniX provider; never stored in x.session.store.',
     )
+    x_webhook_base_url = fields.Char(
+        string='X Webhook Base URL',
+        config_parameter='x_account.webhook_base_url',
+        help='Public https base URL of this Odoo instance, e.g. '
+             'https://azeez-tech.com. OmniX webhooks are registered at '
+             '<base>/x_account/webhook.',
+    )
     x_encryption_key_configured = fields.Boolean(
         string='X Session Encryption Key Configured',
         config_parameter='x_account.encryption_key_configured',

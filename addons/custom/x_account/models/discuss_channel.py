@@ -161,3 +161,82 @@ class DiscussChannel(models.Model):
             author_x_id=author_x_id,
             author_x_username=event.get('author_x_username'),
         )
+
+    @api.model
+    def _handle_x_webhook_event(self, account, event):
+        """Route an OmniX webhook event (message.*, tweet.*, user.follow) into
+        x.message + discuss channels for the owning account."""
+        self = self.sudo()
+        if not account or not event:
+            return False
+        etype = event.get('type') or event.get('event') or ''
+
+        # Direct-message events: message.received / message.sent / edited / deleted
+        if etype.startswith('message.'):
+            conversation_id = event.get('conversation_id')
+            if not conversation_id:
+                return False
+            channel = self._get_x_channel(
+                account,
+                conversation_id=conversation_id,
+                channel_type='x_group' if str(conversation_id).startswith('g') else 'x',
+                create_if_not_found=True,
+            )
+            author_x_id = event.get('sender_id')
+            author_partner = False
+            if author_x_id:
+                author_partner = self.env['res.partner'].sudo().search(
+                    [('x_user_id', '=', str(author_x_id))], limit=1)
+                if not author_partner:
+                    author_partner = self.env['res.partner'].sudo().create({
+                        'name': author_x_id,
+                        'x_user_id': str(author_x_id),
+                    })
+            if etype in ('message.received', 'message.sent'):
+                return channel._save_x_message(
+                    direction='inbound' if etype == 'message.received' else 'outbound',
+                    external_id=event.get('message_id') or event.get('seq_id'),
+                    body=event.get('text', ''),
+                    external_created_at=event.get('created_at'),
+                    author_partner=author_partner,
+                    author_x_id=author_x_id,
+                )
+            return True
+
+        # Tweet events: route into a channel keyed by the tweet conversation.
+        if etype.startswith('tweet.'):
+            conversation_id = event.get('conversationId') or event.get('conversation_id')
+            author_x_id = event.get('author_id') or event.get('user_id')
+            body = event.get('text', '')
+            if not conversation_id and event.get('tweet_id'):
+                conversation_id = 'tweet-%s' % event['tweet_id']
+            if not conversation_id:
+                return False
+            channel = self._get_x_channel(
+                account,
+                conversation_id=str(conversation_id),
+                channel_type='x',
+                create_if_not_found=True,
+            )
+            return channel._save_x_message(
+                direction='inbound',
+                external_id=event.get('tweet_id') or event.get('message_id'),
+                body=body or '%s' % etype,
+                external_created_at=event.get('created_at'),
+                author_x_id=author_x_id,
+                author_x_username=event.get('author_screen_name'),
+            )
+
+        # user.follow events: log to the account's chatter.
+        if etype == 'user.follow':
+            actor_names = event.get('actor_screen_names') or []
+            if actor_names:
+                account.message_post(
+                    body='Followed by: %s' % ', '.join(actor_names),
+                    message_type='comment',
+                    subtype_xmlid='mail.mt_comment',
+                )
+            return True
+
+        return False
+
