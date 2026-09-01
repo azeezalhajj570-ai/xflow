@@ -21,7 +21,6 @@ Highlights:
 - Account grouping (x.account.group) + base_automation rules
 - Non-destructive, staged migration from XAction
 - Optional publish/stats path via XOfficialPublishAdapter (OAuth 1.0a)
-- Optional OmniX REST provider (DM/tweet/follow; per-account either/or with session)
     """,
     'depends': [
         'social',

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- No new security group needed: the OmniX webhook fields reuse
+             x_account's group_x_account_manager and base.group_system. This
+             file exists so the module owns its security declaration point. -->
+    </data>
+</odoo>

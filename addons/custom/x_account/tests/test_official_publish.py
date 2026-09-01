@@ -3,7 +3,6 @@ from unittest.mock import MagicMock, patch
 from odoo.tests import tagged
 
 from odoo.addons.x_account.services.providers.official_publish import XOfficialPublishAdapter
-from odoo.addons.x_account.services.x_provider import XProviderRegistry
 from odoo.addons.x_account.tests.common import XAccountTestBase
 
 
@@ -120,44 +119,3 @@ class TestXOfficialPublish(XAccountTestBase):
         self.assertEqual(result['count'], 2)
         self.assertEqual(result['engagement'], 5)
         self.assertEqual(result['stories'], 1)
-
-
-@tagged('post_install', '-at_install', 'x_account')
-class TestOmniXExtensionPoint(XAccountTestBase):
-    """T16/T18: OmniX is a built-in optional provider; registry stays extensible."""
-
-    @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
-        cls.twitter_media = cls.env.ref('social_twitter.social_media_twitter')
-        cls.env['ir.config_parameter'].sudo().set_param(
-            'x_account.dev_encryption_key', 'test-encryption-key')
-
-    def test_builtin_provider_resolution(self):
-        from odoo.addons.x_account.services.providers.omnix import OmniXProvider
-        from odoo.addons.x_account.services.providers.session_web import SessionWebProvider
-        self.assertIs(
-            XProviderRegistry.resolve('session_web'), SessionWebProvider)
-        self.assertIs(
-            XProviderRegistry.resolve('official_publish'),
-            XOfficialPublishAdapter)
-        self.assertIs(
-            XProviderRegistry.resolve('omnix'), OmniXProvider)
-
-    def test_omnix_is_valid_selection_value(self):
-        """'omnix' is a valid x_provider value (per-account either/or with session)."""
-        account = self.env['social.account'].create({
-            'name': 'OmniX Account',
-            'media_id': self.twitter_media.id,
-            'x_provider': 'omnix',
-        })
-        self.assertEqual(account.x_provider, 'omnix')
-
-    def test_unknown_provider_rejected_by_selection(self):
-        """An unregistered provider code is still rejected by the selection."""
-        with self.assertRaises(ValueError):
-            self.env['social.account'].create({
-                'name': 'Unknown Provider',
-                'media_id': self.twitter_media.id,
-                'x_provider': 'not_a_provider',
-            })

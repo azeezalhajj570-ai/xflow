@@ -12,7 +12,7 @@ from odoo.http import request
 _logger = logging.getLogger(__name__)
 
 
-class XAccountController(http.Controller):
+class XAccountOmniXController(http.Controller):
 
     @http.route('/x_account/webhook/<int:account_id>', type='http',
                 auth='public', csrf=False, methods=['GET', 'POST'], website=False)

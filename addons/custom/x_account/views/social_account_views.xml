@@ -50,12 +50,6 @@
                         <field name="twitter_user_id" readonly="1"/>
                         <field name="x_connection_status"/>
                         <field name="last_validated"/>
-                    </group>
-                    <group string="Webhook">
-                        <field name="x_webhook_url"/>
-                        <field name="x_webhook_id"/>
-                        <field name="x_webhook_valid"/>
-                        <field name="x_webhook_secret" password="True"/>
                         <field name="x_encryption_code" password="True"/>
                     </group>
                 </sheet>

@@ -2,15 +2,18 @@ from unittest.mock import MagicMock, patch
 
 from odoo.tests import tagged
 
-from odoo.addons.x_account.services.providers.omnix import OmniXProvider
 from odoo.addons.x_account.services.providers.session_web import SessionWebProvider
 from odoo.addons.x_account.services.x_provider import XProviderRegistry
 from odoo.addons.x_account.services.x_service import XService
-from odoo.addons.x_account.tests.common import XAccountTestBase
+
+from odoo.addons.x_account_omnix.services.omnix_http_client import OmniXHttpClient
+from odoo.addons.x_account_omnix.services.omnix_provider import OmniXProvider
+
+from .common import XAccountOmniXTestBase
 
 
-@tagged('post_install', '-at_install', 'x_account')
-class TestOmniXProvider(XAccountTestBase):
+@tagged('post_install', '-at_install', 'x_account_omnix')
+class TestOmniXProvider(XAccountOmniXTestBase):
     """T18: optional OmniX REST provider (per-account either/or with session)."""
 
     @classmethod
@@ -46,7 +49,7 @@ class TestOmniXProvider(XAccountTestBase):
             'data': {'id': '12345', 'userName': 'omnix_user', 'name': 'OmniX Account'},
             'error': None,
         }
-        with patch.object(self.provider, '_request', return_value=response.json()) as req:
+        with patch.object(OmniXHttpClient, 'request', return_value=response.json()) as req:
             result = self.provider.validate_session()
         self.assertTrue(result['valid'])
         self.assertEqual(result['reason'], 'omnix')
@@ -67,7 +70,7 @@ class TestOmniXProvider(XAccountTestBase):
         self.assertEqual(result['reason'], 'Missing auth_token cookie')
 
     def test_validate_session_network_error(self):
-        with patch.object(self.provider, '_request',
+        with patch.object(OmniXHttpClient, 'request',
                           side_effect=RuntimeError('network_error: boom')):
             result = self.provider.validate_session()
         self.assertFalse(result['valid'])
@@ -88,7 +91,7 @@ class TestOmniXProvider(XAccountTestBase):
             'data': {'id': '999888', 'userName': 'token_user', 'name': 'Token User'},
             'error': None,
         }
-        with patch.object(provider, '_request',
+        with patch.object(OmniXHttpClient, 'request',
                           side_effect=[home, info]) as req:
             result = provider.validate_session()
         self.assertTrue(result['valid'])
@@ -116,7 +119,7 @@ class TestOmniXProvider(XAccountTestBase):
             },
             'error': None,
         }
-        with patch.object(self.provider, '_request', return_value=data) as req:
+        with patch.object(OmniXHttpClient, 'request', return_value=data) as req:
             result = self.provider.get_conversations(limit=10)
         self.assertEqual(len(result['conversations']), 2)
         self.assertEqual(result['conversations'][0]['conversation_id'], 'conv-1')
@@ -139,7 +142,7 @@ class TestOmniXProvider(XAccountTestBase):
             },
             'error': None,
         }
-        with patch.object(self.provider, '_request', return_value=data) as req:
+        with patch.object(OmniXHttpClient, 'request', return_value=data) as req:
             result = self.provider.get_dms('conv-1')
         self.assertEqual(result['messages'][0]['id'], 'm1')
         self.assertEqual(result['messages'][0]['conversation_id'], 'conv-1')
@@ -162,7 +165,7 @@ class TestOmniXProvider(XAccountTestBase):
             },
             'error': None,
         }
-        with patch.object(self.provider, '_request', return_value=data):
+        with patch.object(OmniXHttpClient, 'request', return_value=data):
             result = self.provider.fetch_groups(self.account)
         self.assertEqual(result['groups'], 1)
         self.assertEqual(result['created'], 1)
@@ -183,7 +186,7 @@ class TestOmniXProvider(XAccountTestBase):
 
     def test_send_dm(self):
         data = {'status': True, 'data': {'id': 'dm-1', 'created_at': '2026-01-01'}, 'error': None}
-        with patch.object(self.provider, '_request', return_value=data) as req:
+        with patch.object(OmniXHttpClient, 'request', return_value=data) as req:
             result = self.provider.send_dm('9', 'hello there')
         self.assertEqual(result['message_id'], 'dm-1')
         self.assertEqual(req.call_args.kwargs['body']['recipient_id'], '9')
@@ -198,34 +201,34 @@ class TestOmniXProvider(XAccountTestBase):
     # ------------------------------------------------------- automation ops
     def test_like(self):
         data = {'status': True, 'data': {'favorited': True}, 'error': None}
-        with patch.object(self.provider, '_request', return_value=data) as req:
+        with patch.object(OmniXHttpClient, 'request', return_value=data) as req:
             result = self.provider.like('111')
         self.assertTrue(result['liked'])
         self.assertEqual(req.call_args.kwargs['body']['tweet_id'], '111')
 
     def test_comment(self):
         data = {'status': True, 'data': {'id': '222'}, 'error': None}
-        with patch.object(self.provider, '_request', return_value=data) as req:
+        with patch.object(OmniXHttpClient, 'request', return_value=data) as req:
             result = self.provider.comment('111', 'nice post')
         self.assertEqual(result['comment_id'], '222')
         self.assertEqual(req.call_args.kwargs['body']['text'], 'nice post')
 
     def test_repost(self):
         data = {'status': True, 'data': {'retweeted': True}, 'error': None}
-        with patch.object(self.provider, '_request', return_value=data):
+        with patch.object(OmniXHttpClient, 'request', return_value=data):
             result = self.provider.repost('111')
         self.assertTrue(result['retweeted'])
 
     def test_follow(self):
         data = {'status': True, 'data': {'followed': True}, 'error': None}
-        with patch.object(self.provider, '_request', return_value=data) as req:
+        with patch.object(OmniXHttpClient, 'request', return_value=data) as req:
             result = self.provider.follow('@someuser')
         self.assertTrue(result['followed'])
         self.assertEqual(req.call_args.kwargs['body']['userName'], 'someuser')
 
     def test_post_tweet(self):
         data = {'status': True, 'data': {'id': '333'}, 'error': None}
-        with patch.object(self.provider, '_request', return_value=data) as req:
+        with patch.object(OmniXHttpClient, 'request', return_value=data) as req:
             result = self.provider.post_tweet('hello world')
         self.assertEqual(result['tweet_id'], '333')
         self.assertEqual(req.call_args.kwargs['body']['text'], 'hello world')
@@ -233,14 +236,14 @@ class TestOmniXProvider(XAccountTestBase):
     # ------------------------------------------------------- error handling
     def test_http_402_is_transient(self):
         """Insufficient credits must surface as rate_limit (transient), not invalid."""
-        with patch.object(self.provider, '_request',
+        with patch.object(OmniXHttpClient, 'request',
                           side_effect=RuntimeError('rate_limit')):
             result = self.provider.validate_session()
         self.assertFalse(result['valid'])
         self.assertEqual(result['reason'], 'rate_limit')
 
     def test_http_401_maps_to_authentication_failure(self):
-        with patch.object(self.provider, '_request',
+        with patch.object(OmniXHttpClient, 'request',
                           side_effect=RuntimeError('authentication_failure')):
             result = self.provider.validate_session()
         self.assertFalse(result['valid'])
@@ -250,14 +253,14 @@ class TestOmniXProvider(XAccountTestBase):
         with patch('requests.request') as mocked:
             mocked.return_value = MagicMock(
                 status_code=200, json=lambda: {'status': True, 'data': {}, 'error': None})
-            self.provider._request('GET', '/user/info', params={'userName': 'u'})
+            self.provider._client.request('GET', '/user/info', params={'userName': 'u'})
         kwargs = mocked.call_args.kwargs
         self.assertEqual(kwargs['params']['auth_token'], 'test-auth-token')
         self.assertEqual(kwargs['headers']['Authorization'], 'Bearer omnix_live_test_key')
 
 
-@tagged('post_install', '-at_install', 'x_account')
-class TestOmniXDispatch(XAccountTestBase):
+@tagged('post_install', '-at_install', 'x_account_omnix')
+class TestOmniXDispatch(XAccountOmniXTestBase):
     """T18: XService dispatch + selection for the 'omnix' provider code."""
 
     @classmethod
@@ -287,7 +290,7 @@ class TestOmniXDispatch(XAccountTestBase):
         self.assertIsInstance(provider, OmniXProvider)
 
     def test_validate_via_xservice(self):
-        with patch.object(OmniXProvider, '_request', return_value={
+        with patch.object(OmniXHttpClient, 'request', return_value={
             'status': True,
             'data': {'id': '1', 'userName': 'dispatch_user', 'name': 'Dispatch'},
             'error': None,
@@ -324,7 +327,7 @@ class TestOmniXDispatch(XAccountTestBase):
             },
             'error': None,
         }
-        with patch.object(OmniXProvider, '_request', return_value=data):
+        with patch.object(OmniXHttpClient, 'request', return_value=data):
             result = self.account.action_fetch_groups()
         self.assertEqual(result['groups'], 1)
         channel = self.env['discuss.channel'].sudo().search([
@@ -333,3 +336,40 @@ class TestOmniXDispatch(XAccountTestBase):
         ], limit=1)
         self.assertTrue(channel)
         self.assertEqual(channel.channel_type, 'x_group')
+
+    def test_enqueued_tasks_execute_via_omnix_provider(self):
+        """Group tasks on an OmniX account dispatch through OmniXProvider."""
+        from odoo.addons.x_account.services.session_manager import XSessionManager
+        # Deactivate the task base_automation rules so the queue worker (not
+        # the on-create automation) executes the task under the test's patch.
+        for xmlid in (
+            'x_account.base_automation_x_task_like',
+            'x_account.base_automation_x_task_repost',
+            'x_account.base_automation_x_task_comment',
+            'x_account.base_automation_x_task_follow',
+            'x_account.base_automation_x_task_send_dm',
+        ):
+            self.env.ref(xmlid).write({'active': False})
+        acc = self.env['social.account'].create({
+            'name': 'Task Account',
+            'media_id': self.twitter_media.id,
+            'social_account_handle': 'task_omx',
+            'x_provider': 'omnix',
+            'x_auth_method': 'session_cookie',
+        })
+        XSessionManager.create_store(acc, 'auth_token=omx-test-token')
+        group = self.env['x.account.group'].create({
+            'name': 'Task Group',
+            'account_ids': [(6, 0, acc.ids)],
+            'actions': 'like',
+            'auto_execute': True,
+            'cooldown_sec': 0,
+        })
+        group._enqueue_group_operation(target_id='777')
+        task = self.env['x.account.task'].search([('group_id', '=', group.id)], limit=1)
+        self.assertEqual(task.status, 'pending')
+        with patch.object(OmniXProvider, 'like',
+                          return_value={'tweet_id': '777', 'liked': True}):
+            self.env['x.account.task']._process_queue()
+        task.invalidate_recordset()
+        self.assertEqual(task.status, 'success')

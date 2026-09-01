@@ -8,4 +8,3 @@ from . import test_security
 from . import test_migration
 from . import test_portability
 from . import test_official_publish
-from . import test_omnix

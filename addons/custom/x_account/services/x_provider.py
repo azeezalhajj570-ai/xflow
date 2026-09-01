@@ -3,7 +3,8 @@
 """X provider interface and registry.
 
 Every X HTTP-capable provider (SessionWebProvider, XOfficialPublishAdapter,
-OmniXProvider) implements the same minimal surface:
+and the optional OmniXProvider from x_account_omnix) implements the same
+minimal surface:
 
     validate_session() -> {'valid': bool, 'user': dict|None, 'reason': str, ...}
 
@@ -12,8 +13,8 @@ send_dm, like, comment, repost, follow, post_tweet, get_account_stats, ...).
 
 XService is the only dispatch point: it resolves a provider either from the
 built-in map below or from the REGISTRY, so new providers can be added without
-modifying XService. OmniX is a built-in optional provider (per-account
-either/or with SessionWebProvider); the system must never depend on it.
+modifying XService. OmniX is an external optional provider (registered by the
+x_account_omnix module); the system must never depend on it.
 """
 
 import logging
@@ -29,7 +30,7 @@ class XProvider:
     """
 
     # Provider code registered in REGISTRY (e.g. 'session_web',
-    # 'official_publish', 'omnix').
+    # 'official_publish', or an external one like 'omnix').
     _provider_code = None
 
     def __init__(self, env, account):
@@ -41,10 +42,11 @@ class XProvider:
 
 
 # Built-in providers, keyed by the social.account.x_provider selection value.
+# 'omnix' is NOT built-in: it is provided by the optional x_account_omnix
+# module, which registers itself with XProviderRegistry at import time (OCP).
 _BUILTIN_PROVIDERS = {
     'session_web': 'odoo.addons.x_account.services.providers.session_web.SessionWebProvider',
     'official_publish': 'odoo.addons.x_account.services.providers.official_publish.XOfficialPublishAdapter',
-    'omnix': 'odoo.addons.x_account.services.providers.omnix.OmniXProvider',
 }
 
 class XProviderRegistry:
@@ -52,13 +54,13 @@ class XProviderRegistry:
 
     Adding a provider is a one-line registration; no change to XService or the
     provider interface is required. This is the only extension point for new
-    providers. OmniX is a built-in provider option (per-account either/or with
-    SessionWebProvider) but remains optional: accounts using SessionWebProvider
-    never import or depend on it.
+    providers. OmniX is an external optional provider (registered by the
+    x_account_omnix module) — accounts using SessionWebProvider never import or
+    depend on it.
     """
 
-    # Extension point for future providers (e.g. OmniX). Maps a provider code
-    # to a dotted path. Registered providers take precedence over built-ins.
+    # Extension point for future providers. Maps a provider code to a dotted
+    # path. Registered providers take precedence over built-ins.
     _registry = {}
 
     @classmethod

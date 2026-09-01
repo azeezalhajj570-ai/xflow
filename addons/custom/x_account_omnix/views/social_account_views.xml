@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="x_account_omnix_social_account_view_form" model="ir.ui.view">
+        <field name="name">x.account.omnix.social.account.view.form</field>
+        <field name="model">social.account</field>
+        <field name="inherit_id" ref="x_account.x_account_social_account_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//group[@name='x_account']" position="inside">
+                <field name="x_webhook_url"/>
+                <field name="x_webhook_id"/>
+                <field name="x_webhook_valid"/>
+                <field name="x_webhook_secret" password="True"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

@@ -1,44 +1,36 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
-import logging
+"""Extend x.import.session with the OmniX provider option.
+
+x_account's import wizard hard-codes session_web + official_publish. This
+module adds 'omnix' as a third provider option and dispatches validation to
+OmniXProvider when selected (SRP: the wizard only picks the provider, the
+provider validates).
+"""
 
 from odoo import _, fields, models
 from odoo.exceptions import ValidationError
 
 from odoo.addons.x_account.services.providers.session_web import SessionWebProvider
-from odoo.addons.x_account.services.session_manager import XSessionManager
-
-_logger = logging.getLogger(__name__)
 
 
 class XImportSession(models.TransientModel):
-    _name = 'x.import.session'
-    _description = 'Import X Session'
+    _inherit = 'x.import.session'
 
-    media_id = fields.Many2one('social.media', string='X Media', required=True)
-    name = fields.Char(string='Display Name')
-    auth_token = fields.Char(string='auth_token', required=True)
-    ct0 = fields.Char(string='ct0')
-    username = fields.Char(string='Username / Handle')
     provider = fields.Selection(
-        [
-            ('session_web', 'Session Web'),
-            ('official_publish', 'Official Publish'),
+        selection_add=[
+            ('omnix', 'OmniX REST API'),
         ],
-        string='Provider',
-        default='session_web',
+        ondelete={'omnix': 'cascade'},
     )
 
-    def default_get(self, fields_list):
-        result = super().default_get(fields_list)
-        if 'media_id' in fields_list and not result.get('media_id'):
-            media = self.env['social.media'].search(
-                [('media_type', '=', 'twitter')], limit=1)
-            if media:
-                result['media_id'] = media.id
-        return result
-
     def action_import(self):
+        """Validate the session via the selected provider, then persist."""
+        if self.provider == 'omnix':
+            return self._action_import_omnix()
+        return super().action_import()
+
+    def _action_import_omnix(self):
         self.ensure_one()
         auth_token = self.auth_token.strip()
         if not auth_token:
@@ -51,19 +43,18 @@ class XImportSession(models.TransientModel):
         if not cookies.get('auth_token'):
             raise ValidationError(_('auth_token is required.'))
 
-        twitter_media = self.media_id
         account = self.env['social.account'].with_context(
             x_no_default_stream=True).create({
-            'name': self.name or self.username or 'X Account',
-            'social_account_handle': self.username or '',
-            'media_id': twitter_media.id,
-            'x_provider': self.provider,
-            'x_auth_method': 'session_cookie',
-            'x_connection_status': 'authenticating',
-        })
+                'name': self.name or self.username or 'X Account',
+                'social_account_handle': self.username or '',
+                'media_id': self.media_id.id,
+                'x_provider': 'omnix',
+                'x_auth_method': 'session_cookie',
+                'x_connection_status': 'authenticating',
+            })
 
-        # Validate before persisting: if invalid, rollback the account.
-        provider = SessionWebProvider(self.env, account, cookies)
+        from odoo.addons.x_account_omnix.services.omnix_provider import OmniXProvider
+        provider = OmniXProvider(self.env, account, cookies)
         result = provider.validate_session()
         if not result.get('valid'):
             account.unlink()
@@ -78,6 +69,7 @@ class XImportSession(models.TransientModel):
             'last_connected': fields.Datetime.now(),
             'last_validated': fields.Datetime.now(),
         })
+        from odoo.addons.x_account.services.session_manager import XSessionManager
         XSessionManager.create_store(account, cookie_string, source='wizard')
         XSessionManager.register_runtime(account, provider)
         return {'type': 'ir.actions.act_window_close'}
