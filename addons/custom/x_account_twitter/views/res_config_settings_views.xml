@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="x_account_twitter_res_config_settings_view_form" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.inherit.x.account.twitter</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="x_account.x_account_res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[@id='x_account_settings_block']" position="inside">
+                <h2>Twitter / X (Official API)</h2>
+                <div class="row mt16 o_settings_container">
+                    <div class="col-12 col-lg-6 o_setting_box">
+                        <div class="o_setting_left_pane">
+                            <label for="x_oauth2_client_id" string="OAuth 2.0 Client ID"/>
+                        </div>
+                        <div class="o_setting_right_pane">
+                            <field name="x_oauth2_client_id"/>
+                            <div class="text-muted">
+                                OAuth 2.0 Client ID from your X app
+                                (Dev Portal &gt; Keys and Tokens &gt; OAuth 2.0 Client ID).
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-lg-6 o_setting_box">
+                        <div class="o_setting_left_pane">
+                            <label for="x_oauth2_client_secret" string="OAuth 2.0 Client Secret"/>
+                        </div>
+                        <div class="o_setting_right_pane">
+                            <field name="x_oauth2_client_secret"/>
+                            <div class="text-muted">
+                                OAuth 2.0 Client Secret from your X app. Used to exchange
+                                authorization codes and refresh access tokens. Add the
+                                callback URI <code>/x_account/twitter/oauth2/callback</code>
+                                to your X app authentication settings.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </xpath>
+        </field>
+    </record>
+</odoo>
