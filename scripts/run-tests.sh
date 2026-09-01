@@ -37,10 +37,23 @@ echo "=== Running tests for module '${MODULE}' ==="
 # Use the container entrypoint so DB credentials are injected correctly.
 # --workers=0 is required for tests and keeps memory usage low.
 # --http-port=18069 avoids binding to the dev server's port 8069.
+#
+# Two phases: -i installs the module (runs at_install tests), then -u runs the
+# post_install tests. Suites tagged `post_install` / `-at_install` only run in
+# the update phase, and the tag spec must include `standard,post_install`.
 docker compose exec -T odoo /entrypoint.sh odoo server \
     -d "${TEST_DB}" \
     -i "${MODULE}" \
-    --test-tags "/${MODULE}" \
+    --stop-after-init \
+    --workers=0 \
+    --http-port=18069 \
+    --logfile="/var/log/odoo/test_${MODULE}.log" \
+    "$@"
+
+docker compose exec -T odoo /entrypoint.sh odoo server \
+    -d "${TEST_DB}" \
+    -u "${MODULE}" \
+    --test-tags "standard,post_install,/${MODULE}" \
     --stop-after-init \
     --workers=0 \
     --http-port=18069 \
