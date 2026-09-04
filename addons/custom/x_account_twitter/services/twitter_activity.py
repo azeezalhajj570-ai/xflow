@@ -388,13 +388,29 @@ class TwitterActivity:
                 ev = msg.get('event') or {}
                 if ev.get('type') == 'Message':
                     content = ev.get('content') or {}
+                    _logger.info('x_account_twitter: decrypted message content keys=%s content=%s',
+                                list(content.keys()), str(content)[:1000])
                     text = content.get('text', '')
                     urls = content.get('urls') or []
+                    entities = content.get('entities') or []
+                    attachments = content.get('attachments') or []
+                    url_texts = []
                     if urls:
-                        url_texts = [u.get('expanded_url') or u.get('url') or '' for u in urls if u]
-                        url_texts = [u for u in url_texts if u]
-                        if url_texts:
-                            text = (text + '\n' + '\n'.join(url_texts)).strip() if text else '\n'.join(url_texts)
+                        url_texts.extend([u.get('expanded_url') or u.get('url') or '' for u in urls if u])
+                    for entity in entities:
+                        if entity.get('type') == 'url':
+                            url_texts.append(entity.get('expanded_url') or entity.get('url') or '')
+                    for attachment in attachments:
+                        if attachment.get('type') == 'url':
+                            url_texts.append(attachment.get('expanded_url') or attachment.get('url') or '')
+                        elif attachment.get('type') == 'media':
+                            url_texts.append(attachment.get('url') or attachment.get('media_url') or '')
+                        elif 'post' in attachment:
+                            post_data = attachment.get('post') or {}
+                            url_texts.append(post_data.get('post_url') or '')
+                    url_texts = [u for u in url_texts if u]
+                    if url_texts:
+                        text = (text + '\n' + '\n'.join(url_texts)).strip() if text else '\n'.join(url_texts)
                     if text:
                         return text, True
         except Exception as exc:
