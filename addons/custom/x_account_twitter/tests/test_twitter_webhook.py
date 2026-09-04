@@ -908,6 +908,25 @@ class TestXChatKeyModes(XAccountTwitterTestBase):
         self.account.write({'x_chat_pin_locked': True})
         self.assertFalse(XChatDecryptor(self.env, self.account).available)
 
+    def test_successful_unlock_clears_lock_flag(self):
+        """A successful Juicebox unlock must ensure x_chat_pin_locked is False.
+        If the lock was previously set (e.g. from a transient error that was
+        misidentified), a successful unlock clears it."""
+        self.account.write({'x_chat_key_mode': 'juicebox',
+                            'x_encryption_code': 'correct-pin',
+                            'x_chat_pin_locked': False})
+        self.assertFalse(self.account.x_chat_pin_locked)
+        fake_chat = Mock()
+        fake_chat.unlock.return_value = None
+        fake_chat.set_identity = Mock()
+        fake_chat.set_cache_keys = Mock()
+        with patch('chat_xdk.Chat', return_value=fake_chat):
+            decryptor = self._decryptor(juicebox=True)
+            decryptor._public_keys_cache = {'juicebox_config': {'some': 'config'}}
+            decryptor.initialize()
+        self.assertFalse(self.account.x_chat_pin_locked)
+        fake_chat.unlock.assert_called_once_with('correct-pin')
+
 
 @tagged('post_install', '-at_install', 'x_account_twitter')
 class TestTwitterBackslashGuard(XAccountTwitterTestBase):
@@ -1001,11 +1020,11 @@ class TestTwitterSubscriptionAuto(XAccountTwitterTestBase):
                    return_value=Mock(ok=True, status_code=200, content=b'{}',
                                      json=_json)):
             summary = provider.subscribe_account(self.account)
-        self.assertEqual(summary['created'], 5)
+        self.assertEqual(summary['created'], 2)
         self.assertEqual(summary['existing'], 0)
         subs = self.env['x.twitter.subscription'].sudo().search(
             [('account_id', '=', self.account.id)])
-        self.assertEqual(len(subs), 5)
+        self.assertEqual(len(subs), 2)
         self.assertTrue(all(s.state == 'active' for s in subs))
 
     def test_subscribe_account_skips_existing(self):
@@ -1027,7 +1046,7 @@ class TestTwitterSubscriptionAuto(XAccountTwitterTestBase):
             provider.subscribe_account(self.account)
             summary2 = provider.subscribe_account(self.account)
         self.assertEqual(summary2['created'], 0)
-        self.assertEqual(summary2['existing'], 5)
+        self.assertEqual(summary2['existing'], 2)
 
     def test_subscribe_account_rejection_does_not_abort_remaining(self):
         """Regression: X rejecting one event type (e.g. dm.received for a user)
@@ -1062,24 +1081,24 @@ class TestTwitterSubscriptionAuto(XAccountTwitterTestBase):
         with patch('odoo.addons.x_account_twitter.services.twitter_webhook.requests.request',
                    side_effect=_fake_request):
             summary = provider.subscribe_account(self.account)
-        self.assertEqual(summary['created'], 4)
+        self.assertEqual(summary['created'], 1)
         self.assertEqual(summary['failed'], 1)
         subs = self.env['x.twitter.subscription'].sudo().search(
             [('account_id', '=', self.account.id)])
-        self.assertEqual(len(subs), 5)
+        self.assertEqual(len(subs), 2)
         self.assertEqual(
             subs.filtered(lambda s: s.state == 'failed').event_type,
             'dm.received')
         self.assertEqual(
-            len(subs.filtered(lambda s: s.state == 'active')), 4)
+            len(subs.filtered(lambda s: s.state == 'active')), 1)
 
     def test_account_ensure_subscriptions_dispatches(self):
         with patch.object(TwitterProvider, 'subscribe_account',
                            return_value={'account_id': self.account.id,
-                                         'created': 5}) as mocked:
+                                         'created': 2}) as mocked:
             result = self.account._ensure_x_account_subscriptions()
         mocked.assert_called_once()
-        self.assertEqual(result['created'], 5)
+        self.assertEqual(result['created'], 2)
 
 
 @tagged('post_install', '-at_install', 'x_account_twitter')

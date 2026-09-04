@@ -16,8 +16,9 @@
                         <field name="twitter_user_id" readonly="1"/>
                     </group>
                     <group string="X Chat Encryption" groups="base.group_system">
-                        <field name="x_encryption_code" password="True" placeholder="Your XChat PIN"/>
                         <field name="x_chat_key_mode" widget="radio"/>
+                        <field name="x_encryption_code" password="True" placeholder="Your XChat PIN"
+                            invisible="x_chat_key_mode != 'juicebox'"/>
                         <field name="x_chat_key_blob" widget="text"
                             invisible="x_chat_key_mode != 'key_blob'"/>
                         <field name="x_chat_initialized" readonly="1" widget="boolean_toggle"/>
@@ -55,8 +56,9 @@
                                 decoration-danger="x_connection_status in ('disconnected', 'error', 'invalid')"/>
                         </group>
                         <group string="X Chat Encryption" groups="base.group_system">
-                            <field name="x_encryption_code" password="True" placeholder="Your XChat PIN"/>
                             <field name="x_chat_key_mode" widget="radio"/>
+                            <field name="x_encryption_code" password="True" placeholder="Your XChat PIN"
+                                invisible="x_chat_key_mode != 'juicebox'"/>
                             <field name="x_chat_key_blob" widget="text" placeholder="Paste key blob here..."
                                 invisible="x_chat_key_mode != 'key_blob'"/>
                             <field name="x_chat_signing_key_version" readonly="1"

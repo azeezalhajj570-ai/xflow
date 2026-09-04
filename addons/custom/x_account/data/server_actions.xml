@@ -4,7 +4,6 @@
         <record id="action_server_fetch_groups" model="ir.actions.server">
             <field name="name">Fetch Groups</field>
             <field name="model_id" ref="social.model_social_account"/>
-            <field name="binding_model_id" ref="social.model_social_account"/>
             <field name="state">code</field>
             <field name="code">action = False
 for rec in records:
@@ -14,7 +13,6 @@ for rec in records:
         <record id="action_server_fetch_group_messages" model="ir.actions.server">
             <field name="name">Fetch Group Messages</field>
             <field name="model_id" ref="mail.model_discuss_channel"/>
-            <field name="binding_model_id" ref="mail.model_discuss_channel"/>
             <field name="state">code</field>
             <field name="code">action = False
 for rec in records:

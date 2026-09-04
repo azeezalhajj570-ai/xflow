@@ -104,6 +104,8 @@ class XChatDecryptor:
             chat = Chat(_json.dumps(keys_record['juicebox_config']))
             try:
                 self._unlock_with_retry(chat, account.x_encryption_code)
+                if getattr(account, 'x_chat_pin_locked', False):
+                    account.sudo().write({'x_chat_pin_locked': False})
             except Exception as exc:
                 if self._is_invalid_pin_error(exc):
                     _LOGGER.warning(
@@ -203,12 +205,22 @@ class XChatDecryptor:
         """True when an exception is a retryable X Juicebox transient error.
 
         The SDK surfaces server-side backpressure/rate limiting as "Juicebox
-        error: Transient error - retry". A wrong PIN or missing registration is
-        *not* transient and must be surfaced immediately.
+        error: Transient error - retry". Network errors, timeouts, and
+        connection failures are also transient and should be retried. A wrong
+        PIN or missing registration is *not* transient and must be surfaced
+        immediately.
         """
         message = str(exc) or ''
-        needle = 'Transient error - retry'
-        return needle in message
+        message_lower = message.lower()
+        # SDK-reported transient errors
+        if 'Transient error - retry' in message:
+            return True
+        # Network/connection errors
+        transient_needles = [
+            'timeout', 'timed out', 'connection', 'network',
+            'temporarily unavailable', 'retry', 'unreachable',
+        ]
+        return any(needle in message_lower for needle in transient_needles)
 
     @staticmethod
     def _is_invalid_pin_error(exc):
@@ -218,9 +230,16 @@ class XChatDecryptor:
         the secure backup. When the SDK surfaces "Invalid PIN" (optionally with
         ``guesses_remaining``), the operator must correct the PIN — retrying
         the same wrong PIN only burns the remaining guesses.
+
+        Must NOT match transient errors, network failures, or other
+        configuration issues.
         """
         message = (str(exc) or '').lower()
-        return 'invalid pin' in message
+        # Must contain "invalid pin" or "wrong pin" to be a PIN rejection
+        # Also check for "guesses_remaining" which is specific to PIN errors
+        return ('invalid pin' in message or
+                'wrong pin' in message or
+                'guesses_remaining' in message)
 
     @staticmethod
     def _unlock_with_retry(chat, pin, tries=4, base_delay=4.0):

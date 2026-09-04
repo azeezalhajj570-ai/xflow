@@ -86,7 +86,7 @@ class SocialAccount(models.Model):
             ('juicebox', 'Secure Backup / PIN'),
         ],
         string='X Chat Key Source',
-        default='key_blob',
+        default='juicebox',
         groups='base.group_system',
         help='Where the account\'s XChat private keys come from. "Imported Key '
              'Blob" stores the native export_keys() blob on the account; '
