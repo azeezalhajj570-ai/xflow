@@ -1,5 +1,7 @@
+from datetime import timedelta
 from unittest.mock import MagicMock, patch
 
+from odoo import fields
 from odoo.tests import tagged
 
 from odoo.addons.x_account.services.x_provider import XProviderRegistry
@@ -205,3 +207,66 @@ class TestTwitterProviderRepost(XAccountTwitterTestBase):
                 self.provider.repost({'post_id': '999'})
         self.assertEqual(ctx.exception.code, 'not_found')
         self.assertFalse(ctx.exception.retryable)
+
+
+@tagged('post_install', '-at_install', 'x_account_twitter')
+class TestTwitterProviderWebhookSubscriptions(XAccountTwitterTestBase):
+    """_subscribe_all must create XAA subscriptions with the account's OAuth 2.0
+    user-context token (X rejects the app bearer for subscription create)."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.twitter_media = cls.env.ref('social_twitter.social_media_twitter')
+        cls.env['ir.config_parameter'].sudo().set_param(
+            'social.twitter_oauth2_client_id', 'test-client-id')
+        cls.env['ir.config_parameter'].sudo().set_param(
+            'social.twitter_oauth2_client_secret', 'test-client-secret')
+        cls.account = cls.env['social.account'].create({
+            'name': 'OAuth2 Twitter Account',
+            'media_id': cls.twitter_media.id,
+            'social_account_handle': 'oauth2_user',
+            'twitter_user_id': '12345',
+            'x_provider': 'twitter',
+            'x_auth_method': 'oauth2',
+            'x_oauth2_access_token': 'user-at-123',
+            'x_oauth2_refresh_token': 'user-rt-123',
+            'x_oauth2_token_expires_at': fields.Datetime.now() + timedelta(hours=1),
+            'x_connection_status': 'active',
+        })
+
+    def test_subscribe_all_passes_user_access_token(self):
+        from odoo.addons.x_account_twitter.services.twitter_webhook import (
+            TwitterWebhook)
+        provider = TwitterProvider(self.env, self.account)
+        hook = self.env['x.twitter.webhook'].sudo().create({
+            'name': 'https://x.example.com/x_account/twitter/webhook',
+            'webhook_id': 'wh-test',
+            'valid': True,
+        })
+        created = {}
+
+        def _fake_create(user_id, event_type, webhook_id='', multiple=False,
+                         access_token=''):
+            created[event_type] = access_token
+            return {'subscription_id': 'sub-%s' % event_type}
+
+        with patch.object(TwitterWebhook, 'create_subscription',
+                          side_effect=_fake_create):
+            provider._subscribe_all(TwitterWebhook(self.env), hook)
+        # every supported event was subscribed with the account's access token
+        from odoo.addons.x_account_twitter.services.twitter_webhook import (
+            SUPPORTED_EVENT_TYPES)
+        self.assertEqual(
+            set(created), set(SUPPORTED_EVENT_TYPES))
+        self.assertTrue(all(tok == 'user-at-123' for tok in created.values()))
+        subs = self.env['x.twitter.subscription'].sudo().search([
+            ('account_id', '=', self.account.id),
+        ])
+        self.assertEqual(len(subs), len(SUPPORTED_EVENT_TYPES))
+        self.assertTrue(all(s.state == 'active' for s in subs))
+        # re-running is idempotent (rows exist, no new API calls)
+        with patch.object(TwitterWebhook, 'create_subscription',
+                          side_effect=_fake_create) as mocked:
+            provider._subscribe_all(TwitterWebhook(self.env), hook)
+        self.assertEqual(mocked.call_count, 0)

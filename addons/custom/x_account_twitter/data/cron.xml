@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="cron_x_twitter_ensure_webhook_subscriptions" model="ir.cron">
+            <field name="name">X: Ensure webhook + activity subscriptions</field>
+            <field name="model_id" ref="model_social_account"/>
+            <field name="state">code</field>
+            <field name="code">model._ensure_x_webhook_subscriptions()</field>
+            <field name="interval_number">30</field>
+            <field name="interval_type">minutes</field>
+            <field name="active">True</field>
+        </record>
+    </data>
+</odoo>

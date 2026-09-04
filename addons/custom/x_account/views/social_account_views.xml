@@ -6,19 +6,22 @@
         <field name="inherit_id" ref="social.social_account_view_form"/>
         <field name="arch" type="xml">
             <xpath expr="//group[@name='social_account_global']" position="after">
-                <group name="x_account" string="X Account &amp; Session">
-                    <field name="x_connection_status" groups="base.group_system"/>
-                    <field name="x_provider"/>
-                    <field name="x_auth_method"/>
-                    <field name="twitter_user_id" readonly="1"/>
-                    <field name="last_connected" readonly="1"/>
-                    <field name="last_validated" readonly="1"/>
-                    <field name="last_error" readonly="1"/>
-                    <field name="x_migration_status" groups="base.group_system"/>
-                    <field name="source_account_id" groups="base.group_system" readonly="1"/>
-                    <field name="source_user_id" groups="base.group_system" readonly="1"/>
-                    <field name="migration_batch_id" groups="base.group_system" readonly="1"/>
-                    <field name="migration_timestamp" groups="base.group_system" readonly="1"/>
+                <group name="x_account" string="X Account">
+                    <group>
+                        <field name="x_connection_status" widget="badge"
+                            decoration-success="x_connection_status == 'active'"
+                            decoration-warning="x_connection_status == 'reauth_required'"
+                            decoration-danger="x_connection_status in ('disconnected', 'error', 'invalid')"/>
+                        <field name="x_provider"/>
+                        <field name="twitter_user_id" readonly="1"/>
+                    </group>
+                    <group string="X Chat Encryption" groups="base.group_system">
+                        <field name="x_encryption_code" password="True" placeholder="Your XChat PIN"/>
+                        <field name="x_chat_key_mode" widget="radio"/>
+                        <field name="x_chat_key_blob" widget="text"
+                            invisible="x_chat_key_mode != 'key_blob'"/>
+                        <field name="x_chat_initialized" readonly="1" widget="boolean_toggle"/>
+                    </group>
                 </group>
             </xpath>
         </field>
@@ -30,27 +33,36 @@
         <field name="arch" type="xml">
             <form string="X Account">
                 <header>
+                    <button name="action_initialize_x_chat_encryption" type="object"
+                        string="Initialize Encryption"
+                        class="btn-primary"
+                        confirm="Initialize X Chat encryption using the configured key source?"
+                        groups="base.group_system"
+                        invisible="x_connection_status not in ('active', 'reauth_required', 'error')"/>
                 </header>
                 <sheet>
-                    <div class="oe_button_box" name="button_box">
-                        <button name="%(action_server_groups_by_account)d" type="action"
-                            class="oe_stat_button" icon="fa-users" string="Groups">
-                            <div class="o_stat_info">
-                                <field name="x_group_count" widget="statinfo"/>
-                            </div>
-                        </button>
-                    </div>
                     <div class="oe_title">
                         <h1><field name="name" placeholder="Account name"/></h1>
                     </div>
                     <group>
-                        <field name="social_account_handle" placeholder="@handle"/>
-                        <field name="x_provider"/>
-                        <field name="x_auth_method"/>
-                        <field name="twitter_user_id" readonly="1"/>
-                        <field name="x_connection_status"/>
-                        <field name="last_validated"/>
-                        <field name="x_encryption_code" password="True"/>
+                        <group string="Account Info">
+                            <field name="social_account_handle" placeholder="@handle"/>
+                            <field name="x_provider"/>
+                            <field name="twitter_user_id" readonly="1"/>
+                            <field name="x_connection_status" widget="badge"
+                                decoration-success="x_connection_status == 'active'"
+                                decoration-warning="x_connection_status == 'reauth_required'"
+                                decoration-danger="x_connection_status in ('disconnected', 'error', 'invalid')"/>
+                        </group>
+                        <group string="X Chat Encryption" groups="base.group_system">
+                            <field name="x_encryption_code" password="True" placeholder="Your XChat PIN"/>
+                            <field name="x_chat_key_mode" widget="radio"/>
+                            <field name="x_chat_key_blob" widget="text" placeholder="Paste key blob here..."
+                                invisible="x_chat_key_mode != 'key_blob'"/>
+                            <field name="x_chat_signing_key_version" readonly="1"
+                                invisible="not x_chat_signing_key_version"/>
+                            <field name="x_chat_initialized" readonly="1" widget="boolean_toggle"/>
+                        </group>
                     </group>
                 </sheet>
             </form>
@@ -66,7 +78,7 @@
                 <field name="social_account_handle"/>
                 <field name="x_provider"/>
                 <field name="x_connection_status"/>
-                <field name="last_validated"/>
+                <!-- <field name="last_validated"/> -->
             </list>
         </field>
     </record>

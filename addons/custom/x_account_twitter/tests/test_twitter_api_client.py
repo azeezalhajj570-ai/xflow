@@ -38,6 +38,7 @@ class TestTwitterApiClient(XAccountTwitterTestBase):
         response.ok = status_code < 400
         response.content = b'{}' if status_code < 400 else b''
         response.json.return_value = json_data if json_data is not None else {}
+        response.headers = {}
         return response
 
     # ------------------------------------------------------------ transport
@@ -101,3 +102,97 @@ class TestTwitterApiClient(XAccountTwitterTestBase):
             with self.assertRaises(twitter_errors.TwitterTemporaryError) as ctx:
                 self.client.request('GET', '/2/users/me')
         self.assertTrue(ctx.exception.retryable)
+
+    # -------------------------------------------------------------- hosts
+    def test_chat_api_uses_api_x_com_host(self):
+        """Chat conversations must go to https://api.x.com (official host)."""
+        from odoo.addons.social_twitter.models.social_account import SocialAccount
+        with patch.object(SocialAccount, '_get_twitter_oauth_header',
+                          return_value={'Authorization': 'Bearer t'}) as hdr, \
+             patch('requests.request', return_value=self._mock_response(200, {})) as mocked:
+            self.client.request('GET', '/2/chat/conversations')
+        self.assertEqual(mocked.call_args.args[1], 'https://api.x.com/2/chat/conversations')
+        self.assertEqual(hdr.call_args.args[0], 'https://api.x.com/2/chat/conversations')
+
+    def test_chat_events_api_uses_api_x_com_host(self):
+        from odoo.addons.social_twitter.models.social_account import SocialAccount
+        with patch.object(SocialAccount, '_get_twitter_oauth_header',
+                          return_value={'Authorization': 'Bearer t'}), \
+             patch('requests.request', return_value=self._mock_response(200, {})) as mocked:
+            self.client.request('GET', '/2/chat/conversations/g1/events')
+        self.assertEqual(mocked.call_args.args[1],
+                         'https://api.x.com/2/chat/conversations/g1/events')
+
+    def test_legacy_dm_events_uses_api_twitter_com_host(self):
+        """Legacy DM endpoints stay on api.twitter.com (social_twitter family)."""
+        from odoo.addons.social_twitter.models.social_account import SocialAccount
+        with patch.object(SocialAccount, '_get_twitter_oauth_header',
+                          return_value={'Authorization': 'Bearer t'}), \
+             patch('requests.request', return_value=self._mock_response(200, {})) as mocked:
+            self.client.request('GET', '/2/dm_events')
+        self.assertEqual(mocked.call_args.args[1], 'https://api.twitter.com/2/dm_events')
+
+    def test_legacy_users_me_uses_api_twitter_com_host(self):
+        from odoo.addons.social_twitter.models.social_account import SocialAccount
+        with patch.object(SocialAccount, '_get_twitter_oauth_header',
+                          return_value={'Authorization': 'Bearer t'}), \
+             patch('requests.request', return_value=self._mock_response(200, {})) as mocked:
+            self.client.request('GET', '/2/users/me')
+        self.assertEqual(mocked.call_args.args[1], 'https://api.twitter.com/2/users/me')
+
+    # -------------------------------------------------------------- retry
+    def test_retries_temporary_5xx_with_backoff(self):
+        """A 503 should be retried with bounded backoff, then classified."""
+        from odoo.addons.social_twitter.models.social_account import SocialAccount
+        with patch.object(SocialAccount, '_get_twitter_oauth_header',
+                          return_value={'Authorization': 'Bearer t'}), \
+             patch.object(TwitterApiClient, '_sleep') as sleep, \
+             patch('requests.request', side_effect=[
+                 self._mock_response(503), self._mock_response(503),
+                 self._mock_response(503), self._mock_response(503),
+             ]) as mocked:
+            with self.assertRaises(twitter_errors.TwitterTemporaryError):
+                self.client.request('GET', '/2/chat/conversations')
+        # DEFAULT_RETRIES=2 -> 3 attempts total.
+        self.assertEqual(mocked.call_count, 3)
+        # Exponential backoff: 2s then 4s.
+        self.assertEqual(sleep.call_args_list[0].args[0], 2.0)
+        self.assertEqual(sleep.call_args_list[1].args[0], 4.0)
+
+    def test_retries_honor_retry_after(self):
+        from odoo.addons.social_twitter.models.social_account import SocialAccount
+        response = self._mock_response(503)
+        response.headers = {'Retry-After': '5'}
+        with patch.object(SocialAccount, '_get_twitter_oauth_header',
+                          return_value={'Authorization': 'Bearer t'}), \
+             patch.object(TwitterApiClient, '_sleep') as sleep, \
+             patch('requests.request', side_effect=[
+                 response, self._mock_response(200, {'data': {}})]) as mocked:
+            result = self.client.request('GET', '/2/chat/conversations')
+        self.assertEqual(mocked.call_count, 2)
+        self.assertEqual(sleep.call_args_list[0].args[0], 5.0)
+        self.assertEqual(result, {'data': {}})
+
+    def test_no_retry_on_permanent_errors(self):
+        """401/403/404 must not be retried."""
+        from odoo.addons.social_twitter.models.social_account import SocialAccount
+        for status in (401, 403, 404):
+            with patch.object(SocialAccount, '_get_twitter_oauth_header',
+                              return_value={'Authorization': 'Bearer t'}), \
+                 patch.object(TwitterApiClient, '_sleep') as sleep, \
+                 patch('requests.request', return_value=self._mock_response(status)) as mocked:
+                with self.assertRaises(twitter_errors.TwitterError):
+                    self.client.request('GET', '/2/chat/conversations')
+            self.assertEqual(mocked.call_count, 1)
+            sleep.assert_not_called()
+
+    def test_retries_disabled_with_retries_zero(self):
+        from odoo.addons.social_twitter.models.social_account import SocialAccount
+        with patch.object(SocialAccount, '_get_twitter_oauth_header',
+                          return_value={'Authorization': 'Bearer t'}), \
+             patch.object(TwitterApiClient, '_sleep') as sleep, \
+             patch('requests.request', return_value=self._mock_response(503)) as mocked:
+            with self.assertRaises(twitter_errors.TwitterTemporaryError):
+                self.client.request('GET', '/2/chat/conversations', retries=0)
+        self.assertEqual(mocked.call_count, 1)
+        sleep.assert_not_called()

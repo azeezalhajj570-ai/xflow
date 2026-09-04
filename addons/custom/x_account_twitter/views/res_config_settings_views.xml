@@ -35,6 +35,54 @@
                         </div>
                     </div>
                 </div>
+                <h3>Real-time Webhooks (V2 Webhooks API + X Activity API)</h3>
+                <div class="row mt16 o_settings_container">
+                    <div class="col-12 col-lg-6 o_setting_box">
+                        <div class="o_setting_right_pane">
+                            <label for="x_twitter_webhook_enabled" string="X Webhooks Enabled"/>
+                            <field name="x_twitter_webhook_enabled"/>
+                            <div class="text-muted">
+                                Deliver DM / chat events from X in (near) real time.
+                                When enabled, register
+                                <b><field name="x_twitter_webhook_url" readonly="1"/></b>
+                                in the X Developer Console and subscribe each linked
+                                account to the events you need.
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-lg-6 o_setting_box">
+                        <div class="o_setting_right_pane">
+                            <label for="x_twitter_webhook_base_url" string="Webhook Base URL"/>
+                            <field name="x_twitter_webhook_base_url"/>
+                            <div class="text-muted">
+                                Public HTTPS base URL where Odoo is reachable
+                                (no path, no port, e.g. <code>https://x.example.com</code>).
+                                The receiver URL above is what X registers.
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-lg-6 o_setting_box">
+                        <div class="o_setting_right_pane">
+                            <label for="x_twitter_app_consumer_secret" string="App Consumer Secret (API Secret Key)"/>
+                            <field name="x_twitter_app_consumer_secret"/>
+                            <div class="text-muted">
+                                X app API Secret Key. Verifies the
+                                <code>x-twitter-webhooks-signature</code> header and answers
+                                the Challenge-Response Check. Never share or log it.
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-lg-6 o_setting_box">
+                        <div class="o_setting_right_pane">
+                            <label for="x_twitter_app_bearer_token" string="App Bearer Token (App-Only)"/>
+                            <field name="x_twitter_app_bearer_token"/>
+                            <div class="text-muted">
+                                OAuth 2.0 App-Only Bearer Token. Used to register/manage
+                                webhooks and X Activity API subscriptions.
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </xpath>
         </field>
     </record>

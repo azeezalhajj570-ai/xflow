@@ -52,21 +52,33 @@ class XImportSession(models.TransientModel):
             raise ValidationError(_('auth_token is required.'))
 
         twitter_media = self.media_id
-        account = self.env['social.account'].with_context(
-            x_no_default_stream=True).create({
-            'name': self.name or self.username or 'X Account',
-            'social_account_handle': self.username or '',
-            'media_id': twitter_media.id,
-            'x_provider': self.provider,
-            'x_auth_method': 'session_cookie',
-            'x_connection_status': 'authenticating',
-        })
+        handle = self.username or ''
 
-        # Validate before persisting: if invalid, rollback the account.
+        existing = self.env['social.account'].search([
+            ('social_account_handle', '=', handle),
+            ('media_type', '=', 'twitter'),
+        ], limit=1) if handle else self.env['social.account']
+
+        if existing:
+            account = existing
+            _logger.info('Relinking session for existing account %s (%s)', account.id, handle)
+        else:
+            account = self.env['social.account'].with_context(
+                x_no_default_stream=True).create({
+                'name': self.name or self.username or 'X Account',
+                'social_account_handle': handle,
+                'media_id': twitter_media.id,
+                'x_provider': self.provider,
+                'x_auth_method': 'session_cookie',
+                'x_connection_status': 'authenticating',
+            })
+
+        # Validate before persisting: if invalid, rollback a newly created account.
         provider = SessionWebProvider(self.env, account, cookies)
         result = provider.validate_session()
         if not result.get('valid'):
-            account.unlink()
+            if not existing:
+                account.unlink()
             raise ValidationError(_('Session validation failed: %s') % result.get('reason'))
 
         user = result.get('user') or {}
@@ -74,6 +86,8 @@ class XImportSession(models.TransientModel):
             'twitter_user_id': user.get('id') or account.twitter_user_id,
             'social_account_handle': user.get('username') or account.social_account_handle,
             'name': user.get('name') or account.name,
+            'x_provider': self.provider,
+            'x_auth_method': 'session_cookie',
             'x_connection_status': 'active',
             'last_connected': fields.Datetime.now(),
             'last_validated': fields.Datetime.now(),

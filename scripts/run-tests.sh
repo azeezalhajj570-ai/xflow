@@ -27,8 +27,16 @@ TEST_DB="test_${MODULE}"
 LOG_FILE="logs/test_${MODULE}.log"
 
 echo "=== Dropping and recreating test database '${TEST_DB}' ==="
-docker compose exec db psql -U "${POSTGRES_USER}" -d postgres -c "DROP DATABASE IF EXISTS ${TEST_DB};"
-docker compose exec db psql -U "${POSTGRES_USER}" -d postgres -c "CREATE DATABASE ${TEST_DB} OWNER ${POSTGRES_USER};"
+# PostgreSQL is provided by the external madarbot stack, not this Compose
+# project.  Run psql from the Odoo container, which shares that external
+# network and already receives POSTGRES_* from .env.
+db_sql() {
+    docker compose exec -T odoo sh -c \
+        'PGPASSWORD="$POSTGRES_PASSWORD" exec psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d postgres -v ON_ERROR_STOP=1 -c "$1"' \
+        sh "$1"
+}
+db_sql "DROP DATABASE IF EXISTS ${TEST_DB};"
+db_sql "CREATE DATABASE ${TEST_DB} OWNER ${POSTGRES_USER};"
 
 mkdir -p logs
 

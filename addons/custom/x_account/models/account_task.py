@@ -59,6 +59,13 @@ class XAccountTask(models.Model):
         help='JSON call kwargs passed to the provider operation. Must not '
              'contain credentials.',
     )
+    company_id = fields.Many2one(
+        'res.company',
+        string='Company',
+        related='account_id.company_id',
+        store=True,
+        index=True,
+    )
 
     _MAX_RUNNING_PER_ACCOUNT = 1
 
@@ -72,7 +79,15 @@ class XAccountTask(models.Model):
 
     @api.model
     def _process_queue(self, limit=100):
-        """Claim and run due tasks (per-account single-flight)."""
+        """Claim and run due tasks (per-account single-flight).
+
+        The single-flight guard must not count the tasks this run has just
+        claimed itself: they were already flushed as ``running`` and are
+        executed sequentially in this same transaction, so counting them
+        throttled claiming to one task per account per sweep (a 13k-event
+        backlog at one webhook event per minute). Only genuinely concurrent
+        claims — a stale ``running`` task left by another worker — block.
+        """
         now = fields.Datetime.now()
         domain = [
             ('status', 'in', ('pending',)),
@@ -85,6 +100,7 @@ class XAccountTask(models.Model):
             running = self.sudo().search_count([
                 ('account_id', '=', account.id),
                 ('status', '=', 'running'),
+                ('id', 'not in', claimed.ids),
             ])
             if running >= self._MAX_RUNNING_PER_ACCOUNT:
                 continue

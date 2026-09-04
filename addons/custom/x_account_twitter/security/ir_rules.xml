@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+
+    <record id="security_rule_x_twitter_event_company" model="ir.rule">
+        <field name="name">X Twitter Event: Multi-Company</field>
+        <field name="model_id" ref="model_x_twitter_event"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+
+    <record id="security_rule_x_twitter_subscription_company" model="ir.rule">
+        <field name="name">X Twitter Subscription: Multi-Company</field>
+        <field name="model_id" ref="model_x_twitter_subscription"/>
+        <field name="domain_force">[('account_id.company_id', 'in', company_ids)]</field>
+    </record>
+
+    <record id="security_rule_x_twitter_webhook_company" model="ir.rule">
+        <field name="name">X Twitter Webhook: Global</field>
+        <field name="model_id" ref="model_x_twitter_webhook"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+    </record>
+
+</odoo>

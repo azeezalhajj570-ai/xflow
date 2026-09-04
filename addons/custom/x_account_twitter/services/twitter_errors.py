@@ -95,5 +95,11 @@ def _build_error(code, response_body):
 
 def _detail(response_body):
     if isinstance(response_body, dict):
-        return response_body.get('detail') or response_body.get('title') or ''
+        detail = response_body.get('detail') or response_body.get('title') or ''
+        errors = response_body.get('errors') or []
+        if errors:
+            error_messages = [e.get('message', '') for e in errors if isinstance(e, dict)]
+            if error_messages:
+                detail = '%s: %s' % (detail, '; '.join(error_messages))
+        return detail
     return ''

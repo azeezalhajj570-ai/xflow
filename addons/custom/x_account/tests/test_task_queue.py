@@ -75,7 +75,11 @@ class TestXTaskQueue(XAccountTestBase):
         self.assertGreaterEqual(task.next_retry_at, expected - timedelta(seconds=5))
 
     def test_concurrency_per_account(self):
-        """A second task for the same account is not running simultaneously."""
+        """Tasks for the same account run sequentially (never two at once),
+        but a single sweep must be able to claim and run ALL of them — the
+        single-flight guard must not count this run's own in-flight claims
+        (that throttled claiming to one task per account per minute and let a
+        13k-event webhook backlog pile up)."""
         t1 = self._make_task(self.account_a, operation='get_conversations')
         t2 = self._make_task(self.account_a, operation='get_conversations')
         state = {'running': 0, 'max': 0, 'done': 0}
@@ -89,12 +93,8 @@ class TestXTaskQueue(XAccountTestBase):
             return {'conversations': []}
 
         with patch('odoo.addons.x_account.services.providers.session_web.SessionWebProvider.get_conversations',
-                   side_effect=fake_get_conversations):
-            # Sweep 1: single-flight allows only one of the two to run.
-            self.env['x.account.task']._process_queue()
-            self.assertEqual(state['max'], 1)
-            self.assertEqual(state['done'], 1)
-            # Sweep 2: the remaining task runs after the first completed.
+                    side_effect=fake_get_conversations):
+            # One sweep drains both tasks, still never concurrently.
             self.env['x.account.task']._process_queue()
             self.assertEqual(state['max'], 1)
             self.assertEqual(state['done'], 2)
@@ -102,3 +102,30 @@ class TestXTaskQueue(XAccountTestBase):
         t2.invalidate_recordset()
         self.assertEqual(t1.status, 'success')
         self.assertEqual(t2.status, 'success')
+
+    def test_process_queue_drains_backlog_one_sweep(self):
+        """Regression: claiming must not count the tasks claimed earlier in
+        the same sweep as 'running' against the account — three due tasks for
+        one account must all be claimed and executed by a single sweep."""
+        tasks = [self._make_task(self.account_a, operation='get_conversations')
+                 for _ in range(3)]
+        with patch('odoo.addons.x_account.services.providers.session_web.SessionWebProvider.get_conversations',
+                    return_value={'conversations': []}):
+            claimed = self.env['x.account.task']._process_queue()
+        self.assertEqual(claimed, 3)
+        for task in tasks:
+            task.invalidate_recordset()
+            self.assertEqual(task.status, 'success')
+
+    def test_process_queue_blocked_by_stale_running_task(self):
+        """A stale 'running' task left behind by another worker still blocks
+        new claims for that account (the guard's real purpose)."""
+        stale = self._make_task(self.account_a, operation='get_conversations')
+        stale.write({'status': 'running'})
+        fresh = self._make_task(self.account_a, operation='get_conversations')
+        with patch('odoo.addons.x_account.services.providers.session_web.SessionWebProvider.get_conversations',
+                    return_value={'conversations': []}):
+            claimed = self.env['x.account.task']._process_queue()
+        self.assertEqual(claimed, 0)
+        fresh.invalidate_recordset()
+        self.assertEqual(fresh.status, 'pending')

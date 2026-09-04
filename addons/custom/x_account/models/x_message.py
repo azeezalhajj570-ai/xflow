@@ -42,6 +42,12 @@ class XMessage(models.Model):
     author_partner_id = fields.Many2one('res.partner', string='Author Partner')
     author_x_id = fields.Char(string='Author X ID')
     author_x_username = fields.Char(string='Author X Username')
+    encrypted = fields.Boolean(
+        string='Encrypted',
+        help='True when the external event body is end-to-end encrypted '
+             '(encoded_event) and no plaintext is available. The record exists '
+             'so the sync state is explicit instead of silently missing.',
+    )
     acked = fields.Boolean(string='Acknowledged')
     delivered = fields.Boolean(string='Delivered')
     participant_joined = fields.Boolean(string='Participant Joined')
@@ -52,11 +58,15 @@ class XMessage(models.Model):
         index=True,
         ondelete='set null',
     )
+    company_id = fields.Many2one(
+        'res.company',
+        string='Company',
+        related='account_id.company_id',
+        store=True,
+        index=True,
+    )
 
-    _sql_constraints = [
-        (
-            'external_id_uniq',
-            'UNIQUE(channel_id, external_id)',
-            'An external X message id must be unique per channel.',
-        ),
-    ]
+    _external_id_uniq = models.Constraint(
+        'UNIQUE(channel_id, external_id)',
+        'An external X message id must be unique per channel.',
+    )

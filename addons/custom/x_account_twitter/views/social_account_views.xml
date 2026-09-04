@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="x_account_twitter_social_account_view_form" model="ir.ui.view">
+        <field name="name">x.account.twitter.social.account.view.form</field>
+        <field name="model">social.account</field>
+        <field name="inherit_id" ref="x_account.x_account_social_account_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//group[@name='x_account']//group[1]" position="inside">
+                <field name="x_subscription_status" widget="badge"
+                    decoration-success="x_subscription_status == 'Active'"
+                    decoration-warning="x_subscription_status == 'Pending'"
+                    decoration-danger="x_subscription_status == 'Failed'"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="x_account_twitter_social_account_view_form_standalone" model="ir.ui.view">
+        <field name="name">x.account.twitter.social.account.view.form.standalone</field>
+        <field name="model">social.account</field>
+        <field name="inherit_id" ref="x_account.x_account_social_account_view_form_standalone"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='x_connection_status']" position="after">
+                <field name="x_subscription_status" widget="badge"
+                    decoration-success="x_subscription_status == 'Active'"
+                    decoration-warning="x_subscription_status == 'Pending'"
+                    decoration-danger="x_subscription_status == 'Failed'"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="x_account_twitter_social_account_view_list" model="ir.ui.view">
+        <field name="name">x.account.twitter.social.account.view.list</field>
+        <field name="model">social.account</field>
+        <field name="inherit_id" ref="x_account.x_account_social_account_view_list"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='x_connection_status']" position="after">
+                <field name="x_subscription_status" widget="badge"
+                    decoration-success="x_subscription_status == 'Active'"
+                    decoration-warning="x_subscription_status == 'Pending'"
+                    decoration-danger="x_subscription_status == 'Failed'"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

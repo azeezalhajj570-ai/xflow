@@ -39,6 +39,16 @@ class DiscussChannel(models.Model):
         string='Last X Mail Message',
         index='btree_not_null',
     )
+    x_sync_status = fields.Selection(
+        [
+            ('ok', 'Synchronized'),
+            ('partial', 'Partially Synchronized'),
+            ('encrypted', 'Messages Encrypted'),
+            ('failed', 'Synchronization Failed'),
+        ],
+        string='X Sync Status',
+        help='Message synchronization state for this X conversation.',
+    )
     x_group_member_ids = fields.Many2many(
         'res.partner',
         string='X Group Members',
@@ -49,6 +59,13 @@ class DiscussChannel(models.Model):
         string='X Group Member Count',
         compute='_compute_x_group_members',
     )
+    x_company_id = fields.Many2one(
+        'res.company',
+        string='X Company',
+        related='x_account_id.company_id',
+        store=True,
+        index=True,
+    )
 
     @api.depends('channel_member_ids', 'channel_member_ids.partner_id')
     def _compute_x_group_members(self):
@@ -57,19 +74,18 @@ class DiscussChannel(models.Model):
             channel.x_group_member_ids = partners
             channel.x_group_member_count = len(partners)
 
-    _sql_constraints = [
-        (
-            'x_conversation_uniq',
-            'UNIQUE(x_account_id, x_conversation_id)',
-            'An X conversation id must be unique per account.',
-        ),
-    ]
+    _x_conversation_uniq = models.Constraint(
+        'UNIQUE(x_account_id, x_conversation_id)',
+        'An X conversation id must be unique per account.',
+    )
 
     @api.model
     def _get_x_channel(self, x_account, partner=None, conversation_id=None,
                        channel_type='x', create_if_not_found=False,
                        member_ids=None):
         self = self.sudo()
+        if not x_account:
+            raise ValueError('x_account is required to resolve an X channel')
         domain = [('channel_type', '=', channel_type), ('x_account_id', '=', x_account.id)]
         if conversation_id:
             domain.append(('x_conversation_id', '=', conversation_id))
@@ -136,6 +152,7 @@ class DiscussChannel(models.Model):
             'author_partner_id': author_partner.id if author_partner else False,
             'author_x_id': kw.get('author_x_id'),
             'author_x_username': kw.get('author_x_username'),
+            'encrypted': kw.get('encrypted', False),
             'acked': kw.get('acked', False),
             'delivered': kw.get('delivered', False),
             'participant_joined': kw.get('participant_joined', False),
@@ -161,12 +178,12 @@ class DiscussChannel(models.Model):
         account = self.x_account_id
         if not account:
             raise ValueError('This group has no linked X account.')
-        if not account.x_encryption_code:
+        from odoo.addons.x_account.services.x_service import XService
+        provider = XService.get_provider(account)
+        if getattr(provider, '_needs_encryption_code', True) and not account.x_encryption_code:
             raise ValueError(
                 'Set the XChat Encryption Code on the account first — it is '
                 'required to read encrypted group DMs.')
-        from odoo.addons.x_account.services.x_service import XService
-        provider = XService.get_provider(account)
         get_dms = getattr(provider, 'get_dms', None)
         if not get_dms:
             raise NotImplementedError(
@@ -174,7 +191,39 @@ class DiscussChannel(models.Model):
         conv_id = self.x_conversation_id
         if not conv_id:
             raise ValueError('This group has no conversation id.')
-        result = get_dms(conv_id, limit=int(limit))
+        try:
+            result = get_dms(conv_id, limit=int(limit))
+        except Exception as exc:
+            # A dead/revoked X OAuth 2.0 credential surfaces as an auth failure
+            # that would otherwise escape as a raw RPC_ERROR. Show the user a
+            # meaningful message instead, and let the account's reauthentication
+            # state (already recorded by the provider) commit. Guarded by
+            # try/except because x_account does not hard-depend on
+            # x_account_twitter, so the import may legitimately be unavailable.
+            try:
+                from odoo.addons.x_account_twitter.services import twitter_errors
+            except Exception:
+                raise
+            if isinstance(exc, twitter_errors.TwitterError):
+                message = (
+                    'This X account needs reauthentication — %s. Re-link the '
+                    'account from Social Marketing to refresh its credentials.'
+                    % exc)
+                _logger.exception(
+                    'action_fetch_group_messages: auth failure fetching %s',
+                    conv_id)
+                if self.env.context.get('dialog'):
+                    return {
+                        'type': 'ir.actions.client',
+                        'tag': 'display_notification',
+                        'params': {
+                            'title': 'Fetch Group Messages',
+                            'message': message,
+                            'type': 'warning',
+                            'sticky': True,
+                        },
+                    }
+            raise
         count = 0
         for msg in result['messages']:
             author_partner = False

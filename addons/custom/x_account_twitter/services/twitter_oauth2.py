@@ -9,8 +9,10 @@ account linking uses OAuth 2.0 with PKCE against the X API v2 endpoints:
     token     -> https://api.x.com/2/oauth2/token
     user      -> https://api.x.com/2/users/me
 
-Scopes requested: ``tweet.read tweet.write users.read offline.access``.
-``offline.access`` grants refresh tokens (access tokens expire after 2 hours).
+Scopes requested: ``tweet.read tweet.write users.read offline.access
+dm.read dm.write``. ``offline.access`` grants refresh tokens (access tokens
+expire after 2 hours). ``dm.read``/``dm.write`` grant DM + group-DM access
+(Group conversations are read via ``GET /2/dm_events``).
 
 This class owns the HTTP + PKCE plumbing only (SRP); the controller owns the
 session state/CSRF handling and the account model owns token storage/refresh.
@@ -24,7 +26,7 @@ from werkzeug.urls import url_encode
 
 from . import twitter_errors
 
-SCOPES = 'tweet.read tweet.write users.read offline.access'
+SCOPES = 'tweet.read tweet.write users.read offline.access dm.read dm.write'
 
 
 class TwitterOAuth2Client:

@@ -128,8 +128,19 @@ class XAccountTwitterOAuth2Controller(http.Controller):
                 'X authorization failed (%s). Please try again.', exc))
 
         try:
-            request.env['social.account'].sudo()._create_or_update_twitter_oauth2(
-                media, user, tokens, expires_in)
+            account = (
+                request.env['social.account'].sudo()
+                ._create_or_update_twitter_oauth2(media, user, tokens, expires_in))
+            # Programmatically create the XAA subscriptions for this X account
+            # so its DM/chat events start flowing immediately. Best-effort and
+            # self-healing (the cron sweeps missed accounts), so a webhook
+            # misconfiguration must never block a successful account link.
+            if account and getattr(account, '_ensure_x_account_subscriptions', None):
+                try:
+                    account._ensure_x_account_subscriptions()
+                except Exception:
+                    _logger.exception(
+                        'x_account_twitter: post-link subscription failed')
         except UserError as exc:
             return self._error(str(exc))
 

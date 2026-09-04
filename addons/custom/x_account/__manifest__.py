@@ -32,6 +32,7 @@ Highlights:
     'data': [
         'security/x_account_security.xml',
         'security/ir.model.access.csv',
+        'security/ir_rules.xml',
         'data/cron.xml',
         'data/base_automation.xml',
         'data/server_actions.xml',

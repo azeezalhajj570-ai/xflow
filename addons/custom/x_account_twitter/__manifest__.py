@@ -40,8 +40,16 @@ Highlights.
         'x_account',
         'social_twitter',
     ],
+    'external_dependencies': {
+        'python': ['chatxdk'],
+    },
     'data': [
+        'security/ir.model.access.csv',
+        'security/ir_rules.xml',
+        'data/cron.xml',
         'views/res_config_settings_views.xml',
+        'views/social_media_views.xml',
+        'views/social_account_views.xml',
     ],
     'installable': True,
     'application': False,

@@ -65,6 +65,52 @@ class SocialAccount(models.Model):
              'X. Used to recover your key so encrypted DM messages can be '
              'decrypted and outgoing events signed.',
     )
+    x_chat_key_blob = fields.Text(
+        string='X Chat Key Blob',
+        groups='base.group_system',
+        help='Opaque private-key blob exported from the official Chat XDK '
+             '(chatxdk export_keys), stored base64-encoded (hex or a Python '
+             'bytes repr are also accepted). Imported with import_keys to '
+             'decrypt XChat encrypted message events. Treat as a password: '
+             'never log it.',
+    )
+    x_chat_signing_key_version = fields.Char(
+        string='X Chat Signing Key Version',
+        groups='base.group_system',
+        help='public_key_version of the account\'s registered Chat public key; '
+             'passed to chatxdk set_identity.',
+    )
+    x_chat_key_mode = fields.Selection(
+        [
+            ('key_blob', 'Imported Key Blob'),
+            ('juicebox', 'Secure Backup / PIN'),
+        ],
+        string='X Chat Key Source',
+        default='key_blob',
+        groups='base.group_system',
+        help='Where the account\'s XChat private keys come from. "Imported Key '
+             'Blob" stores the native export_keys() blob on the account; '
+             '"Secure Backup / PIN" recovers keys from X\'s secure key backup '
+             '(Juicebox) with the XChat encryption code and never stores a key '
+             'blob server-side.',
+    )
+    x_chat_initialized = fields.Boolean(
+        string='X Chat Encryption Initialized',
+        groups='base.group_system',
+        help='True once the Chat XDK has successfully imported/recovered the '
+             'account\'s keys (via the configured key source) and set the '
+             'identity. Cleared whenever the PIN/blob changes.',
+    )
+    x_chat_pin_locked = fields.Boolean(
+        string='X Chat PIN Rejected',
+        groups='base.group_system',
+        copy=False,
+        readonly=True,
+        help='Set when X rejected the configured X Chat PIN. Unlock attempts '
+             'are paused until a different PIN is entered — each wrong attempt '
+             'consumes one of the limited guesses X allows before locking the '
+             'secure backup permanently.',
+    )
 
     x_migration_status = fields.Selection(
         [
@@ -123,6 +169,29 @@ class SocialAccount(models.Model):
                             default_x_account_id=self.id),
         }
 
+    def _display_notification(self, title, message, kind='success'):
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': title,
+                'message': message,
+                'type': kind,
+                'sticky': False,
+            },
+        }
+
+    def _groups_not_supported(self, title, message):
+        """Respond when the account's provider cannot fetch group DMs.
+
+        UI clicks (dialog context, e.g. the 'Fetch Groups' server action) get a
+        warning notification instead of a 500; programmatic callers keep the
+        NotImplementedError signal.
+        """
+        if self.env.context.get('dialog'):
+            return self._display_notification(title, message, kind='warning')
+        raise NotImplementedError(message)
+
     def action_fetch_groups(self):
         """Fetch X group-DM conversations + members via the account's provider."""
         self.ensure_one()
@@ -132,7 +201,8 @@ class SocialAccount(models.Model):
         provider = XService.get_provider(self)
         fetch = getattr(provider, 'fetch_groups', None)
         if not fetch:
-            raise NotImplementedError(
+            return self._groups_not_supported(
+                'Fetch Groups',
                 'Provider %s does not support fetching groups' % self.x_provider)
         result = fetch(self, limit=100)
         if self.env.context.get('dialog'):
@@ -155,31 +225,69 @@ class SocialAccount(models.Model):
         self.ensure_one()
         if not self._filter_x_accounts():
             raise ValueError('Fetch group messages is only available on X accounts.')
-        if not self.x_encryption_code:
+        from odoo.addons.x_account.services.x_service import XService
+        provider = XService.get_provider(self)
+        if getattr(provider, '_needs_encryption_code', True) and not self.x_encryption_code:
             raise ValueError(
                 'Set the XChat Encryption Code on this account first — it is '
                 'required to read encrypted group DMs.')
-        from odoo.addons.x_account.services.x_service import XService
-        provider = XService.get_provider(self)
         fetch = getattr(provider, 'fetch_group_messages', None)
         if not fetch:
-            raise NotImplementedError(
+            return self._groups_not_supported(
+                'Fetch Group Messages',
                 'Provider %s does not support fetching group messages' % self.x_provider)
         result = fetch(self, limit=100)
         if self.env.context.get('dialog'):
+            parts = ['Groups: %s, messages: %s, failures: %s' % (
+                result.get('groups', 0), result.get('messages', 0),
+                result.get('failures', 0))]
+            if result.get('encrypted_skipped'):
+                parts.append('encrypted skipped: %s' % result.get('encrypted_skipped'))
             return {
                 'type': 'ir.actions.client',
                 'tag': 'display_notification',
                 'params': {
                     'title': 'Fetch Group Messages',
-                    'message': 'Groups: %s, messages: %s, failures: %s' % (
-                        result.get('groups', 0), result.get('messages', 0),
-                        result.get('failures', 0)),
+                    'message': ', '.join(parts),
                     'type': 'success' if not result.get('failures') else 'warning',
                     'sticky': False,
                 },
             }
         return result
+
+    def action_initialize_x_chat_encryption(self):
+        """Initialize the account's XChat encryption via its provider.
+
+        Dispatches to the provider's ``initialize_x_chat_encryption`` so the
+        official-X (blob import / Juicebox unlock) and any other provider can
+        implement it with their own key material. Marks ``x_chat_initialized``
+        on success and clears it on failure. Returns a dialog/notification
+        result.
+        """
+        self.ensure_one()
+        if not self._filter_x_accounts():
+            raise ValueError('X Chat encryption is only available on X accounts.')
+        from odoo.addons.x_account.services.x_service import XService
+        provider = XService.get_provider(self)
+        initialize = getattr(provider, 'initialize_x_chat_encryption', None)
+        if not initialize:
+            return self._display_notification(
+                'X Chat Encryption',
+                'Provider %s does not support initializing X Chat encryption'
+                % self.x_provider, kind='warning')
+        try:
+            initialize(self)
+        except Exception as exc:
+            self.write({'x_chat_initialized': False})
+            return self._display_notification(
+                'X Chat Encryption',
+                'Initialization failed: %s' % exc, kind='danger')
+        self.write({'x_chat_initialized': True})
+        mode = self.x_chat_key_mode or 'key_blob'
+        source = 'PIN' if mode == 'juicebox' else 'key blob'
+        return self._display_notification(
+            'X Chat Encryption',
+            'Initialized (key source: %s).' % source, kind='success')
 
     def _skip_oauth_stats(self):
         """Accounts managed by x_account (omnix / session_web) have no OAuth
@@ -217,6 +325,23 @@ class SocialAccount(models.Model):
             finally:
                 TwitterSocialAccount._create_default_stream_twitter = original
         return super().create(vals_list)
+
+    def write(self, vals):
+        """Clear the PIN-lock flag when the operator changes the PIN.
+
+        Each wrong PIN attempt consumes one of X's limited guesses before the
+        secure backup is permanently locked. When X rejects the PIN we stamp
+        ``x_chat_pin_locked`` so further attempts short-circuit without hitting
+        X. Changing the PIN value means the operator is trying a different
+        code, so the lock is lifted for the new attempt.
+        """
+        if 'x_encryption_code' in vals:
+            new_pin = vals.get('x_encryption_code')
+            to_unlock = self.filtered(
+                lambda a: a.x_chat_pin_locked and a.x_encryption_code != new_pin)
+            if to_unlock:
+                super(SocialAccount, to_unlock).write({'x_chat_pin_locked': False})
+        return super().write(vals)
 
     def _transition(self, status):
         self.write({'x_connection_status': status})

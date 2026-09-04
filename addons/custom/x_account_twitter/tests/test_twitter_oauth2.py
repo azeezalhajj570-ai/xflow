@@ -58,6 +58,8 @@ class TestTwitterOAuth2Client(XAccountTwitterTestBase):
         self.assertIn('code_challenge=', url)
         self.assertIn('scope=', url)
         self.assertIn('offline.access', url)
+        self.assertIn('dm.read', url)
+        self.assertIn('dm.write', url)
         self.assertTrue(url.startswith('https://twitter.com/i/oauth2/authorize'))
 
     def test_pkce_challenge_is_sha256_base64url(self):
@@ -187,6 +189,20 @@ class TestTwitterOAuth2Account(XAccountTwitterTestBase):
             with self.assertRaises(twitter_errors.TwitterAuthenticationError):
                 account._x_oauth2_ensure_access_token()
 
+    def test_refresh_400_marks_account_reauth_required(self):
+        account = self._make_account()
+        account.write({
+            'x_oauth2_token_expires_at': fields.Datetime.now() - timedelta(minutes=5)})
+        # A 400 from the token endpoint (revoked/expired refresh token) is
+        # classified as a generic non-retryable http_400.
+        with patch.object(
+                TwitterOAuth2Client, 'refresh',
+                side_effect=twitter_errors.TwitterError('http_400', 'Invalid or expired refresh token')):
+            token = account._x_oauth2_ensure_access_token()
+        self.assertIsNone(token)
+        self.assertEqual(account.x_connection_status, 'reauth_required')
+        self.assertEqual(account.last_error, 'Invalid or expired refresh token')
+
     def test_create_or_update_creates_oauth2_account(self):
         account = self.env['social.account']._create_or_update_twitter_oauth2(
             self.twitter_media,
@@ -199,6 +215,11 @@ class TestTwitterOAuth2Account(XAccountTwitterTestBase):
         self.assertEqual(account.x_oauth2_access_token, 'at2')
         self.assertEqual(account.x_provider, 'twitter')
         self.assertEqual(account.x_auth_method, 'oauth2')
+        # The callback just proved the credentials work (token exchange +
+        # /users/me), so the account must be live — not left on the 'new'
+        # default that nothing later promotes for OAuth2 accounts.
+        self.assertEqual(account.x_connection_status, 'active')
+        self.assertTrue(account.last_connected)
 
     def test_create_or_update_updates_existing(self):
         created = self.env['social.account']._create_or_update_twitter_oauth2(
@@ -218,6 +239,29 @@ class TestTwitterOAuth2Account(XAccountTwitterTestBase):
         count = self.env['social.account'].search_count([
             ('twitter_user_id', '=', '999')])
         self.assertEqual(count, 1)
+
+    def test_create_or_update_reactivates_stale_existing(self):
+        """Re-linking an account stuck in 'new'/'reauth_required' must flip it
+        back to 'active' — the callback proves the fresh credentials work."""
+        stale = self.env['social.account'].create({
+            'name': 'Stale User',
+            'media_id': self.twitter_media.id,
+            'social_account_handle': 'stale_user',
+            'twitter_user_id': '1000',
+            'x_oauth2_access_token': 'old-at',
+            'x_oauth2_refresh_token': 'old-rt',
+            'x_connection_status': 'reauth_required',
+            'last_error': 'http_400',
+        })
+        relinked = self.env['social.account']._create_or_update_twitter_oauth2(
+            self.twitter_media,
+            {'id': '1000', 'name': 'Stale User', 'username': 'stale_user'},
+            {'access_token': 'fresh-at', 'refresh_token': 'fresh-rt'},
+            7200,
+        )
+        self.assertEqual(relinked.id, stale.id)
+        self.assertEqual(relinked.x_connection_status, 'active')
+        self.assertFalse(relinked.last_error)
 
 
 @tagged('post_install', '-at_install', 'x_account_twitter')

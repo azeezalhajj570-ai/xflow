@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_x_twitter_webhook_manager,x.twitter.webhook.manager,model_x_twitter_webhook,social.group_social_manager,1,1,1,1
+access_x_twitter_webhook_system,x.twitter.webhook.system,model_x_twitter_webhook,base.group_system,1,1,1,1
+access_x_twitter_subscription_manager,x.twitter.subscription.manager,model_x_twitter_subscription,social.group_social_manager,1,1,1,1
+access_x_twitter_subscription_system,x.twitter.subscription.system,model_x_twitter_subscription,base.group_system,1,1,1,1
