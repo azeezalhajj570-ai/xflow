@@ -389,6 +389,12 @@ class TwitterActivity:
                 if ev.get('type') == 'Message':
                     content = ev.get('content') or {}
                     text = content.get('text', '')
+                    urls = content.get('urls') or []
+                    if urls:
+                        url_texts = [u.get('expanded_url') or u.get('url') or '' for u in urls if u]
+                        url_texts = [u for u in url_texts if u]
+                        if url_texts:
+                            text = (text + '\n' + '\n'.join(url_texts)).strip() if text else '\n'.join(url_texts)
                     if text:
                         return text, True
         except Exception as exc:

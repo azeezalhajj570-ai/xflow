@@ -491,10 +491,17 @@ class TwitterGroupSync:
                     if ev and ev.get('type') == 'Message':
                         content = ev.get('content') or {}
                         sender = ev.get('sender_id') or enc.get('sender_id')
+                        text = content.get('text', '')
+                        urls = content.get('urls') or []
+                        if urls:
+                            url_texts = [u.get('expanded_url') or u.get('url') or '' for u in urls if u]
+                            url_texts = [u for u in url_texts if u]
+                            if url_texts:
+                                text = (text + '\n' + '\n'.join(url_texts)).strip() if text else '\n'.join(url_texts)
                         messages.append({
                             'id': enc['id'],
                             'sender_id': sender,
-                            'text': content.get('text', ''),
+                            'text': text,
                             'created_at': ev.get('created_at') or enc.get('created_at'),
                             'from_me': bool(sender) and str(sender) == str(
                                 self.client.account.twitter_user_id),
