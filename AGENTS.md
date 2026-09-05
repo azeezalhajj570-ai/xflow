@@ -143,3 +143,79 @@ container. Use `docker compose exec db psql ...`.
 
 `docs/ai_whatsapp_context.SPEC.md` — full spec with objective, commands,
 structure, code style, testing, boundaries, and open questions.
+
+## Git Workflow
+
+**No direct commits to `main` branch.** All changes must go through feature branches and pull requests.
+
+### Branch Naming
+
+- `feat/<description>` — New features
+- `fix/<description>` — Bug fixes
+- `refactor/<description>` — Code refactoring
+- `docs/<description>` — Documentation updates
+- `test/<description>` — Test additions
+
+Examples:
+- `feat/subscription-events-config`
+- `fix/webhook-decryption`
+- `refactor/task-queue`
+
+### Workflow
+
+1. **Create feature branch from main:**
+   ```bash
+   git checkout main
+   git pull origin main
+   git checkout -b feat/your-feature-name
+   ```
+
+2. **Make changes and commit:**
+   ```bash
+   git add .
+   git commit -m "feat: add subscription event configuration"
+   ```
+
+3. **Push and create PR:**
+   ```bash
+   git push -u origin feat/your-feature-name
+   gh pr create --title "feat: add subscription event configuration" --body "Description of changes"
+   ```
+
+4. **After PR approval and merge:**
+   ```bash
+   git checkout main
+   git pull origin main
+   git branch -d feat/your-feature-name
+   ```
+
+### Commit Message Format
+
+Use [Conventional Commits](https://www.conventionalcommits.org/):
+
+```
+<type>: <description>
+
+[optional body]
+
+[optional footer(s)]
+```
+
+Types:
+- `feat:` — New feature
+- `fix:` — Bug fix
+- `refactor:` — Code refactoring
+- `docs:` — Documentation
+- `test:` — Tests
+- `chore:` — Maintenance tasks
+
+Examples:
+```
+feat: add configurable subscription events
+fix: resolve webhook decryption error
+refactor: simplify task queue processing
+```
+
+### Protected Branch
+
+The `main` branch is protected via pre-commit and pre-push hooks. Direct commits and pushes are blocked. All changes must go through pull requests.
