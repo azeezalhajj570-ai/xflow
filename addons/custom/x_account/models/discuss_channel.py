@@ -96,27 +96,46 @@ class DiscussChannel(models.Model):
             member_ids = member_ids or ([partner.id] if partner else []) + [
                 self.env.user.partner_id.id
             ]
-            channel = self.create({
-                'channel_type': channel_type,
-                'x_account_id': x_account.id,
-                'x_partner_id': partner.id if partner else False,
-                'x_conversation_id': conversation_id,
-                'name': conversation_id or getattr(partner, 'name', False) or 'X Conversation',
-            })
+            # Use try-except with flush for race conditions
+            try:
+                channel = self.create({
+                    'channel_type': channel_type,
+                    'x_account_id': x_account.id,
+                    'x_partner_id': partner.id if partner else False,
+                    'x_conversation_id': conversation_id,
+                    'name': conversation_id or getattr(partner, 'name', False) or 'X Conversation',
+                })
+                self.env.cr.flush()
+            except Exception:
+                self.env.cr.rollback()
+                # Race condition: another thread created it first. Search again.
+                channel = self.search(domain, limit=1)
+                if not channel:
+                    # Re-raise if still not found (different error)
+                    raise
             # Add members after creation (mail's discuss.channel.create() does
             # not accept Command.create on channel_member_ids). The creator is
             # auto-added by mail, so only add members not already present.
-            existing = set(channel.channel_member_ids.partner_id.ids)
-            self.env['discuss.channel.member'].sudo().create([
-                {'channel_id': channel.id, 'partner_id': pid}
-                for pid in dict.fromkeys(member_ids)
-                if pid and pid not in existing
-            ])
+            if channel:
+                try:
+                    existing = set(channel.channel_member_ids.partner_id.ids)
+                    self.env['discuss.channel.member'].sudo().create([
+                        {'channel_id': channel.id, 'partner_id': pid}
+                        for pid in dict.fromkeys(member_ids)
+                        if pid and pid not in existing
+                    ])
+                    self.env.cr.flush()
+                except Exception:
+                    self.env.cr.rollback()
+                    # Channel was deleted by another thread, ignore
+                    pass
         return channel
 
     def _save_x_message(self, direction, external_id, body, external_created_at,
                         author_partner=None, **kw):
         self.ensure_one()
+        if not body:
+            return self.env['x.message']
         # OmniX delivers timestamps in several shapes: ISO-8601 strings
         # ("2026-08-31T12:00:00Z") or Unix epoch milliseconds (ints). Odoo
         # Datetime fields want "%Y-%m-%d %H:%M:%S". Normalize when needed.

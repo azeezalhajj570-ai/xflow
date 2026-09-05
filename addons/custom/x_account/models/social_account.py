@@ -289,6 +289,30 @@ class SocialAccount(models.Model):
             'X Chat Encryption',
             'Initialized (key source: %s).' % source, kind='success')
 
+    def action_delete_x_subscriptions(self):
+        """Delete X Activity API subscriptions for this account.
+
+        Stub method to be overridden by provider-specific modules (e.g.
+        x_account_twitter). Returns a notification result.
+        """
+        self.ensure_one()
+        return self._display_notification(
+            'Delete X Subscriptions',
+            'Provider %s does not support subscription management'
+            % self.x_provider, kind='warning')
+
+    def action_resubscribe_x_subscriptions(self):
+        """Re-create X Activity API subscriptions for this account.
+
+        Stub method to be overridden by provider-specific modules (e.g.
+        x_account_twitter). Returns a notification result.
+        """
+        self.ensure_one()
+        return self._display_notification(
+            'Resubscribe',
+            'Provider %s does not support subscription management'
+            % self.x_provider, kind='warning')
+
     def _skip_oauth_stats(self):
         """Accounts managed by x_account (omnix / session_web) have no OAuth
         tokens and must never call social_twitter's stats endpoints (which fall

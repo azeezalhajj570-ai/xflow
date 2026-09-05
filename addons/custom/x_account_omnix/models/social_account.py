@@ -172,3 +172,17 @@ class SocialAccount(models.Model):
                 },
             }
         return True
+
+    def unlink(self):
+        omnix_accounts = self.filtered(
+            lambda a: a.x_provider == 'omnix' and a.x_webhook_id)
+        for account in omnix_accounts:
+            try:
+                provider = account._get_webhook_provider()
+                if provider and hasattr(provider, 'delete_webhook'):
+                    provider.delete_webhook(account.x_webhook_id)
+            except Exception:
+                _logger.exception(
+                    'x_account_omnix: failed to delete webhook for account %s',
+                    account.id)
+        return super().unlink()

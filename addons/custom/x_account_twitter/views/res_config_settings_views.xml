@@ -6,41 +6,39 @@
         <field name="inherit_id" ref="x_account.x_account_res_config_settings_view_form"/>
         <field name="arch" type="xml">
             <xpath expr="//div[@id='x_account_settings_block']" position="inside">
-                <h2>Twitter / X (Official API)</h2>
+                <h2>X API Credentials</h2>
                 <div class="row mt16 o_settings_container">
                     <div class="col-12 col-lg-6 o_setting_box">
-                        <div class="o_setting_left_pane">
-                            <label for="x_oauth2_client_id" string="OAuth 2.0 Client ID"/>
-                        </div>
                         <div class="o_setting_right_pane">
-                            <field name="x_oauth2_client_id"/>
+                            <label for="x_oauth2_client_id"/>
                             <div class="text-muted">
                                 OAuth 2.0 Client ID from your X app
                                 (Dev Portal &gt; Keys and Tokens &gt; OAuth 2.0 Client ID).
                             </div>
+                            <field name="x_oauth2_client_id"/>
                         </div>
                     </div>
                     <div class="col-12 col-lg-6 o_setting_box">
-                        <div class="o_setting_left_pane">
-                            <label for="x_oauth2_client_secret" string="OAuth 2.0 Client Secret"/>
-                        </div>
                         <div class="o_setting_right_pane">
-                            <field name="x_oauth2_client_secret"/>
+                            <label for="x_oauth2_client_secret"/>
                             <div class="text-muted">
                                 OAuth 2.0 Client Secret from your X app. Used to exchange
                                 authorization codes and refresh access tokens. Add the
                                 callback URI <code>/x_account/twitter/oauth2/callback</code>
                                 to your X app authentication settings.
                             </div>
+                            <field name="x_oauth2_client_secret" password="True"/>
                         </div>
                     </div>
                 </div>
-                <h3>Real-time Webhooks (V2 Webhooks API + X Activity API)</h3>
+                <h2>Webhooks</h2>
                 <div class="row mt16 o_settings_container">
                     <div class="col-12 col-lg-6 o_setting_box">
-                        <div class="o_setting_right_pane">
-                            <label for="x_twitter_webhook_enabled" string="X Webhooks Enabled"/>
+                        <div class="o_setting_left_pane">
                             <field name="x_twitter_webhook_enabled"/>
+                        </div>
+                        <div class="o_setting_right_pane">
+                            <label for="x_twitter_webhook_enabled"/>
                             <div class="text-muted">
                                 Deliver DM / chat events from X in (near) real time.
                                 When enabled, register
@@ -52,34 +50,33 @@
                     </div>
                     <div class="col-12 col-lg-6 o_setting_box">
                         <div class="o_setting_right_pane">
-                            <label for="x_twitter_webhook_base_url" string="Webhook Base URL"/>
-                            <field name="x_twitter_webhook_base_url"/>
+                            <label for="x_twitter_webhook_base_url"/>
                             <div class="text-muted">
                                 Public HTTPS base URL where Odoo is reachable
                                 (no path, no port, e.g. <code>https://x.example.com</code>).
-                                The receiver URL above is what X registers.
                             </div>
+                            <field name="x_twitter_webhook_base_url"/>
                         </div>
                     </div>
                     <div class="col-12 col-lg-6 o_setting_box">
                         <div class="o_setting_right_pane">
-                            <label for="x_twitter_app_consumer_secret" string="App Consumer Secret (API Secret Key)"/>
-                            <field name="x_twitter_app_consumer_secret"/>
+                            <label for="x_twitter_app_consumer_secret"/>
                             <div class="text-muted">
                                 X app API Secret Key. Verifies the
                                 <code>x-twitter-webhooks-signature</code> header and answers
                                 the Challenge-Response Check. Never share or log it.
                             </div>
+                            <field name="x_twitter_app_consumer_secret" password="True"/>
                         </div>
                     </div>
                     <div class="col-12 col-lg-6 o_setting_box">
                         <div class="o_setting_right_pane">
-                            <label for="x_twitter_app_bearer_token" string="App Bearer Token (App-Only)"/>
-                            <field name="x_twitter_app_bearer_token"/>
+                            <label for="x_twitter_app_bearer_token"/>
                             <div class="text-muted">
                                 OAuth 2.0 App-Only Bearer Token. Used to register/manage
                                 webhooks and X Activity API subscriptions.
                             </div>
+                            <field name="x_twitter_app_bearer_token" password="True"/>
                         </div>
                     </div>
                 </div>

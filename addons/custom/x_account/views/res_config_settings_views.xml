@@ -16,55 +16,47 @@
                 <div class="app_settings_block" id="x_account_settings_block"
                      data-string="X Account" string="X Account"
                      data-key="x_account" groups="base.group_system">
-                    <h2>X Account &amp; Session Platform</h2>
+                    <h2>Authentication</h2>
                     <div class="row mt16 o_settings_container">
                         <div class="col-12 col-lg-6 o_setting_box">
-                            <div class="o_setting_left_pane">
-                                <label for="x_provider" string="Provider"/>
-                            </div>
                             <div class="o_setting_right_pane">
-                                <field name="x_provider"/>
-                                <div class="text-muted">
-                                    Provider implementation used for X HTTP operations.
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-12 col-lg-6 o_setting_box">
-                            <div class="o_setting_left_pane">
-                                <label for="x_auth_method" string="Authentication Method"/>
-                            </div>
-                            <div class="o_setting_right_pane">
-                                <field name="x_auth_method"/>
+                                <label for="x_auth_method"/>
                                 <div class="text-muted">
                                     Authentication method used when adding X accounts.
                                 </div>
+                                <field name="x_auth_method"/>
+                            </div>
+                        </div>
+                        <div class="col-12 col-lg-6 o_setting_box">
+                            <div class="o_setting_right_pane">
+                                <label for="x_provider"/>
+                                <div class="text-muted">
+                                    Provider implementation used for X HTTP operations.
+                                </div>
+                                <field name="x_provider"/>
                             </div>
                         </div>
                     </div>
+                    <h2>Advanced</h2>
                     <div class="row mt16 o_settings_container">
                         <div class="col-12 col-lg-6 o_setting_box">
-                            <div class="o_setting_left_pane">
-                                <label for="x_web_api_base" string="Web API Base URL"/>
-                            </div>
                             <div class="o_setting_right_pane">
-                                <field name="x_web_api_base"/>
+                                <label for="x_web_api_base"/>
                                 <div class="text-muted">
                                     Base URL used by the undocumented web-session provider.
                                 </div>
+                                <field name="x_web_api_base"/>
                             </div>
                         </div>
                         <div class="col-12 col-lg-6 o_setting_box">
-                            <div class="o_setting_left_pane">
-                                <label for="x_encryption_key_configured"
-                                       string="Session Encryption Key Configured"/>
-                            </div>
                             <div class="o_setting_right_pane">
-                                <field name="x_encryption_key_configured"/>
+                                <label for="x_encryption_key_configured"/>
                                 <div class="text-muted">
                                     The session encryption key is supplied via the
                                     <code>X_SESSION_ENCRYPTION_KEY</code> deployment environment
                                     variable. It is never stored in Odoo, logged, or returned by APIs.
                                 </div>
+                                <field name="x_encryption_key_configured"/>
                             </div>
                         </div>
                     </div>

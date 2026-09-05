@@ -27,5 +27,20 @@ for rec in records:
 if records:
     action = records[:1].action_x_account_groups_by_account()</field>
         </record>
+
+        <record id="action_server_delete_x_subscriptions" model="ir.actions.server">
+            <field name="name">Delete X Subscriptions</field>
+            <field name="model_id" ref="social.model_social_account"/>
+            <field name="state">code</field>
+            <field name="code">results = []
+for rec in records:
+    if rec.x_provider == 'twitter' and rec.twitter_user_id:
+        try:
+            result = rec.action_delete_x_subscriptions()
+            results.append({'account': rec.name, 'deleted': result.get('deleted', 0)})
+        except Exception as e:
+            results.append({'account': rec.name, 'error': str(e)})
+action = {'type': 'ir.actions.client', 'tag': 'display_notification', 'params': {'title': 'Delete X Subscriptions', 'message': str(results), 'type': 'info', 'sticky': True}}</field>
+        </record>
     </data>
 </odoo>

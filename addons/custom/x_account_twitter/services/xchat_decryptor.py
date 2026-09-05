@@ -83,6 +83,8 @@ class XChatDecryptor:
         """
         account = self.account
         keys_record = self._public_keys_record()
+        selected_version = keys_record.get('public_key_version')
+        
         if account.x_chat_key_mode == 'juicebox':
             if not account.x_encryption_code:
                 raise ValueError(
@@ -102,18 +104,41 @@ class XChatDecryptor:
             from chat_xdk import Chat
             import json as _json
             chat = Chat(_json.dumps(keys_record['juicebox_config']))
+            _LOGGER.info(
+                'X Chat Juicebox unlock attempt: account_id=%s pin_length=%d '
+                'key_mode=%s selected_version=%s twitter_user_id=%s',
+                account.id,
+                len(account.x_encryption_code or ''),
+                account.x_chat_key_mode,
+                selected_version,
+                account.twitter_user_id)
             try:
                 self._unlock_with_retry(chat, account.x_encryption_code)
                 if getattr(account, 'x_chat_pin_locked', False):
                     account.sudo().write({'x_chat_pin_locked': False})
+                # Always persist the selected version after successful unlock
+                # (handles key rotation: if X rotated keys, we now use the new version)
+                if selected_version:
+                    account.sudo().write({
+                        'x_chat_signing_key_version': str(selected_version)
+                    })
+                    _LOGGER.info(
+                        'Persisted signing key version %s for account %s',
+                        selected_version, account.id)
             except Exception as exc:
+                exc_str = str(exc)
                 if self._is_invalid_pin_error(exc):
                     _LOGGER.warning(
                         'X Chat PIN rejected for account %s; locking further '
                         'attempts until the PIN changes (each wrong attempt '
                         'consumes one of X\'s limited guesses before the '
-                        'secure backup is permanently locked).', account.id)
+                        'secure backup is permanently locked). Error: %s',
+                        account.id, exc_str[:300])
                     account.sudo().write({'x_chat_pin_locked': True})
+                else:
+                    _LOGGER.error(
+                        'X Chat Juicebox unlock failed for account %s: %s',
+                        account.id, exc_str[:300])
                 raise
         else:
             if not account.x_chat_key_blob:
@@ -131,10 +156,11 @@ class XChatDecryptor:
             # happens to be returned first by the API (the API can return
             # several, including rotated historical keys).
             version = account.x_chat_signing_key_version \
-                or keys_record.get('public_key_version') or '1'
+                or selected_version or '1'
             chat.import_keys(blob, version=version)
+        # Use the selected version for set_identity
         signing_key_version = account.x_chat_signing_key_version \
-            or keys_record.get('public_key_version') or '1'
+            or selected_version or '1'
         if account.twitter_user_id:
             chat.set_identity(str(account.twitter_user_id), signing_key_version)
         chat.set_cache_keys(True)
@@ -287,25 +313,60 @@ class XChatDecryptor:
             'signing_key_version': self.account.x_chat_signing_key_version,
         }
 
+    def _select_key_record(self):
+        """Select the appropriate public-key record for this account.
+
+        Always selects the record with the highest numeric ``public_key_version``
+        (these are millisecond timestamps, so numeric comparison is required).
+        This handles key rotation gracefully: when X rotates keys, the API
+        returns the new version, and we use it immediately.
+
+        Returns the selected record dict, or {} if no records found.
+        """
+        if self.client is None or not self.account.twitter_user_id:
+            return {}
+        
+        records = self._public_key_records_for(self.account.twitter_user_id)
+        if not records:
+            _LOGGER.warning(
+                'Failed to fetch Chat public keys for account %s; '
+                'decryption may skip signature verification / unlock',
+                self.account.id, exc_info=False)
+            return {}
+        
+        # Log all API versions for diagnostic tracking
+        api_versions = [str(r.get('public_key_version')) for r in records if r.get('public_key_version')]
+        persisted_version = self.account.x_chat_signing_key_version
+        
+        # Always select the latest version by numeric version
+        # public_key_version values are millisecond timestamps
+        def parse_version(record):
+            try:
+                return int(record.get('public_key_version') or 0)
+            except (ValueError, TypeError):
+                return 0
+        
+        latest_record = max(records, key=parse_version)
+        latest_version = str(latest_record.get('public_key_version') or '')
+        
+        # Log diagnostic info for key version tracking
+        _LOGGER.info(
+            'Account %s key selection: persisted=%s api_versions=%s selected=%s',
+            self.account.id, persisted_version or 'unset',
+            api_versions, latest_version)
+        
+        return latest_record
+
     def _public_keys_record(self):
         """Fetch the account's Chat public-key record(s) from the X API.
 
         Includes the ``juicebox_config`` needed to construct a ``Chat`` instance
         that can recover keys via the secure key backup (``setup``/``unlock``).
-        Returns the first record dict, or {} on failure/none found.
+        Returns the selected record dict (latest or persisted version), or {} on failure.
         """
         if self._public_keys_cache is not None:
             return self._public_keys_cache
-        record = {}
-        if self.client is not None and self.account.twitter_user_id:
-            records = self._public_key_records_for(self.account.twitter_user_id)
-            if records:
-                record = records[0]
-            else:
-                _LOGGER.warning(
-                    'Failed to fetch Chat public keys for account %s; '
-                    'decryption may skip signature verification / unlock',
-                    self.account.id, exc_info=False)
+        record = self._select_key_record()
         self._public_keys_cache = record or {}
         return self._public_keys_cache
 
@@ -354,11 +415,11 @@ class XChatDecryptor:
         """
         return {
             'user_id': str(record.get('user_id') or user_id),
-            'public_key_version': record.get('public_key_version'),
-            'public_key': record.get('signing_public_key'),
-            'identity_public_key': record.get('public_key'),
+            'public_key_version': str(record.get('public_key_version') or ''),
+            'public_key': str(record.get('signing_public_key') or ''),
+            'identity_public_key': str(record.get('public_key') or ''),
             'identity_public_key_signature':
-                record.get('identity_public_key_signature'),
+                str(record.get('identity_public_key_signature') or ''),
         }
 
     def _public_key_record_for(self, user_id):
@@ -423,6 +484,18 @@ class XChatDecryptor:
         keys = self._ensure_signing_key_store()
         for user_id in sender_ids or []:
             self._ensure_signing_key_for(user_id)
+        
+        # Diagnostic: log signing keys structure
+        if keys:
+            for i, key in enumerate(keys):
+                missing_fields = [f for f in ['user_id', 'public_key_version', 'public_key', 
+                                               'identity_public_key', 'identity_public_key_signature']
+                                  if key.get(f) is None]
+                if missing_fields:
+                    _LOGGER.warning(
+                        'Account %s signing key %d missing fields: %s',
+                        self.account.id, i, missing_fields)
+        
         return keys
 
     # ------------------------------------------------------------------ public
@@ -439,12 +512,25 @@ class XChatDecryptor:
             return self._conversation_keys
         if self._conversation_keys is None:
             self._conversation_keys = {}
+        
+        # Debug: log signing keys we have
+        signing_versions = [k.get('public_key_version') for k in signing_keys if k.get('public_key_version')]
+        _LOGGER.info(
+            'Key-change absorption for account %s: %d events, signing_versions=%s',
+            self.account.id, len(key_change_events), signing_versions[:5])
+        
         try:
+            # Set signing keys before extracting conversation keys
+            if signing_keys and hasattr(chat, 'set_signing_keys'):
+                chat.set_signing_keys(signing_keys)
             extracted = chat.extract_conversation_keys(
                 list(key_change_events)) \
                 if hasattr(chat, 'extract_conversation_keys') else {}
             if isinstance(extracted, dict):
                 keys = extracted.get('keys') or {}
+                _LOGGER.info(
+                    'Key-change extraction for account %s: extracted %d keys, versions=%s',
+                    self.account.id, len(keys), list(keys.keys())[:5])
                 # Chat XDK returns {key_version: raw_key_bytes}; preserve the
                 # direction because decrypt_event accepts exactly that map.
                 self._conversation_keys.update(
@@ -476,14 +562,23 @@ class XChatDecryptor:
         chat = self._chat_instance()
         signing_keys = self._signing_keys(sender_ids)
         self._absorb_key_changes(chat, signing_keys, key_change_events)
+        # Only decrypt message events, not key change events
         blobs = list(raw_events or [])
-        if key_change_events:
-            blobs = list(key_change_events) + blobs
-        result = chat.decrypt_events(blobs, signing_keys)
-        if not isinstance(result, dict):
-            result = {}
-        messages = result.get('messages') or []
-        errors = result.get('errors') or {}
+        # Use single-event decryption to pass conversation_keys
+        messages = []
+        errors = {}
+        _LOGGER.info('decrypt_events: %d blobs, %d conversation_keys, %d signing_keys',
+                     len(blobs), len(self._conversation_keys or {}), len(signing_keys or []))
+        for blob in blobs:
+            try:
+                result = chat.decrypt_event(blob, self._conversation_keys or None, signing_keys)
+                _LOGGER.info('decrypt_event result: %s', type(result).__name__ if result else 'None')
+                if result:
+                    messages.append(result)
+            except Exception as exc:
+                _LOGGER.warning('decrypt_event error: %s', str(exc)[:200])
+                errors[str(exc)[:100]] = str(exc)
+        _LOGGER.info('decrypt_events done: %d messages, %d errors', len(messages), len(errors))
         return {'messages': messages, 'errors': errors}
 
     def decrypt_event(self, raw_event, key_change_events=None, sender_id=None):

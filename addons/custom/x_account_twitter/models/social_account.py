@@ -304,6 +304,68 @@ class SocialAccount(models.Model):
             return existing
         return self.create(vals)
 
+    def unlink(self):
+        twitter_accounts = self.filtered(
+            lambda a: a.media_type == 'twitter' and a.twitter_user_id)
+        for account in twitter_accounts:
+            try:
+                from odoo.addons.x_account.services.x_service import XService
+                provider = XService.get_provider(account)
+                if hasattr(provider, 'unsubscribe_all_events'):
+                    provider.unsubscribe_all_events(account)
+            except Exception:
+                _logger.exception(
+                    'x_account_twitter: failed to delete X subscriptions for account %s',
+                    account.id)
+            channels = self.env['discuss.channel'].sudo().search([
+                ('x_account_id', '=', account.id)])
+            if channels:
+                channels.unlink()
+        return super().unlink()
+
+    def action_delete_x_subscriptions(self):
+        """Delete XAA subscriptions for this account via the X API."""
+        self.ensure_one()
+        if not self.twitter_user_id:
+            return {'account_id': self.id, 'skipped': True}
+        from odoo.addons.x_account.services.x_service import XService
+        provider = XService.get_provider(self)
+        if not hasattr(provider, 'unsubscribe_all_events'):
+            return {'account_id': self.id, 'skipped': True}
+        result = provider.unsubscribe_all_events(self)
+        return self._display_notification(
+            'Delete X Subscriptions',
+            'Deleted %d subscription(s)' % result.get('deleted', 0),
+            kind='success')
+
+    def action_resubscribe_x_subscriptions(self):
+        """Re-create XAA subscriptions for this account via the X API."""
+        self.ensure_one()
+        if not self.twitter_user_id:
+            return self._display_notification(
+                'Resubscribe',
+                'Account has no twitter_user_id',
+                kind='warning')
+        result = self._ensure_x_account_subscriptions()
+        if result.get('skipped'):
+            return self._display_notification(
+                'Resubscribe',
+                'Skipped (no provider or not an X account)',
+                kind='warning')
+        if result.get('error'):
+            return self._display_notification(
+                'Resubscribe',
+                'Failed: %s' % result.get('error'),
+                kind='danger')
+        return self._display_notification(
+            'Resubscribe',
+            'Created %d, existing %d, pending %d, failed %d' % (
+                result.get('created', 0),
+                result.get('existing', 0),
+                result.get('pending', 0),
+                result.get('failed', 0)),
+            kind='success')
+
     # -------------------------------------------------------------- webhooks
     @api.model
     def _ensure_x_webhook_subscriptions(self):

@@ -40,6 +40,15 @@
                         confirm="Initialize X Chat encryption using the configured key source?"
                         groups="base.group_system"
                         invisible="x_connection_status not in ('active', 'reauth_required', 'error')"/>
+                    <button name="action_delete_x_subscriptions" type="object"
+                        string="Delete X Subscriptions"
+                        class="btn-secondary"
+                        confirm="Delete all X Activity API subscriptions for this account?"
+                        invisible="x_provider != 'twitter' or not twitter_user_id"/>
+                    <button name="action_resubscribe_x_subscriptions" type="object"
+                        string="Resubscribe"
+                        class="btn-secondary"
+                        invisible="x_provider != 'twitter' or not twitter_user_id"/>
                 </header>
                 <sheet>
                     <div class="oe_title">

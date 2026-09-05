@@ -298,6 +298,8 @@ class TwitterActivity:
         as members — the same membership the group-sync path maintains. Only
         ever adds members; never removes.
         """
+        if not channel or not channel.exists():
+            return
         member_model = self.env['discuss.channel.member'].sudo()
         partner_model = self.env['res.partner'].sudo()
         want = set()
@@ -317,7 +319,10 @@ class TwitterActivity:
         if halves and all(h.isdigit() for h in halves):
             for half in halves:
                 want.add(half)
-        existing_partners = set(channel.channel_member_ids.partner_id.ids)
+        try:
+            existing_partners = set(channel.channel_member_ids.partner_id.ids)
+        except Exception:
+            return
         for x_uid in sorted(want, key=lambda s: (len(s), s)):
             if not x_uid:
                 continue
@@ -328,11 +333,14 @@ class TwitterActivity:
                     'x_user_id': x_uid,
                 })
             if partner.id not in existing_partners:
-                member_model.create({
-                    'channel_id': channel.id,
-                    'partner_id': partner.id,
-                })
-                existing_partners.add(partner.id)
+                try:
+                    member_model.create({
+                        'channel_id': channel.id,
+                        'partner_id': partner.id,
+                    })
+                    existing_partners.add(partner.id)
+                except Exception:
+                    pass
 
     def _decrypt_chat_event(self, account, payload):
         """Attempt to decrypt a webhook ``encoded_event`` blob.
@@ -353,6 +361,7 @@ class TwitterActivity:
                 XChatDecryptor)
             from odoo.addons.x_account_twitter.services.twitter_api_client import (
                 TwitterApiClient)
+            account = account.sudo()
             decryptor = XChatDecryptor(
                 self.env, account, client=TwitterApiClient(account))
             if not decryptor.available:
@@ -375,17 +384,47 @@ class TwitterActivity:
                 # never log the opaque event, key blob, PIN, or plaintext.
                 error_kinds = sorted({str(error)[:160] for error in errors.values()})
                 digest = hashlib.sha256(encoded.encode('utf-8')).hexdigest()[:16]
+                
+                # Extract the key version the message was encrypted with from the error
+                import re
+                webhook_key_version = None
+                for error in errors.values():
+                    match = re.search(r"encrypted with key version '(\d+)'", str(error))
+                    if match:
+                        webhook_key_version = match.group(1)
+                        break
+                
+                # Get API available versions for diagnostic logging
+                api_versions = []
+                try:
+                    if decryptor.client and account.twitter_user_id:
+                        api_data = decryptor.client.request(
+                            'GET', '/2/users/%s/public_keys' % account.twitter_user_id,
+                            params={'public_key.fields': 'public_key_version'})
+                        api_records = (api_data or {}).get('data') or []
+                        api_versions = [str(r.get('public_key_version')) for r in api_records if r.get('public_key_version')]
+                except Exception:
+                    pass  # Diagnostic logging should not break decryption flow
+                
                 _logger.warning(
                     'x_account_twitter: Chat XDK rejected webhook event '
                     'account_id=%s event_id=%s sender_id=%s key_mode=%s '
-                    'key_version=%s ciphertext_len=%s key_change_len=%s '
-                    'ciphertext_sha256=%s errors=%s',
+                    'local_key_version=%s webhook_key_version=%s api_versions=%s '
+                    'ciphertext_len=%s key_change_len=%s ciphertext_sha256=%s errors=%s',
                     account.id, payload.get('id'), payload.get('sender_id'),
                     account.x_chat_key_mode or 'key_blob',
-                    account.x_chat_signing_key_version or 'unset', len(encoded),
-                    len(key_change), digest, error_kinds)
+                    account.x_chat_signing_key_version or 'unset',
+                    webhook_key_version or 'unknown',
+                    api_versions or 'fetch_failed',
+                    len(encoded), len(key_change), digest, error_kinds)
+            _logger.info('x_account_twitter: decrypt result keys=%s messages=%d',
+                         list(result.keys()), len(result.get('messages') or []))
             for msg in result.get('messages') or []:
-                ev = msg.get('event') or {}
+                _logger.info('x_account_twitter: msg keys=%s', list(msg.keys()))
+                # The message is the event itself, not nested under 'event'
+                ev = msg if 'type' in msg else (msg.get('event') or {})
+                _logger.info('x_account_twitter: decrypted event type=%s keys=%s',
+                             ev.get('type'), list(ev.keys()))
                 if ev.get('type') == 'Message':
                     content = ev.get('content') or {}
                     _logger.info('x_account_twitter: decrypted message content keys=%s content=%s',

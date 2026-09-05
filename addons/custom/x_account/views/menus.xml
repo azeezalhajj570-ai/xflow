@@ -22,7 +22,7 @@
 
     <menuitem
         id="menu_x_account_x_groups"
-        name="X Groups"
+        name="Chat"
         parent="menu_x_account_root"
         action="action_x_account_group_channels"
         sequence="20"/>
