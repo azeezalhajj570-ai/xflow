@@ -35,6 +35,7 @@ Highlights:
         'security/ir_rules.xml',
         'data/cron.xml',
         'data/base_automation.xml',
+        'data/channel_automation.xml',
         'data/server_actions.xml',
         'views/res_config_settings_views.xml',
         'views/social_account_views.xml',

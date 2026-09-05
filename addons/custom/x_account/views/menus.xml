@@ -1,5 +1,35 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+    <record id="action_x_account_automation_rules" model="ir.actions.act_window">
+        <field name="name">Automation Rules</field>
+        <field name="res_model">base.automation</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('model_id.model', 'in', ['x.message', 'x.account.task', 'x.account.group'])]</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create automation rules for X Account operations
+            </p>
+            <p>
+                Automate retweets, likes, comments, and follows based on messages or events.
+            </p>
+        </field>
+    </record>
+
+    <record id="action_x_account_server_actions" model="ir.actions.act_window">
+        <field name="name">Server Actions</field>
+        <field name="res_model">ir.actions.server</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('model_id.model', 'in', ['x.message', 'x.account.task', 'x.account.group'])]</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create server actions for X Account operations
+            </p>
+            <p>
+                Server actions execute Python code when triggered by automation rules or manually.
+            </p>
+        </field>
+    </record>
+
     <menuitem
         id="menu_x_account_root"
         name="X Account"
@@ -40,6 +70,20 @@
         parent="menu_x_account_root"
         action="action_x_account_task"
         sequence="40"/>
+
+    <menuitem
+        id="menu_x_account_automation"
+        name="Automation"
+        parent="menu_x_account_root"
+        action="action_x_account_automation_rules"
+        sequence="45"/>
+
+    <menuitem
+        id="menu_x_account_server_actions"
+        name="Server Actions"
+        parent="menu_x_account_root"
+        action="action_x_account_server_actions"
+        sequence="46"/>
 
     <menuitem
         id="menu_x_account_settings"

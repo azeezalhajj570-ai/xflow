@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!--
+            Channel automation: Retweet on message with tweet URL.
+            Triggers when an x.message is created in a specific channel.
+            The filter_domain should be customized per channel, e.g.:
+            [('channel_id.x_conversation_id', '=', 'g12345')]
+        -->
+        <record id="base_automation_x_message_retweet" model="base.automation">
+            <field name="name">X: Channel Retweet Automation</field>
+            <field name="model_id" ref="model_x_message"/>
+            <field name="trigger">on_create_or_write</field>
+            <field name="active" eval="True"/>
+            <field name="filter_domain">[('direction', '=', 'inbound'), ('encrypted', '=', False)]</field>
+        </record>
+
+        <record id="ir_actions_server_x_message_retweet" model="ir.actions.server">
+            <field name="name">X: Extract Tweet URLs and Retweet</field>
+            <field name="model_id" ref="model_x_message"/>
+            <field name="state">code</field>
+            <field name="base_automation_id" ref="base_automation_x_message_retweet"/>
+            <field name="code">
+for record in records:
+    if not record.body_plain or not record.channel_id or not record.channel_id.x_account_id:
+        continue
+    body = record.body_plain
+    tweet_ids = []
+    for domain in ['twitter.com', 'x.com']:
+        if domain in body:
+            for part in body.split():
+                if domain in part and '/status/' in part:
+                    url_parts = part.split('/status/')
+                    if len(url_parts) > 1:
+                        tweet_id = url_parts[1].split('?')[0].split('/')[0]
+                        if tweet_id.isdigit() and tweet_id not in tweet_ids:
+                            tweet_ids.append(tweet_id)
+    if not tweet_ids:
+        continue
+    account = record.channel_id.x_account_id
+    if not account.active or account.x_connection_status == 'disabled':
+        continue
+    for tweet_id in tweet_ids:
+        env['x.account.task'].sudo().create({
+            'account_id': account.id,
+            'operation': 'repost',
+            'priority': 1,
+            'task_context': json.dumps({
+                'target_id': tweet_id,
+                'channel_id': record.channel_id.id,
+                'source': 'channel_automation',
+            }),
+        })
+</field>
+        </record>
+    </data>
+</odoo>

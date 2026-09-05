@@ -7,3 +7,4 @@ from . import account_task
 from . import res_partner
 from . import x_message
 from . import discuss_channel
+from . import base_automation
