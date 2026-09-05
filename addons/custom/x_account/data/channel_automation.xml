@@ -46,7 +46,7 @@ for record in records:
             'operation': 'repost',
             'priority': 1,
             'task_context': json.dumps({
-                'target_id': tweet_id,
+                'post': {'post_id': tweet_id},
                 'channel_id': record.channel_id.id,
                 'source': 'channel_automation',
             }),
