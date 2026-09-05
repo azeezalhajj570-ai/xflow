@@ -3,3 +3,5 @@ access_x_twitter_webhook_manager,x.twitter.webhook.manager,model_x_twitter_webho
 access_x_twitter_webhook_system,x.twitter.webhook.system,model_x_twitter_webhook,base.group_system,1,1,1,1
 access_x_twitter_subscription_manager,x.twitter.subscription.manager,model_x_twitter_subscription,social.group_social_manager,1,1,1,1
 access_x_twitter_subscription_system,x.twitter.subscription.system,model_x_twitter_subscription,base.group_system,1,1,1,1
+access_x_subscription_event_type_manager,x.subscription.event.type.manager,model_x_subscription_event_type,social.group_social_manager,1,1,1,1
+access_x_subscription_event_type_system,x.subscription.event.type.system,model_x_subscription_event_type,base.group_system,1,1,1,1
