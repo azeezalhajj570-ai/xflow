@@ -88,6 +88,15 @@ class TwitterActivity:
                 'x_account_twitter: no X account for event user_id=%s', user_id)
             return {'status': 'ignored', 'reason': 'no_account',
                     'event_type': event_type}
+        configured_events = account.x_subscription_event_ids.mapped('name')
+        if not configured_events:
+            configured_events = ['dm.received', 'chat.received']
+        if event_type not in configured_events:
+            _logger.info(
+                'x_account_twitter: event type %s not configured for account %s',
+                event_type, account.id)
+            return {'status': 'ignored', 'reason': 'event_not_configured',
+                    'event_type': event_type}
 
         existing = self.env['x.twitter.event'].sudo().search([
             ('event_uuid', '=', event_uuid),

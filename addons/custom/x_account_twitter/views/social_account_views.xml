@@ -10,6 +10,9 @@
                     decoration-success="x_subscription_status == 'Active'"
                     decoration-warning="x_subscription_status == 'Pending'"
                     decoration-danger="x_subscription_status == 'Failed'"/>
+                <field name="x_subscription_event_ids" widget="many2many_tags"
+                    options="{'no_create': True, 'no_open': True}"
+                    placeholder="Select event types..."/>
             </xpath>
         </field>
     </record>
@@ -24,6 +27,9 @@
                     decoration-success="x_subscription_status == 'Active'"
                     decoration-warning="x_subscription_status == 'Pending'"
                     decoration-danger="x_subscription_status == 'Failed'"/>
+                <field name="x_subscription_event_ids" widget="many2many_tags"
+                    options="{'no_create': True, 'no_open': True}"
+                    placeholder="Select event types..."/>
             </xpath>
         </field>
     </record>

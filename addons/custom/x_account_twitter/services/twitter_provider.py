@@ -208,9 +208,11 @@ class TwitterProvider:
                                            'error', False)),
         ])
         subs_model = self.env['x.twitter.subscription'].sudo()
-        from .twitter_webhook import SUPPORTED_EVENT_TYPES as _EVENT_TYPES
         for acc in accounts:
-            self._subscribe_account(service, hook, acc, subs_model, _EVENT_TYPES)
+            event_types = acc.x_subscription_event_ids.mapped('name')
+            if not event_types:
+                event_types = ['dm.received', 'chat.received']
+            self._subscribe_account(service, hook, acc, subs_model, event_types)
 
     def _subscribe_account(self, service, hook, acc, subs_model=None,
                            event_types=None):
@@ -220,9 +222,11 @@ class TwitterProvider:
         subscriptions in ``pending`` state on retryable (temporary) failures so
         the next sweep can retry them. Returns a per-account summary dict.
         """
-        from .twitter_webhook import SUPPORTED_EVENT_TYPES as _EVENT_TYPES
         subs_model = subs_model or self.env['x.twitter.subscription'].sudo()
-        event_types = event_types or _EVENT_TYPES
+        if event_types is None:
+            event_types = acc.x_subscription_event_ids.mapped('name')
+        if not event_types:
+            event_types = ['dm.received', 'chat.received']
         summary = {'account_id': acc.id, 'user_id': str(acc.twitter_user_id),
                    'created': 0, 'pending': 0, 'existing': 0, 'failed': 0}
         access_token = acc.sudo()._x_oauth2_ensure_access_token()

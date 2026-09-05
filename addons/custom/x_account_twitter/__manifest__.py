@@ -46,6 +46,7 @@ Highlights.
     'data': [
         'security/ir.model.access.csv',
         'security/ir_rules.xml',
+        'data/subscription_event_types.xml',
         'data/cron.xml',
         'views/res_config_settings_views.xml',
         'views/social_media_views.xml',

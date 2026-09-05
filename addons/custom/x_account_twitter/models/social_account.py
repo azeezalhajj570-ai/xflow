@@ -27,10 +27,28 @@ _logger = logging.getLogger(__name__)
 
 from odoo.addons.x_account_twitter.services import twitter_errors
 from odoo.addons.x_account_twitter.services.twitter_oauth2 import TwitterOAuth2Client
+from odoo.addons.x_account_twitter.services.twitter_webhook import TwitterWebhook
 
 
 class SocialAccount(models.Model):
     _inherit = 'social.account'
+
+    x_subscription_event_ids = fields.Many2many(
+        'x.subscription.event.type',
+        'social_account_subscription_event_type_rel',
+        'account_id',
+        'event_type_id',
+        string='Subscription Events',
+        help='Event types to subscribe to for this account. '
+             'Changes will sync subscriptions on next save.',
+    )
+
+    @api.model
+    def _get_default_subscription_events(self):
+        """Return default subscription event types (dm.received, chat.received)."""
+        return self.env['x.subscription.event.type'].search([
+            ('name', 'in', ('dm.received', 'chat.received')),
+        ])
 
     x_provider = fields.Selection(
         selection_add=[
@@ -102,6 +120,84 @@ class SocialAccount(models.Model):
             elif record.x_oauth2_access_token:
                 record.write(self._get_oauth2_defaults())
         return records
+
+    def write(self, vals):
+        """Sync subscriptions when subscription events are changed."""
+        res = super().write(vals)
+        if 'x_subscription_event_ids' in vals and not self.env.context.get('x_skip_subscription_sync'):
+            for account in self:
+                if account.media_type == 'twitter' and account.twitter_user_id:
+                    try:
+                        account._sync_subscriptions()
+                    except Exception:
+                        _logger.exception(
+                            'x_account_twitter: subscription sync failed for account %s',
+                            account.id)
+        return res
+
+    def _sync_subscriptions(self):
+        """Sync XAA subscriptions to match the configured event types.
+
+        Creates subscriptions for newly added events and deactivates/deletes
+        subscriptions for removed events.
+        """
+        self.ensure_one()
+        if not self.twitter_user_id or self.media_type != 'twitter':
+            return {'skipped': True}
+        configured_events = set(self.x_subscription_event_ids.mapped('name'))
+        subs_model = self.env['x.twitter.subscription'].sudo()
+        existing_subs = subs_model.search([('account_id', '=', self.id)])
+        existing_event_map = {sub.event_type: sub for sub in existing_subs}
+        to_create = configured_events - set(existing_event_map.keys())
+        to_delete = set(existing_event_map.keys()) - configured_events
+        result = {'created': 0, 'deleted': 0}
+        for event_type in to_delete:
+            sub = existing_event_map[event_type]
+            if sub.subscription_id:
+                try:
+                    from odoo.addons.x_account.services.x_service import XService
+                    provider = XService.get_provider(self)
+                    webhook_service = TwitterWebhook(self.env)
+                    webhook_service.delete_subscription(sub.subscription_id)
+                except Exception:
+                    _logger.warning(
+                        'x_account_twitter: failed to delete subscription %s '
+                        'for event_type %s on account %s',
+                        sub.subscription_id, event_type, self.id)
+            sub.unlink()
+            result['deleted'] += 1
+        if to_create:
+            from odoo.addons.x_account.services.x_service import XService
+            provider = XService.get_provider(self)
+            webhook_service = TwitterWebhook(self.env)
+            hook = self.env['x.twitter.webhook'].sudo().search([], limit=1)
+            for event_type in to_create:
+                try:
+                    access_token = self._x_oauth2_ensure_access_token()
+                    if not access_token:
+                        _logger.warning(
+                            'x_account_twitter: no access token for account %s; '
+                            'cannot create subscription for %s', self.id, event_type)
+                        continue
+                    data = webhook_service.create_subscription(
+                        self.twitter_user_id, event_type,
+                        webhook_id=hook and hook.webhook_id or '',
+                        access_token=access_token)
+                    sub_id = (data or {}).get('subscription_id') or (data or {}).get('id')
+                    subs_model.create({
+                        'account_id': self.id,
+                        'webhook_id': hook.id if hook else False,
+                        'event_type': event_type,
+                        'subscription_id': sub_id or '',
+                        'state': 'active',
+                        'created_at': self.env.cr.now(),
+                    })
+                    result['created'] += 1
+                except Exception:
+                    _logger.exception(
+                        'x_account_twitter: failed to create subscription for '
+                        'account %s event_type %s', self.id, event_type)
+        return result
 
     def _skip_oauth_stats(self):
         """Skip OAuth stats for twitter-provider accounts that have no tokens.
