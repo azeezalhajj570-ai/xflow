@@ -1,0 +1,537 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+#	* x_account
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 19.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-09-05 20:00+0000\n"
+"PO-Revision-Date: 2026-09-05 20:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: Arabic\n"
+"Language: ar\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=6; plural=n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 && n%100<=10 ? 3 : n%100>=11 ? 4 : 5;\n"
+
+#. module: x_account
+#: model:ir.model,name:x_account.model_social_account
+msgid "X Account"
+msgstr "حساب X"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_social_account__x_connection_status
+msgid "X Connection Status"
+msgstr "حالة اتصال X"
+
+#. module: x_account
+#: model:ir.model.fields.selection,name:x_account.selection__social_account__x_connection_status__new
+msgid "New"
+msgstr "جديد"
+
+#. module: x_account
+#: model:ir.model.fields.selection,name:x_account.selection__social_account__x_connection_status__authenticating
+msgid "Authenticating"
+msgstr "جاري المصادقة"
+
+#. module: x_account
+#: model:ir.model.fields.selection,name:x_account.selection__social_account__x_connection_status__active
+msgid "Active"
+msgstr "نشط"
+
+#. module: x_account
+#: model:ir.model.fields.selection,name:x_account.selection__social_account__x_connection_status__disconnected
+msgid "Disconnected"
+msgstr "غير متصل"
+
+#. module: x_account
+#: model:ir.model.fields.selection,name:x_account.selection__social_account__x_connection_status__invalid
+msgid "Invalid"
+msgstr "غير صالح"
+
+#. module: x_account
+#: model:ir.model.fields.selection,name:x_account.selection__social_account__x_connection_status__reauth_required
+msgid "Reauthentication Required"
+msgstr "مطلوب إعادة المصادقة"
+
+#. module: x_account
+#: model:ir.model.fields.selection,name:x_account.selection__social_account__x_connection_status__error
+msgid "Error"
+msgstr "خطأ"
+
+#. module: x_account
+#: model:ir.model.fields.selection,name:x_account.selection__social_account__x_connection_status__disabled
+msgid "Disabled"
+msgstr "معطل"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_social_account__last_connected
+msgid "Last Connected"
+msgstr "آخر اتصال"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_social_account__last_validated
+msgid "Last Validated"
+msgstr "آخر تحقق"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_social_account__last_error
+msgid "Last Error"
+msgstr "آخر خطأ"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_social_account__x_provider
+msgid "X Provider"
+msgstr "مزود X"
+
+#. module: x_account
+#: model:ir.model.fields.selection,name:x_account.selection__social_account__x_provider__session_web
+msgid "Session Web"
+msgstr "جلسة الويب"
+
+#. module: x_account
+#: model:ir.model.fields.selection,name:x_account.selection__social_account__x_provider__official_publish
+msgid "Official Publish"
+msgstr "النشر الرسمي"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_social_account__x_auth_method
+msgid "X Auth Method"
+msgstr "طريقة مصادقة X"
+
+#. module: x_account
+#: model:ir.model.fields.selection,name:x_account.selection__social_account__x_auth_method__session_cookie
+msgid "Session Cookie"
+msgstr "ملف تعريف الارتباط للجلسة"
+
+#. module: x_account
+#: model:ir.model.fields.selection,name:x_account.selection__social_account__x_auth_method__oauth1
+msgid "OAuth 1.0a"
+msgstr "OAuth 1.0a"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_social_account__x_session_store_id
+msgid "X Session Store"
+msgstr "متجر جلسة X"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_social_account__x_encryption_code
+msgid "XChat Encryption Code"
+msgstr "رمز تشفير XChat"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_social_account__x_chat_key_blob
+msgid "X Chat Key Blob"
+msgstr "كتلة مفتاح X Chat"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_social_account__x_chat_signing_key_version
+msgid "X Chat Signing Key Version"
+msgstr "إصدار مفتاح التوقيع X Chat"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_social_account__x_chat_key_mode
+msgid "X Chat Key Source"
+msgstr "مصدر مفتاح X Chat"
+
+#. module: x_account
+#: model:ir.model.fields.selection,name:x_account.selection__social_account__x_chat_key_mode__key_blob
+msgid "Imported Key Blob"
+msgstr "كتلة المفتاح المستوردة"
+
+#. module: x_account
+#: model:ir.model.fields.selection,name:x_account.selection__social_account__x_chat_key_mode__juicebox
+msgid "Secure Backup / PIN"
+msgstr "النسخ الاحتياطي الآمن / PIN"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_social_account__x_chat_initialized
+msgid "X Chat Encryption Initialized"
+msgstr "تم تهيئة تشفير X Chat"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_social_account__x_chat_pin_locked
+msgid "X Chat PIN Rejected"
+msgstr "تم رفض PIN X Chat"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_social_account__x_migration_status
+msgid "X Migration Status"
+msgstr "حالة ترحيل X"
+
+#. module: x_account
+#: model:ir.model.fields.selection,name:x_account.selection__social_account__x_migration_status__pending
+msgid "Pending"
+msgstr "قيد الانتظار"
+
+#. module: x_account
+#: model:ir.model.fields.selection,name:x_account.selection__social_account__x_migration_status__migrated
+msgid "Migrated"
+msgstr "تم الترحيل"
+
+#. module: x_account
+#: model:ir.model.fields.selection,name:x_account.selection__social_account__x_migration_status__failed
+msgid "Failed"
+msgstr "فشل"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_social_account__source_account_id
+msgid "Source Account ID"
+msgstr "معرف الحساب المصدر"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_social_account__source_user_id
+msgid "Source User ID"
+msgstr "معرف المستخدم المصدر"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_social_account__migration_batch_id
+msgid "Migration Batch ID"
+msgstr "معرف دفعة الترحيل"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_social_account__migration_timestamp
+msgid "Migration Timestamp"
+msgstr "طابع وقت الترحيل"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_social_account__x_group_count
+msgid "X Groups"
+msgstr "مجموعات X"
+
+#. module: x_account
+#: model:ir.actions.act_window,name:x_account.action_x_account_social_accounts
+#: model:ir.ui.menu,name:x_account.menu_x_account_social_accounts
+#: model:ir.ui.view,name:x_account.x_account_social_account_view_list
+msgid "X Accounts"
+msgstr "حسابات X"
+
+#. module: x_account
+#: model:ir.ui.menu,name:x_account.menu_x_account_root
+msgid "X Account"
+msgstr "حساب X"
+
+#. module: x_account
+#: model:ir.ui.menu,name:x_account.menu_x_account_link_account
+msgid "Link Account"
+msgstr "ربط الحساب"
+
+#. module: x_account
+#: model:ir.ui.menu,name:x_account.menu_x_account_x_groups
+msgid "Chat"
+msgstr "الدردشة"
+
+#. module: x_account
+#: model:ir.ui.menu,name:x_account.menu_x_account_messages
+msgid "Messages"
+msgstr "الرسائل"
+
+#. module: x_account
+#: model:ir.ui.menu,name:x_account.menu_x_account_tasks
+msgid "Tasks"
+msgstr "المهام"
+
+#. module: x_account
+#: model:ir.ui.menu,name:x_account.menu_x_account_automation
+msgid "Automation"
+msgstr "الأتمتة"
+
+#. module: x_account
+#: model:ir.ui.menu,name:x_account.menu_x_account_server_actions
+msgid "Server Actions"
+msgstr "إجراءات الخادم"
+
+#. module: x_account
+#: model:ir.ui.menu,name:x_account.menu_x_account_settings
+msgid "Settings"
+msgstr "الإعدادات"
+
+#. module: x_account
+#: model:ir.actions.act_window,name:x_account.action_x_account_automation_rules
+msgid "Automation Rules"
+msgstr "قواعد الأتمتة"
+
+#. module: x_account
+#: model:ir.model,name:x_account.model_x_account_task
+#: model:ir.model.fields,field_description:x_account.field_x_account_task__account_id
+msgid "X Account Task"
+msgstr "مهمة حساب X"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_x_account_task__group_id
+msgid "X Account Group"
+msgstr "مجموعة حساب X"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_x_account_task__operation
+msgid "Operation"
+msgstr "العملية"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_x_account_task__status
+msgid "Status"
+msgstr "الحالة"
+
+#. module: x_account
+#: model:ir.model.fields.selection,name:x_account.selection__x_account_task__status__pending
+msgid "Pending"
+msgstr "قيد الانتظار"
+
+#. module: x_account
+#: model:ir.model.fields.selection,name:x_account.selection__x_account_task__status__running
+msgid "Running"
+msgstr "قيد التشغيل"
+
+#. module: x_account
+#: model:ir.model.fields.selection,name:x_account.selection__x_account_task__status__success
+msgid "Success"
+msgstr "نجاح"
+
+#. module: x_account
+#: model:ir.model.fields.selection,name:x_account.selection__x_account_task__status__failed
+msgid "Failed"
+msgstr "فشل"
+
+#. module: x_account
+#: model:ir.model.fields.selection,name:x_account.selection__x_account_task__status__cancelled
+msgid "Cancelled"
+msgstr "ملغي"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_x_account_task__priority
+msgid "Priority"
+msgstr "الأولوية"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_x_account_task__retry_count
+msgid "Retry Count"
+msgstr "عدد المحاولات"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_x_account_task__max_attempts
+msgid "Max Attempts"
+msgstr "الحد الأقصى للمحاولات"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_x_account_task__claimed_at
+msgid "Claimed At"
+msgstr "تم المطالبة في"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_x_account_task__next_retry_at
+msgid "Next Retry At"
+msgstr "المحاولة التالية في"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_x_account_task__error
+msgid "Error"
+msgstr "خطأ"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_x_account_task__result
+msgid "Result"
+msgstr "النتيجة"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_x_account_task__backoff_base
+msgid "Backoff Base (seconds)"
+msgstr "أساس التراجع (ثواني)"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_x_account_task__task_context
+msgid "Task Context"
+msgstr "سياق المهمة"
+
+#. module: x_account
+#: model:ir.model,name:x_account.model_x_message
+msgid "X Message"
+msgstr "رسالة X"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_x_message__channel_id
+msgid "Discuss Channel"
+msgstr "قناة المناقشة"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_x_message__account_id
+msgid "X Account"
+msgstr "حساب X"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_x_message__direction
+msgid "Direction"
+msgstr "الاتجاه"
+
+#. module: x_account
+#: model:ir.model.fields.selection,name:x_account.selection__x_message__direction__inbound
+msgid "Inbound"
+msgstr "وارد"
+
+#. module: x_account
+#: model:ir.model.fields.selection,name:x_account.selection__x_message__direction__outbound
+msgid "Outbound"
+msgstr "صادر"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_x_message__external_id
+msgid "External ID"
+msgstr "المعرف الخارجي"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_x_message__body_plain
+msgid "Body (plain text)"
+msgstr "النص (نص عادي)"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_x_message__external_created_at
+msgid "External Created At"
+msgstr "تاريخ الإنشاء الخارجي"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_x_message__author_partner_id
+msgid "Author Partner"
+msgstr "شريك المؤلف"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_x_message__author_x_id
+msgid "Author X ID"
+msgstr "معرف X للمؤلف"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_x_message__author_x_username
+msgid "Author X Username"
+msgstr "اسم مستخدم X للمؤلف"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_x_message__encrypted
+msgid "Encrypted"
+msgstr "مشفر"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_x_message__acked
+msgid "Acknowledged"
+msgstr "تم الاستلام"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_x_message__delivered
+msgid "Delivered"
+msgstr "تم التسليم"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_x_message__participant_joined
+msgid "Participant Joined"
+msgstr "انضم المشارك"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_x_message__participant_left
+msgid "Participant Left"
+msgstr "غادر المشارك"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_x_message__mail_message_id
+msgid "Mail Message"
+msgstr "رسالة البريد"
+
+#. module: x_account
+#: model:ir.model,name:x_account.model_x_account_group
+msgid "X Account Group"
+msgstr "مجموعة حساب X"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_x_account_group__name
+msgid "Name"
+msgstr "الاسم"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_x_account_group__description
+msgid "Description"
+msgstr "الوصف"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_x_account_group__account_ids
+msgid "X Accounts"
+msgstr "حسابات X"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_x_account_group__actions
+msgid "Automation Action"
+msgstr "إجراء الأتمتة"
+
+#. module: x_account
+#: model:ir.model.fields.selection,name:x_account.selection__x_account_group__actions__like
+msgid "Like"
+msgstr "إعجاب"
+
+#. module: x_account
+#: model:ir.model.fields.selection,name:x_account.selection__x_account_group__actions__comment
+msgid "Comment"
+msgstr "تعليق"
+
+#. module: x_account
+#: model:ir.model.fields.selection,name:x_account.selection__x_account_group__actions__repost
+msgid "Repost"
+msgstr "إعادة نشر"
+
+#. module: x_account
+#: model:ir.model.fields.selection,name:x_account.selection__x_account_group__actions__follow
+msgid "Follow"
+msgstr "متابعة"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_x_account_group__auto_execute
+msgid "Auto Execute"
+msgstr "تنفيذ تلقائي"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_x_account_group__cooldown_sec
+msgid "Cooldown (seconds)"
+msgstr "فترة التهدئة (ثواني)"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_x_account_group__paused
+msgid "Paused"
+msgstr "متوقف مؤقتاً"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_x_account_group__last_executed_at
+msgid "Last Executed At"
+msgstr "آخر تنفيذ في"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_social_account__company_id
+#: model:ir.model.fields,field_description:x_account.field_x_account_task__company_id
+#: model:ir.model.fields,field_description:x_account.field_x_message__company_id
+msgid "Company"
+msgstr "الشركة"
+
+#. module: x_account
+#: model_terms:ir.ui.view,arch_db:x_account.x_account_social_account_view_form
+msgid "X Chat Encryption"
+msgstr "تشفير X Chat"
+
+#. module: x_account
+#: model_terms:ir.ui.view,arch_db:x_account.x_account_social_account_view_form_standalone
+msgid "Initialize Encryption"
+msgstr "تهيئة التشفير"
+
+#. module: x_account
+#: model_terms:ir.ui.view,arch_db:x_account.x_account_social_account_view_form_standalone
+msgid "Delete X Subscriptions"
+msgstr "حذف اشتراكات X"
+
+#. module: x_account
+#: model_terms:ir.ui.view,arch_db:x_account.x_account_social_account_view_form_standalone
+msgid "Resubscribe"
+msgstr "إعادة الاشتراك"
+
+#. module: x_account
+#: model_terms:ir.ui.view,arch_db:x_account.x_account_social_account_view_form_standalone
+msgid "Account Info"
+msgstr "معلومات الحساب"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_social_account__x_subscription_event_ids
+msgid "Subscription Events"
+msgstr "أحداث الاشتراك"
