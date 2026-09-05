@@ -101,6 +101,9 @@ class SocialAccount(models.Model):
         'twitter'-provider account not yet linked) must not trigger the default
         stream, which would call the real X API and fail — the same suppression
         x_account uses for session imports.
+        
+        Also handles utm.medium uniqueness: when relinking an account with the
+        same name, reuse the existing utm.medium instead of creating a duplicate.
         """
         for vals in vals_list:
             media_type = vals.get('media_type')
@@ -111,6 +114,23 @@ class SocialAccount(models.Model):
                     and not self.env.context.get('x_no_default_stream')):
                 self = self.with_context(x_no_default_stream=True)
                 break
+        
+        # Pre-create utm.medium records to handle uniqueness constraint
+        # This prevents errors when relinking accounts with the same name
+        for vals in vals_list:
+            if vals.get('media_id') and vals.get('name') and not vals.get('utm_medium_id'):
+                media = self.env['social.media'].browse(vals['media_id'])
+                medium_name = "[%(media_name)s] %(account_name)s" % {
+                    "media_name": media.name,
+                    "account_name": vals['name']
+                }
+                # Check if utm.medium with this name already exists
+                existing_medium = self.env['utm.medium'].sudo().search([
+                    ('name', '=', medium_name)
+                ], limit=1)
+                if existing_medium:
+                    vals['utm_medium_id'] = existing_medium.id
+        
         records = super().create(vals_list)
         for record, vals in zip(records, vals_list):
             if record.media_type != 'twitter' or vals.get('x_provider'):
