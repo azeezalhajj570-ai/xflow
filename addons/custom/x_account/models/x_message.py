@@ -1,5 +1,7 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
+import json
+
 from odoo import fields, models
 
 
@@ -70,3 +72,106 @@ class XMessage(models.Model):
         'UNIQUE(channel_id, external_id)',
         'An external X message id must be unique per channel.',
     )
+
+    def _get_company_x_account(self):
+        """Get the X account for the current company."""
+        self.ensure_one()
+        return self.env['social.account'].sudo().search([
+            ('company_id', '=', self.env.company.id),
+            ('x_provider', '!=', False),
+            ('active', '=', True),
+            ('x_connection_status', 'not in', ('disabled', 'new')),
+        ], limit=1)
+
+    def _extract_tweet_ids(self):
+        """Extract tweet IDs from message body."""
+        self.ensure_one()
+        if not self.body_plain:
+            return []
+        tweet_ids = []
+        body = self.body_plain
+        for domain in ['twitter.com', 'x.com']:
+            if domain in body:
+                for part in body.split():
+                    if domain in part and '/status/' in part:
+                        url_parts = part.split('/status/')
+                        if len(url_parts) > 1:
+                            tweet_id = url_parts[1].split('?')[0].split('/')[0]
+                            if tweet_id.isdigit() and tweet_id not in tweet_ids:
+                                tweet_ids.append(tweet_id)
+        return tweet_ids
+
+    def _run_channel_automation(self, operation):
+        """Generic helper for channel automation.
+
+        Executes the specified operation for the current company's X account.
+        The Automation Rule domain handles all filtering (channel, time, content).
+        """
+        self.ensure_one()
+        if not self.body_plain:
+            return
+
+        account = self._get_company_x_account()
+        if not account:
+            return
+
+        today_start = fields.Datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+
+        existing = self.env['x.account.task'].sudo().search_count([
+            ('account_id', '=', account.id),
+            ('operation', '=', operation),
+            ('create_date', '>=', today_start),
+            ('task_context', 'ilike', self.author_x_id or ''),
+        ])
+        if existing:
+            return
+
+        if operation in ('like', 'repost', 'comment'):
+            tweet_ids = self._extract_tweet_ids()
+            if not tweet_ids:
+                return
+
+            for tweet_id in tweet_ids:
+                task_ctx = {
+                    'post': {'post_id': tweet_id},
+                    'channel_id': self.channel_id.id,
+                    'author_x_id': self.author_x_id,
+                    'source': 'channel_automation',
+                }
+                self.env['x.account.task'].sudo().create({
+                    'account_id': account.id,
+                    'operation': operation,
+                    'priority': 1,
+                    'task_context': json.dumps(task_ctx),
+                })
+        elif operation == 'follow':
+            if not self.author_x_username:
+                return
+            task_ctx = {
+                'screen_name': self.author_x_username,
+                'channel_id': self.channel_id.id,
+                'author_x_id': self.author_x_id,
+                'source': 'channel_automation',
+            }
+            self.env['x.account.task'].sudo().create({
+                'account_id': account.id,
+                'operation': 'follow',
+                'priority': 1,
+                'task_context': json.dumps(task_ctx),
+            })
+
+    def _run_channel_like(self):
+        """Execute like automation for this message."""
+        return self._run_channel_automation('like')
+
+    def _run_channel_repost(self):
+        """Execute repost automation for this message."""
+        return self._run_channel_automation('repost')
+
+    def _run_channel_comment(self):
+        """Execute comment automation for this message."""
+        return self._run_channel_automation('comment')
+
+    def _run_channel_follow(self):
+        """Execute follow automation for this message."""
+        return self._run_channel_automation('follow')
