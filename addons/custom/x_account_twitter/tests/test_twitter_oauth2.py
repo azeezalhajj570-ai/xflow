@@ -263,6 +263,62 @@ class TestTwitterOAuth2Account(XAccountTwitterTestBase):
         self.assertEqual(relinked.x_connection_status, 'active')
         self.assertFalse(relinked.last_error)
 
+    def test_relink_reuses_canonical_medium_when_orphan_exists(self):
+        """Re-linking an account whose canonical utm.medium still exists
+        (orphaned by a previously deleted account) must not crash with 'The
+        name must be unique' nor grow a new suffixed medium. It reuses the
+        canonical '[X] name' medium instead."""
+        # Simulate a previously-deleted account that left its medium behind.
+        orphan_medium_name = '[%s] %s' % (
+            self.twitter_media.name, 'Relink Medium User')
+        self.env['utm.medium'].sudo().create({'name': orphan_medium_name})
+        account = self.env['social.account'].create({
+            'name': 'Relink Medium User',
+            'media_id': self.twitter_media.id,
+            'social_account_handle': 'relink_medium_user',
+            'twitter_user_id': '2001',
+            'x_oauth2_access_token': 'at',
+            'x_oauth2_refresh_token': 'rt',
+            'x_oauth2_token_expires_at': fields.Datetime.now() + timedelta(hours=1),
+        })
+        # The create must have reused the exact canonical medium (no '[2]').
+        self.assertEqual(account.utm_medium_id.name, orphan_medium_name)
+        medium_count_after_create = self.env['utm.medium'].sudo().search_count(
+            [('name', '=', orphan_medium_name)])
+        self.assertEqual(medium_count_after_create, 1)
+
+        relinked = self.env['social.account']._create_or_update_twitter_oauth2(
+            self.twitter_media,
+            {'id': '2001', 'name': 'Relink Medium User',
+             'username': 'relink_medium_user'},
+            {'access_token': 'fresh-at', 'refresh_token': 'fresh-rt'},
+            7200,
+        )
+        self.assertEqual(relinked.id, account.id)
+        # No duplicate medium was created during the relink write either.
+        medium_count_after_relink = self.env['utm.medium'].sudo().search_count(
+            [('name', '=', orphan_medium_name)])
+        self.assertEqual(medium_count_after_relink, 1)
+
+    def test_create_and_write_do_not_create_duplicate_medium(self):
+        """Creating then re-writing the same account name keeps a single
+        canonical utm.medium (no '[2]', '[3]', ... duplicates)."""
+        account = self.env['social.account'].create({
+            'name': 'Dedupe Medium User',
+            'media_id': self.twitter_media.id,
+            'social_account_handle': 'dedupe_user',
+            'twitter_user_id': '2002',
+            'x_oauth2_access_token': 'at',
+            'x_oauth2_refresh_token': 'rt',
+            'x_oauth2_token_expires_at': fields.Datetime.now() + timedelta(hours=1),
+        })
+        account.write({'name': 'Dedupe Medium User'})
+        mediums = self.env['utm.medium'].sudo().search([
+            ('name', 'like', '[%s] Dedupe Medium User%%' % self.twitter_media.name),
+        ])
+        self.assertEqual(len(mediums), 1)
+        self.assertEqual(mediums.name, '[%s] Dedupe Medium User' % self.twitter_media.name)
+
 
 @tagged('post_install', '-at_install', 'x_account_twitter')
 class TestTwitterOAuth2ApiClient(XAccountTwitterTestBase):
