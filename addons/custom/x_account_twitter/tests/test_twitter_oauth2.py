@@ -107,6 +107,25 @@ class TestTwitterOAuth2Client(XAccountTwitterTestBase):
             with self.assertRaises(twitter_errors.TwitterAuthenticationError):
                 self.client.exchange_code('code-1', 'verifier-123')
 
+    def test_invalid_refresh_token_classified_as_invalid_token(self):
+        """A 400 from the token endpoint with an OAuth2 invalid_grant /
+        invalid_request error must classify as TwitterInvalidTokenError, not a
+        generic http_400 — so refresh callers know re-authorization is needed
+        instead of hammering X."""
+        for error_code in ('invalid_grant', 'invalid_request', 'invalid_client'):
+            body = {'error': error_code,
+                    'error_description': 'Value passed for the token was invalid.'}
+            with patch('requests.post',
+                       return_value=self._mock_response(400, body)):
+                exc = None
+                try:
+                    self.client.refresh('dead-refresh-token')
+                except twitter_errors.TwitterInvalidTokenError as caught:
+                    exc = caught
+                self.assertIsNotNone(exc, error_code)
+                self.assertEqual(exc.code, 'invalid_token')
+                self.assertIn(error_code, exc.message)
+
 
 @tagged('post_install', '-at_install', 'x_account_twitter')
 class TestTwitterOAuth2Account(XAccountTwitterTestBase):
@@ -202,6 +221,81 @@ class TestTwitterOAuth2Account(XAccountTwitterTestBase):
         self.assertIsNone(token)
         self.assertEqual(account.x_connection_status, 'reauth_required')
         self.assertEqual(account.last_error, 'Invalid or expired refresh token')
+
+    def test_invalid_token_marks_reauth_with_clear_message(self):
+        """An invalid_grant/invalid_request response surfaces a UI-friendly
+        're-authorization required' reason instead of a generic HTTP 400."""
+        account = self._make_account()
+        account.write({
+            'x_oauth2_token_expires_at': fields.Datetime.now() - timedelta(minutes=5)})
+        with patch.object(
+                TwitterOAuth2Client, 'refresh',
+                side_effect=twitter_errors.TwitterInvalidTokenError(
+                    'invalid_grant: Value passed for the token was invalid.')):
+            token = account._x_oauth2_ensure_access_token()
+        self.assertIsNone(token)
+        self.assertEqual(account.x_connection_status, 'reauth_required')
+        self.assertIn('re-authorization required', account.last_error)
+        self.assertIn('invalid_grant', account.last_error)
+
+    def test_reauth_required_short_circuits_no_refresh_retry(self):
+        """Once an account is reauth_required (dead refresh token), subsequent
+        ensure-access-token calls must NOT re-contact X's token endpoint until
+        the account is re-authorized."""
+        account = self.env['social.account'].create({
+            'name': 'Reauth No-Retry',
+            'media_id': self.twitter_media.id,
+            'social_account_handle': 'reauth2',
+            'twitter_user_id': '7777',
+            'x_oauth2_access_token': 'stale',
+            'x_oauth2_refresh_token': 'dead-rt',
+            'x_oauth2_token_expires_at': fields.Datetime.now() - timedelta(minutes=5),
+            'x_connection_status': 'reauth_required',
+            'last_error': 'dead',
+        })
+        with patch.object(TwitterOAuth2Client, 'refresh') as mocked:
+            token = account._x_oauth2_ensure_access_token()
+        self.assertIsNone(token)
+        mocked.assert_not_called()
+
+    def test_relink_restores_active_and_refresh(self):
+        """A successful OAuth relink (fresh token exchange via the callback)
+        resets the account to active and refresh-token rotation works again."""
+        account = self.env['social.account'].create({
+            'name': 'Relink Recovers',
+            'media_id': self.twitter_media.id,
+            'social_account_handle': 'relink_covers',
+            'twitter_user_id': '7778',
+            'x_oauth2_access_token': 'stale-at',
+            'x_oauth2_refresh_token': 'dead-rt',
+            'x_oauth2_token_expires_at': fields.Datetime.now() - timedelta(minutes=5),
+            'x_connection_status': 'reauth_required',
+            'last_error': 'invalid_grant: dead',
+        })
+        # Re-authorization through the OAuth 2.0 callback.
+        relinked = self.env['social.account']._create_or_update_twitter_oauth2(
+            self.twitter_media,
+            {'id': '7778', 'name': 'Relink Recovers', 'username': 'relink_cookie'},
+            {'access_token': 'fresh-at', 'refresh_token': 'fresh-rt'},
+            7200,
+        )
+        self.assertEqual(relinked.id, account.id)
+        self.assertEqual(relinked.x_connection_status, 'active')
+        self.assertFalse(relinked.last_error)
+        # The refreshed account can now rotate tokens again.
+        relinked.write({'x_oauth2_token_expires_at':
+                        fields.Datetime.now() - timedelta(minutes=5)})
+        with patch.object(
+                TwitterOAuth2Client, 'refresh',
+                return_value={'access_token': 'rotated-at',
+                              'refresh_token': 'rotated-rt',
+                              'expires_in': 7200}) as mocked:
+            token = relinked._x_oauth2_ensure_access_token()
+        self.assertEqual(token, 'rotated-at')
+        mocked.assert_called_once()
+        relinked.invalidate_recordset()
+        self.assertEqual(relinked.x_oauth2_refresh_token, 'rotated-rt')
+        self.assertEqual(relinked.x_connection_status, 'active')
 
     def test_create_or_update_creates_oauth2_account(self):
         account = self.env['social.account']._create_or_update_twitter_oauth2(

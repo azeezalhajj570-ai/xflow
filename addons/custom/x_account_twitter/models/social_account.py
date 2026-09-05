@@ -319,6 +319,12 @@ class SocialAccount(models.Model):
         revoked refresh token or missing client configuration).
         """
         self.ensure_one()
+        # A dead refresh token is a permanent condition: do not keep sending
+        # it to X until the account is re-authorized. Webhook/API traffic may
+        # call this many times a second; short-circuit so we never resubmit the
+        # same revoked token.
+        if self.x_connection_status == 'reauth_required':
+            return None
         if not self.x_oauth2_access_token:
             if not self.x_oauth2_refresh_token:
                 return None
@@ -350,6 +356,12 @@ class SocialAccount(models.Model):
                 and (self.x_oauth2_access_token != seen_access_token
                      or self.x_oauth2_refresh_token != seen_refresh_token)):
             return self.x_oauth2_access_token
+        # If another request already marked the account reauth_required (dead
+        # refresh token), do not resubmit it to X.  The status could only be
+        # reset to 'active' by a successful re-authorization, at which point
+        # the fresh tokens make refresh viable again.
+        if self.x_connection_status == 'reauth_required':
+            return None
         if not self.x_oauth2_refresh_token:
             raise twitter_errors.TwitterAuthenticationError(
                 'oauth2_refresh_token_missing')
@@ -360,6 +372,13 @@ class SocialAccount(models.Model):
         client = TwitterOAuth2Client(client_id, client_secret)
         try:
             tokens = client.refresh(self.x_oauth2_refresh_token)
+        except twitter_errors.TwitterInvalidTokenError as exc:
+            # The token endpoint explicitly rejected the token
+            # (invalid/expired/revoked).  Permanent: requires re-authorization.
+            # Surface a UI-friendly reason instead of a generic HTTP 400.
+            self.transition_to_reauth(
+                'X OAuth2 re-authorization required: %s' % exc)
+            return None
         except twitter_errors.TwitterAuthenticationError:
             # A typed authentication failure from the token endpoint is a
             # permanent, expected condition that callers already handle; let it
