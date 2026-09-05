@@ -95,11 +95,17 @@ def _build_error(code, response_body):
 
 def _detail(response_body):
     if isinstance(response_body, dict):
-        detail = response_body.get('detail') or response_body.get('title') or ''
+        # Twitter OAuth 2.0 token endpoint returns error/error_description
+        detail = response_body.get('error_description') or response_body.get('detail') or response_body.get('title') or ''
+        error = response_body.get('error')
+        if error and detail:
+            detail = '%s: %s' % (error, detail)
+        elif error:
+            detail = error
         errors = response_body.get('errors') or []
         if errors:
             error_messages = [e.get('message', '') for e in errors if isinstance(e, dict)]
             if error_messages:
-                detail = '%s: %s' % (detail, '; '.join(error_messages))
+                detail = '%s: %s' % (detail, '; '.join(error_messages)) if detail else '; '.join(error_messages)
         return detail
     return ''

@@ -101,9 +101,15 @@ class SocialAccount(models.Model):
         'twitter'-provider account not yet linked) must not trigger the default
         stream, which would call the real X API and fail — the same suppression
         x_account uses for session imports.
-        
-        Also handles utm.medium uniqueness: when relinking an account with the
-        same name, reuse the existing utm.medium instead of creating a duplicate.
+
+        Also keeps each account on its canonical utm.medium: base social always
+        creates a fresh '[media] account' medium on create, and once an account
+        with the same display name was deleted (its medium stays orphaned) the
+        fresh medium ends up suffixed ('[2]', '[3]', ...). Relinking such an
+        account then fails with 'The name must be unique' when base social
+        renames the suffixed medium back to the canonical form. New accounts
+        are re-aligned to the canonical medium after create
+        (see ``_x_align_account_medium``).
         """
         for vals in vals_list:
             media_type = vals.get('media_type')
@@ -114,24 +120,12 @@ class SocialAccount(models.Model):
                     and not self.env.context.get('x_no_default_stream')):
                 self = self.with_context(x_no_default_stream=True)
                 break
-        
-        # Pre-create utm.medium records to handle uniqueness constraint
-        # This prevents errors when relinking accounts with the same name
-        for vals in vals_list:
-            if vals.get('media_id') and vals.get('name') and not vals.get('utm_medium_id'):
-                media = self.env['social.media'].browse(vals['media_id'])
-                medium_name = "[%(media_name)s] %(account_name)s" % {
-                    "media_name": media.name,
-                    "account_name": vals['name']
-                }
-                # Check if utm.medium with this name already exists
-                existing_medium = self.env['utm.medium'].sudo().search([
-                    ('name', '=', medium_name)
-                ], limit=1)
-                if existing_medium:
-                    vals['utm_medium_id'] = existing_medium.id
-        
+
         records = super().create(vals_list)
+        for record, vals in zip(records, vals_list):
+            if (vals.get('media_id') and vals.get('name')
+                    and record.media_type == 'twitter'):
+                self._x_align_account_medium(record, vals['name'])
         for record, vals in zip(records, vals_list):
             if record.media_type != 'twitter' or vals.get('x_provider'):
                 continue
@@ -142,7 +136,20 @@ class SocialAccount(models.Model):
         return records
 
     def write(self, vals):
-        """Sync subscriptions when subscription events are changed."""
+        """Sync subscriptions when subscription events are changed.
+
+        Also re-aligns the linked utm.medium before base social renames it to
+        the canonical '[media] account' form. Renaming a suffixed medium
+        ('[X] name [2]', ...) back to the canonical name raises 'The name must
+        be unique' when an orphaned medium already holds the canonical name
+        (left behind by a previously deleted/archived account). Realigning to
+        the existing canonical medium avoids the collision (see
+        ``_x_align_account_medium``).
+        """
+        if vals.get('name'):
+            for account in self:
+                if account.media_type == 'twitter':
+                    self._x_align_account_medium(account, vals['name'])
         res = super().write(vals)
         if 'x_subscription_event_ids' in vals and not self.env.context.get('x_skip_subscription_sync'):
             for account in self:
@@ -154,6 +161,70 @@ class SocialAccount(models.Model):
                             'x_account_twitter: subscription sync failed for account %s',
                             account.id)
         return res
+
+    @api.model
+    def _x_medium_name_for(self, media_name, account_name):
+        """Return the canonical utm.medium name for a social account."""
+        return "[%(media_name)s] %(account_name)s" % {
+            "media_name": media_name,
+            "account_name": account_name,
+        }
+
+    def _x_align_account_medium(self, account, account_name):
+        """Re-point ``account`` at the canonical '[media] account' utm.medium.
+
+        Called on create/write of twitter accounts because base social blindly
+        creates (create) or renames (name-write) a per-account utm.medium.
+        Once a medium holding the canonical name is orphaned (a previous
+        account with the same display name was deleted), those operations
+        produce suffixed duplicates ('[2]', '[3]', ...) or crash with
+        'The name must be unique' when one is renamed back to the canonical
+        name. This reuses the canonical medium and drops the suffixed duplicate
+        whenever no other account depends on it.
+        """
+        account.ensure_one()
+        if (account.media_type != 'twitter' or not account.media_id
+                or not account_name):
+            return account
+        canonical = self._x_medium_name_for(
+            account.media_id.name, account_name)
+        current = account.utm_medium_id
+        if current and current.name == canonical:
+            return account
+        holder = self.env['utm.medium'].sudo().with_context(
+            active_test=False).search([('name', '=', canonical)], limit=1)
+        if holder and holder != current:
+            # The canonical name is already taken (normally by an orphaned
+            # medium). Reuse it only when no other account depends on it.
+            others = self.env['social.account'].sudo().with_context(
+                active_test=False).search_count([
+                    ('utm_medium_id', '=', holder.id),
+                    ('id', '!=', account.id),
+                ])
+            if others:
+                return account
+            account.write({'utm_medium_id': holder.id})
+            holder.sudo().write({'active': True})
+            if current:
+                shared = self.env['social.account'].sudo().with_context(
+                    active_test=False).search_count([
+                        ('utm_medium_id', '=', current.id),
+                        ('id', '!=', account.id),
+                    ])
+                if not shared:
+                    try:
+                        current.sudo().unlink()
+                    except Exception:
+                        _logger.warning(
+                            'x_account_twitter: could not remove duplicate '
+                            'utm.medium %s (%s); leaving it orphaned',
+                            current.id, current.name, exc_info=True)
+            return account
+        # Canonical name is free: rename our own (suffixed) medium to it
+        # instead of letting base social create/rename another row.
+        if current:
+            current.sudo().write({'name': canonical, 'active': True})
+        return account
 
     def _sync_subscriptions(self):
         """Sync XAA subscriptions to match the configured event types.
