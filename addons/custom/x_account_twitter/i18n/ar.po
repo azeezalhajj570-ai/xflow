@@ -1,0 +1,278 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+#	* x_account_twitter
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 19.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-09-05 20:00+0000\n"
+"PO-Revision-Date: 2026-09-05 20:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: Arabic\n"
+"Language: ar\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=6; plural=n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 && n%100<=10 ? 3 : n%100>=11 ? 4 : 5;\n"
+
+#. module: x_account_twitter
+#: model:ir.model,name:x_account_twitter.model_social_account
+msgid "X Account"
+msgstr "حساب X"
+
+#. module: x_account_twitter
+#: model:ir.model.fields,field_description:x_account_twitter.field_social_account__x_provider
+msgid "X Provider"
+msgstr "مزود X"
+
+#. module: x_account_twitter
+#: model:ir.model.fields.selection,name:x_account_twitter.selection__social_account__x_provider__twitter
+msgid "Twitter (Official API)"
+msgstr "تويتر (الواجهة البرمجية الرسمية)"
+
+#. module: x_account_twitter
+#: model:ir.model.fields,field_description:x_account_twitter.field_social_account__x_auth_method
+msgid "X Auth Method"
+msgstr "طريقة مصادقة X"
+
+#. module: x_account_twitter
+#: model:ir.model.fields.selection,name:x_account_twitter.selection__social_account__x_auth_method__oauth2
+msgid "OAuth 2.0 (Official API)"
+msgstr "OAuth 2.0 (الواجهة البرمجية الرسمية)"
+
+#. module: x_account_twitter
+#: model:ir.model.fields,field_description:x_account_twitter.field_social_account__x_oauth2_access_token
+msgid "X OAuth 2.0 Access Token"
+msgstr "رمز وصول X OAuth 2.0"
+
+#. module: x_account_twitter
+#: model:ir.model.fields,field_description:x_account_twitter.field_social_account__x_oauth2_refresh_token
+msgid "X OAuth 2.0 Refresh Token"
+msgstr "رمز تحديث X OAuth 2.0"
+
+#. module: x_account_twitter
+#: model:ir.model.fields,field_description:x_account_twitter.field_social_account__x_oauth2_token_expires_at
+msgid "X OAuth 2.0 Token Expiry"
+msgstr "انتهاء صلاحية رمز X OAuth 2.0"
+
+#. module: x_account_twitter
+#: model:ir.model.fields,field_description:x_account_twitter.field_social_account__x_subscription_status
+msgid "Subscription Status"
+msgstr "حالة الاشتراك"
+
+#. module: x_account_twitter
+#: model:ir.model.fields,field_description:x_account_twitter.field_social_account__x_subscription_event_ids
+msgid "Subscription Events"
+msgstr "أحداث الاشتراك"
+
+#. module: x_account_twitter
+#: model:ir.model,name:x_account_twitter.model_x_subscription_event_type
+msgid "X Subscription Event Type"
+msgstr "نوع حدث اشتراك X"
+
+#. module: x_account_twitter
+#: model:ir.model.fields,field_description:x_account_twitter.field_x_subscription_event_type__name
+msgid "Event Type"
+msgstr "نوع الحدث"
+
+#. module: x_account_twitter
+#: model:ir.model.fields,field_description:x_account_twitter.field_x_subscription_event_type__description
+msgid "Description"
+msgstr "الوصف"
+
+#. module: x_account_twitter
+#: model:ir.model.fields,field_description:x_account_twitter.field_x_subscription_event_type__sequence
+msgid "Sequence"
+msgstr "التسلسل"
+
+#. module: x_account_twitter
+#: model:ir.model.fields,field_description:x_account_twitter.field_x_subscription_event_type__active
+msgid "Active"
+msgstr "نشط"
+
+#. module: x_account_twitter
+#: model:x.subscription.event.type,name:x_account_twitter.event_type_dm_received
+msgid "Direct Messages (received)"
+msgstr "الرسائل المباشرة (الواردة)"
+
+#. module: x_account_twitter
+#: model:x.subscription.event.type,name:x_account_twitter.event_type_chat_received
+msgid "XChat Messages (received)"
+msgstr "رسائل XChat (الواردة)"
+
+#. module: x_account_twitter
+#: model:x.subscription.event.type,name:x_account_twitter.event_type_dm_sent
+msgid "Direct Messages (sent)"
+msgstr "الرسائل المباشرة (الصادرة)"
+
+#. module: x_account_twitter
+#: model:x.subscription.event.type,name:x_account_twitter.event_type_chat_sent
+msgid "XChat Messages (sent)"
+msgstr "رسائل XChat (الصادرة)"
+
+#. module: x_account_twitter
+#: model:x.subscription.event.type,name:x_account_twitter.event_type_chat_conversation_join
+msgid "Conversation Join Events"
+msgstr "أحداث الانضمام إلى المحادثة"
+
+#. module: x_account_twitter
+#: model:ir.model,name:x_account_twitter.model_x_twitter_webhook
+msgid "X Webhook Registration"
+msgstr "تسجيل Webhook لـ X"
+
+#. module: x_account_twitter
+#: model:ir.model.fields,field_description:x_account_twitter.field_x_twitter_webhook__name
+msgid "Webhook URL"
+msgstr "رابط Webhook"
+
+#. module: x_account_twitter
+#: model:ir.model.fields,field_description:x_account_twitter.field_x_twitter_webhook__webhook_id
+msgid "X Webhook ID"
+msgstr "معرف Webhook لـ X"
+
+#. module: x_account_twitter
+#: model:ir.model.fields,field_description:x_account_twitter.field_x_twitter_webhook__valid
+msgid "Valid"
+msgstr "صالح"
+
+#. module: x_account_twitter
+#: model:ir.model.fields,field_description:x_account_twitter.field_x_twitter_webhook__app_consumer_secret_set
+msgid "Signing Secret Set"
+msgstr "تم تعيين سر التوقيع"
+
+#. module: x_account_twitter
+#: model:ir.model.fields,field_description:x_account_twitter.field_x_twitter_webhook__registered_at
+msgid "Registered At"
+msgstr "تم التسجيل في"
+
+#. module: x_account_twitter
+#: model:ir.model,name:x_account_twitter.model_x_twitter_subscription
+msgid "X Activity API Subscription"
+msgstr "اشتراك واجهة برمجة تطبيقات نشاط X"
+
+#. module: x_account_twitter
+#: model:ir.model.fields,field_description:x_account_twitter.field_x_twitter_subscription__account_id
+msgid "X Account"
+msgstr "حساب X"
+
+#. module: x_account_twitter
+#: model:ir.model.fields,field_description:x_account_twitter.field_x_twitter_subscription__webhook_id
+msgid "Webhook"
+msgstr "Webhook"
+
+#. module: x_account_twitter
+#: model:ir.model.fields,field_description:x_account_twitter.field_x_twitter_subscription__event_type
+msgid "Event Type"
+msgstr "نوع الحدث"
+
+#. module: x_account_twitter
+#: model:ir.model.fields,field_description:x_account_twitter.field_x_twitter_subscription__subscription_id
+msgid "Subscription ID"
+msgstr "معرف الاشتراك"
+
+#. module: x_account_twitter
+#: model:ir.model.fields,field_description:x_account_twitter.field_x_twitter_subscription__state
+msgid "State"
+msgstr "الحالة"
+
+#. module: x_account_twitter
+#: model:ir.model.fields.selection,name:x_account_twitter.selection__x_twitter_subscription__state__active
+msgid "Active"
+msgstr "نشط"
+
+#. module: x_account_twitter
+#: model:ir.model.fields.selection,name:x_account_twitter.selection__x_twitter_subscription__state__pending
+msgid "Pending"
+msgstr "قيد الانتظار"
+
+#. module: x_account_twitter
+#: model:ir.model.fields.selection,name:x_account_twitter.selection__x_twitter_subscription__state__failed
+msgid "Failed"
+msgstr "فشل"
+
+#. module: x_account_twitter
+#: model:ir.model.fields,field_description:x_account_twitter.field_x_twitter_subscription__error
+msgid "Error"
+msgstr "خطأ"
+
+#. module: x_account_twitter
+#: model:ir.model.fields,field_description:x_account_twitter.field_x_twitter_subscription__created_at
+msgid "Created At"
+msgstr "تم الإنشاء في"
+
+#. module: x_account_twitter
+#: model:ir.model,name:x_account_twitter.model_x_twitter_event
+msgid "X Webhook Event"
+msgstr "حدث Webhook لـ X"
+
+#. module: x_account_twitter
+#: model:ir.model.fields,field_description:x_account_twitter.field_x_twitter_event__event_uuid
+msgid "Event UUID"
+msgstr "معرف UUID للحدث"
+
+#. module: x_account_twitter
+#: model:ir.model.fields,field_description:x_account_twitter.field_x_twitter_event__account_id
+msgid "X Account"
+msgstr "حساب X"
+
+#. module: x_account_twitter
+#: model:ir.model.fields,field_description:x_account_twitter.field_x_twitter_event__event_type
+msgid "Event Type"
+msgstr "نوع الحدث"
+
+#. module: x_account_twitter
+#: model:ir.model.fields,field_description:x_account_twitter.field_x_twitter_event__state
+msgid "State"
+msgstr "الحالة"
+
+#. module: x_account_twitter
+#: model:ir.model.fields.selection,name:x_account_twitter.selection__x_twitter_event__state__queued
+msgid "Queued"
+msgstr "في قائمة الانتظار"
+
+#. module: x_account_twitter
+#: model:ir.model.fields.selection,name:x_account_twitter.selection__x_twitter_event__state__processing
+msgid "Processing"
+msgstr "قيد المعالجة"
+
+#. module: x_account_twitter
+#: model:ir.model.fields.selection,name:x_account_twitter.selection__x_twitter_event__state__done
+msgid "Processed"
+msgstr "تمت المعالجة"
+
+#. module: x_account_twitter
+#: model:ir.model.fields.selection,name:x_account_twitter.selection__x_twitter_event__state__failed
+msgid "Failed"
+msgstr "فشل"
+
+#. module: x_account_twitter
+#: model:ir.model.fields.selection,name:x_account_twitter.selection__x_twitter_event__state__skipped
+msgid "Skipped"
+msgstr "تم التخطي"
+
+#. module: x_account_twitter
+#: model:ir.model.fields,field_description:x_account_twitter.field_x_twitter_event__error
+msgid "Error"
+msgstr "خطأ"
+
+#. module: x_account_twitter
+#: model:ir.model.fields,field_description:x_account_twitter.field_x_twitter_event__task_id
+msgid "Task"
+msgstr "المهمة"
+
+#. module: x_account_twitter
+#: model:ir.model.fields,field_description:x_account_twitter.field_x_twitter_event__payload
+msgid "Payload"
+msgstr "الحمولة"
+
+#. module: x_account_twitter
+#: model:ir.model.fields,field_description:x_account_twitter.field_x_twitter_event__company_id
+#: model:ir.model.fields,field_description:x_account_twitter.field_x_twitter_subscription__company_id
+msgid "Company"
+msgstr "الشركة"
+
+#. module: x_account_twitter
+#: model:ir.model.fields,field_description:x_account_twitter.field_social_account__x_subscription_status
+msgid "Subscription Status"
+msgstr "حالة الاشتراك"
