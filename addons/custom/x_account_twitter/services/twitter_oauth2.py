@@ -106,7 +106,11 @@ class TwitterOAuth2Client:
         except requests.RequestException as exc:
             raise twitter_errors.TwitterTemporaryError('network_error: %s' % exc)
         if response.status_code != 200:
-            raise twitter_errors.classify(response.status_code, self._body_json(response))
+            # Token endpoint failures are classified distinctly: an
+            # invalid/expired/revoked token is a permanent condition
+            # (re-authorization required), not a generic http_400.
+            raise twitter_errors.classify_token_endpoint(
+                response.status_code, self._body_json(response))
         try:
             return response.json()
         except ValueError:

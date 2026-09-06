@@ -12,6 +12,14 @@
                 <field name="retry_count"/>
                 <field name="claimed_at"/>
                 <field name="next_retry_at"/>
+                <control>
+                    <button name="action_process_queue"
+                            string="Process Queue"
+                            type="object"
+                            class="btn-primary"
+                            icon="fa-play"
+                            title="Run the pending task queue now"/>
+                </control>
             </list>
         </field>
     </record>
@@ -22,6 +30,11 @@
         <field name="arch" type="xml">
             <form string="X Account Task" create="false">
                 <header>
+                    <button name="action_process_queue"
+                            string="Process Queue"
+                            type="object"
+                            class="btn-primary"
+                            title="Run the pending task queue now"/>
                     <button name="action_cancel" string="Cancel" type="object" class="btn-secondary"/>
                 </header>
                 <sheet>

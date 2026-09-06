@@ -66,6 +66,56 @@ class TwitterTemporaryError(TwitterError):
         super().__init__('temporary_error', message)
 
 
+class TwitterInvalidTokenError(TwitterError):
+    """An OAuth 2.0 token sent to X is invalid, expired, or revoked.
+
+    Raised only by the token endpoint (``/2/oauth2/token``) for the
+    ``refresh_token`` / ``authorization_code`` grants.  X returns
+    ``{"error": invalid_request|invalid_grant|invalid_client|...}`` when the
+    token can no longer be exchanged.  This is a permanent condition: the only
+    recovery is a fresh OAuth 2.0 authorization.  It is intentionally NOT a
+    ``authentication_failure`` subclass so refresh callers can distinguish
+    "token is dead, ask the user to re-link" from "credentials wrong".
+    """
+
+    def __init__(self, message=''):
+        super().__init__('invalid_token', message)
+
+
+# X OAuth 2.0 token-endpoint ``error`` values that mean the submitted
+# access/refresh token can no longer be used (usually the refresh token was
+# revoked, expired, or already rotated by X on the previous use).
+_INVALID_TOKEN_ENDPOINT_ERRORS = frozenset({
+    'invalid_request', 'invalid_grant', 'invalid_client',
+    'unauthorized_client', 'invalid_token', 'expired_token',
+})
+
+# Token-endpoint errors that indicate malformed/missing request parameters
+# (recoverable if the caller fixes the request), as opposed to a dead token.
+_REQUEST_ERRORS = frozenset({
+    'unsupported_grant_type', 'unsupported_response_type',
+    'invalid_scope', 'invalid_redirect_uri', 'missing_required_parameter',
+})
+
+
+def classify_token_endpoint(status_code, response_body=None):
+    """Classify an OAuth 2.0 token-endpoint response.
+
+    Unlike the generic :func:`classify` (used by the REST API), the token
+    endpoint returns ``{"error": <code>, "error_description": ...}`` on
+    failure. Distinguishes a dead/revoked/expired token (permanent, requires
+    re-authorization) from other token-endpoint failures so the caller can
+    stop hammering X with the same token.
+    """
+    if isinstance(response_body, dict):
+        error = (response_body.get('error') or '').lower()
+        if error in _INVALID_TOKEN_ENDPOINT_ERRORS:
+            return TwitterInvalidTokenError(_detail(response_body) or error)
+        if error in _REQUEST_ERRORS:
+            return TwitterError('token_request_error', _detail(response_body))
+    return classify(status_code, response_body)
+
+
 def classify(status_code, response_body=None):
     """Return a TwitterError for an HTTP status + optional X API body.
 
