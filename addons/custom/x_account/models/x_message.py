@@ -11,7 +11,7 @@ class XMessage(models.Model):
 
     _name = 'x.message'
     _description = 'X Message'
-    _order = 'external_created_at asc'
+    _order = 'external_created_at desc'
 
     channel_id = fields.Many2one(
         'discuss.channel',
