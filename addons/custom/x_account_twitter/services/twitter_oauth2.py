@@ -26,7 +26,7 @@ from werkzeug.urls import url_encode
 
 from . import twitter_errors
 
-SCOPES = 'tweet.read tweet.write users.read offline.access dm.read dm.write'
+SCOPES = 'tweet.read tweet.write like.write follows.write users.read offline.access dm.read dm.write'
 
 
 class TwitterOAuth2Client:
