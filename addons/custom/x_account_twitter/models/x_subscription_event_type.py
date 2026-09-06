@@ -6,7 +6,7 @@ from odoo import api, fields, models
 class XSubscriptionEventType(models.Model):
     _name = 'x.subscription.event.type'
     _description = 'X Subscription Event Type'
-    _order = 'sequence, name'
+    _order = 'category, sequence, name'
 
     name = fields.Char(
         string='Event Type',
@@ -16,6 +16,21 @@ class XSubscriptionEventType(models.Model):
     description = fields.Char(
         string='Description',
         help='Human-readable description of the event type.',
+    )
+    category = fields.Selection(
+        [
+            ('profile', 'Profile'),
+            ('news', 'News'),
+            ('chat', 'Chat'),
+            ('dm', 'DM'),
+            ('follow', 'Follow'),
+            ('spaces', 'Spaces'),
+            ('broadcast', 'Broadcast'),
+            ('post', 'Post'),
+            ('like', 'Like'),
+        ],
+        string='Category',
+        help='X Activity API category this event type belongs to.',
     )
     sequence = fields.Integer(
         string='Sequence',

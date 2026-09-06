@@ -1,34 +1,298 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <data noupdate="1">
-        <record id="event_type_dm_received" model="x.subscription.event.type">
-            <field name="name">dm.received</field>
-            <field name="description">Direct Messages (received)</field>
+
+        <!-- ============================================================
+             Profile
+             ============================================================ -->
+        <record id="event_type_profile_update_bio" model="x.subscription.event.type">
+            <field name="name">profile.update.bio</field>
+            <field name="description">User updates their bio</field>
+            <field name="category">profile</field>
             <field name="sequence">10</field>
         </record>
 
-        <record id="event_type_chat_received" model="x.subscription.event.type">
-            <field name="name">chat.received</field>
-            <field name="description">XChat Messages (received)</field>
+        <record id="event_type_profile_update_profile_picture" model="x.subscription.event.type">
+            <field name="name">profile.update.profile_picture</field>
+            <field name="description">User updates their profile picture</field>
+            <field name="category">profile</field>
             <field name="sequence">20</field>
         </record>
 
-        <record id="event_type_dm_sent" model="x.subscription.event.type">
-            <field name="name">dm.sent</field>
-            <field name="description">Direct Messages (sent)</field>
+        <record id="event_type_profile_update_banner_picture" model="x.subscription.event.type">
+            <field name="name">profile.update.banner_picture</field>
+            <field name="description">User updates their banner picture</field>
+            <field name="category">profile</field>
             <field name="sequence">30</field>
+        </record>
+
+        <record id="event_type_profile_update_screenname" model="x.subscription.event.type">
+            <field name="name">profile.update.screenname</field>
+            <field name="description">User updates their screen name</field>
+            <field name="category">profile</field>
+            <field name="sequence">40</field>
+        </record>
+
+        <record id="event_type_profile_update_geo" model="x.subscription.event.type">
+            <field name="name">profile.update.geo</field>
+            <field name="description">User updates their geo</field>
+            <field name="category">profile</field>
+            <field name="sequence">50</field>
+        </record>
+
+        <record id="event_type_profile_update_url" model="x.subscription.event.type">
+            <field name="name">profile.update.url</field>
+            <field name="description">User updates their website URL</field>
+            <field name="category">profile</field>
+            <field name="sequence">60</field>
+        </record>
+
+        <record id="event_type_profile_update_verified_badge" model="x.subscription.event.type">
+            <field name="name">profile.update.verified_badge</field>
+            <field name="description">User updates their verified badge</field>
+            <field name="category">profile</field>
+            <field name="sequence">70</field>
+        </record>
+
+        <record id="event_type_profile_update_affiliate_badge" model="x.subscription.event.type">
+            <field name="name">profile.update.affiliate_badge</field>
+            <field name="description">User updates their affiliate badge</field>
+            <field name="category">profile</field>
+            <field name="sequence">80</field>
+        </record>
+
+        <record id="event_type_profile_update_handle" model="x.subscription.event.type">
+            <field name="name">profile.update.handle</field>
+            <field name="description">User updates their handle</field>
+            <field name="category">profile</field>
+            <field name="sequence">90</field>
+        </record>
+
+        <!-- ============================================================
+             News
+             ============================================================ -->
+        <record id="event_type_news_new" model="x.subscription.event.type">
+            <field name="name">news.new</field>
+            <field name="description">New news event</field>
+            <field name="category">news</field>
+            <field name="sequence">10</field>
+        </record>
+
+        <!-- ============================================================
+             Chat
+             ============================================================ -->
+        <record id="event_type_chat_received" model="x.subscription.event.type">
+            <field name="name">chat.received</field>
+            <field name="description">XChat Messages (received)</field>
+            <field name="category">chat</field>
+            <field name="sequence">10</field>
         </record>
 
         <record id="event_type_chat_sent" model="x.subscription.event.type">
             <field name="name">chat.sent</field>
             <field name="description">XChat Messages (sent)</field>
-            <field name="sequence">40</field>
+            <field name="category">chat</field>
+            <field name="sequence">20</field>
         </record>
 
         <record id="event_type_chat_conversation_join" model="x.subscription.event.type">
             <field name="name">chat.conversation_join</field>
-            <field name="description">Conversation Join Events</field>
+            <field name="description">Conversation Join (deprecated alias)</field>
+            <field name="category">chat</field>
+            <field name="sequence">30</field>
+        </record>
+
+        <record id="event_type_chat_conversation_join_canonical" model="x.subscription.event.type">
+            <field name="name">chat.conversation.join</field>
+            <field name="description">Conversation Join</field>
+            <field name="category">chat</field>
+            <field name="sequence">40</field>
+        </record>
+
+        <record id="event_type_chat_conversation_member_added" model="x.subscription.event.type">
+            <field name="name">chat.conversation.member_added</field>
+            <field name="description">Member added to conversation</field>
+            <field name="category">chat</field>
             <field name="sequence">50</field>
+        </record>
+
+        <record id="event_type_chat_conversation_member_removed" model="x.subscription.event.type">
+            <field name="name">chat.conversation.member_removed</field>
+            <field name="description">Member removed from conversation</field>
+            <field name="category">chat</field>
+            <field name="sequence">60</field>
+        </record>
+
+        <record id="event_type_chat_conversation_admin_added" model="x.subscription.event.type">
+            <field name="name">chat.conversation.admin_added</field>
+            <field name="description">Admin added to conversation</field>
+            <field name="category">chat</field>
+            <field name="sequence">70</field>
+        </record>
+
+        <record id="event_type_chat_conversation_admin_removed" model="x.subscription.event.type">
+            <field name="name">chat.conversation.admin_removed</field>
+            <field name="description">Admin removed from conversation</field>
+            <field name="category">chat</field>
+            <field name="sequence">80</field>
+        </record>
+
+        <record id="event_type_chat_update_group_name" model="x.subscription.event.type">
+            <field name="name">chat.update.group_name</field>
+            <field name="description">Conversation group name updated</field>
+            <field name="category">chat</field>
+            <field name="sequence">90</field>
+        </record>
+
+        <record id="event_type_chat_update_restrictions" model="x.subscription.event.type">
+            <field name="name">chat.update.restrictions</field>
+            <field name="description">Conversation restrictions updated</field>
+            <field name="category">chat</field>
+            <field name="sequence">100</field>
+        </record>
+
+        <!-- ============================================================
+             DM
+             ============================================================ -->
+        <record id="event_type_dm_received" model="x.subscription.event.type">
+            <field name="name">dm.received</field>
+            <field name="description">Direct Messages (received)</field>
+            <field name="category">dm</field>
+            <field name="sequence">10</field>
+        </record>
+
+        <record id="event_type_dm_sent" model="x.subscription.event.type">
+            <field name="name">dm.sent</field>
+            <field name="description">Direct Messages (sent)</field>
+            <field name="category">dm</field>
+            <field name="sequence">20</field>
+        </record>
+
+        <record id="event_type_dm_indicate_typing" model="x.subscription.event.type">
+            <field name="name">dm.indicate_typing</field>
+            <field name="description">User is typing in a DM</field>
+            <field name="category">dm</field>
+            <field name="sequence">30</field>
+        </record>
+
+        <record id="event_type_dm_read" model="x.subscription.event.type">
+            <field name="name">dm.read</field>
+            <field name="description">DM read receipt</field>
+            <field name="category">dm</field>
+            <field name="sequence">40</field>
+        </record>
+
+        <!-- ============================================================
+             Follow
+             ============================================================ -->
+        <record id="event_type_follow_follow" model="x.subscription.event.type">
+            <field name="name">follow.follow</field>
+            <field name="description">User follows another user</field>
+            <field name="category">follow</field>
+            <field name="sequence">10</field>
+        </record>
+
+        <record id="event_type_follow_unfollow" model="x.subscription.event.type">
+            <field name="name">follow.unfollow</field>
+            <field name="description">User unfollows another user</field>
+            <field name="category">follow</field>
+            <field name="sequence">20</field>
+        </record>
+
+        <!-- ============================================================
+             Spaces
+             ============================================================ -->
+        <record id="event_type_spaces_start" model="x.subscription.event.type">
+            <field name="name">spaces.start</field>
+            <field name="description">User starts a Space</field>
+            <field name="category">spaces</field>
+            <field name="sequence">10</field>
+        </record>
+
+        <record id="event_type_spaces_end" model="x.subscription.event.type">
+            <field name="name">spaces.end</field>
+            <field name="description">User ends a Space</field>
+            <field name="category">spaces</field>
+            <field name="sequence">20</field>
+        </record>
+
+        <!-- ============================================================
+             Broadcast
+             ============================================================ -->
+        <record id="event_type_broadcast_start" model="x.subscription.event.type">
+            <field name="name">broadcast.start</field>
+            <field name="description">User starts a live broadcast</field>
+            <field name="category">broadcast</field>
+            <field name="sequence">10</field>
+        </record>
+
+        <record id="event_type_broadcast_end" model="x.subscription.event.type">
+            <field name="name">broadcast.end</field>
+            <field name="description">User ends a live broadcast</field>
+            <field name="category">broadcast</field>
+            <field name="sequence">20</field>
+        </record>
+
+        <record id="event_type_broadcast_chat" model="x.subscription.event.type">
+            <field name="name">broadcast.chat</field>
+            <field name="description">Live broadcast chat event</field>
+            <field name="category">broadcast</field>
+            <field name="sequence">30</field>
+        </record>
+
+        <!-- ============================================================
+             Post
+             ============================================================ -->
+        <record id="event_type_post_create" model="x.subscription.event.type">
+            <field name="name">post.create</field>
+            <field name="description">User creates a Post</field>
+            <field name="category">post</field>
+            <field name="sequence">10</field>
+        </record>
+
+        <record id="event_type_post_delete" model="x.subscription.event.type">
+            <field name="name">post.delete</field>
+            <field name="description">User deletes a Post</field>
+            <field name="category">post</field>
+            <field name="sequence">20</field>
+        </record>
+
+        <record id="event_type_post_mention_create" model="x.subscription.event.type">
+            <field name="name">post.mention.create</field>
+            <field name="description">Someone @mentions the user in a Post</field>
+            <field name="category">post</field>
+            <field name="sequence">30</field>
+        </record>
+
+        <record id="event_type_post_reply_create" model="x.subscription.event.type">
+            <field name="name">post.reply.create</field>
+            <field name="description">A reply to the user's Post is created</field>
+            <field name="category">post</field>
+            <field name="sequence">40</field>
+        </record>
+
+        <record id="event_type_post_quote_create" model="x.subscription.event.type">
+            <field name="name">post.quote.create</field>
+            <field name="description">The user's Post is quoted</field>
+            <field name="category">post</field>
+            <field name="sequence">50</field>
+        </record>
+
+        <record id="event_type_post_repost_create" model="x.subscription.event.type">
+            <field name="name">post.repost.create</field>
+            <field name="description">The user's Post is reposted</field>
+            <field name="category">post</field>
+            <field name="sequence">60</field>
+        </record>
+
+        <!-- ============================================================
+             Like
+             ============================================================ -->
+        <record id="event_type_like_create" model="x.subscription.event.type">
+            <field name="name">like.create</field>
+            <field name="description">The user's Post is liked</field>
+            <field name="category">like</field>
+            <field name="sequence">10</field>
         </record>
     </data>
 </odoo>
