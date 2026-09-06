@@ -111,7 +111,9 @@ class XMessage(models.Model):
         if not self.body_plain:
             return
 
-        account = self._get_company_x_account()
+        account = self.account_id.sudo()
+        if not account or not account.active or account.x_connection_status in ('disabled', 'new'):
+            account = self._get_company_x_account()
         if not account:
             return
 

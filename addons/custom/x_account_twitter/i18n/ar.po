@@ -67,6 +67,31 @@ msgid "Subscription Events"
 msgstr "أحداث الاشتراك"
 
 #. module: x_account_twitter
+#: model:ir.actions.act_window,action_relink
+msgid "Relink Account"
+msgstr "إعادة ربط الحساب"
+
+#. module: x_account_twitter
+#: model:ir.actions.act_window,action_relink
+msgid "Relink X Account"
+msgstr "إعادة ربط حساب X"
+
+#. module: x_account_twitter
+#: model:ir.actions.act_window,action_relink
+msgid "Relink"
+msgstr "إعادة الربط"
+
+#. module: x_account_twitter
+#: model:ir.actions.act_window,action_relink
+msgid "Re-running the X OAuth 2.0 flow will issue new tokens on X's side. Continue?"
+msgstr "سيُصدر إعادة تشغيل تدفق X OAuth 2.0 رموزًا جديدة لدى X. هل تريد المتابعة؟"
+
+#. module: x_account_twitter
+#: model:ir.actions.act_window,action_relink
+msgid "Relinking is only available for OAuth 2.0 accounts."
+msgstr "إعادة الربط متاحة فقط للحسابات التي تستخدم OAuth 2.0."
+
+#. module: x_account_twitter
 #: model:ir.model,name:x_account_twitter.model_x_subscription_event_type
 msgid "X Subscription Event Type"
 msgstr "نوع حدث اشتراك X"
