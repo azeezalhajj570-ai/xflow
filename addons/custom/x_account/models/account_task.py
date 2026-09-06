@@ -17,7 +17,7 @@ class XAccountTask(models.Model):
 
     _name = 'x.account.task'
     _description = 'X Account Task'
-    _order = 'priority desc, create_date asc'
+    _order = 'create_date desc, priority desc'
 
     account_id = fields.Many2one(
         'social.account',
