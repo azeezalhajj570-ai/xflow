@@ -90,6 +90,73 @@ class TwitterProvider:
         )
         return twitter_envelope.TwitterEnvelope.repost(envelope, post_id)
 
+    # ---------------------------------------------------------------- like
+    def like(self, post, **kwargs):
+        """Like a post via the X API.
+
+        Same normalized ``post`` reference contract as :meth:`repost`. Returns
+        the normalized provider result DTO.
+        """
+        post_id = self._post_id(post)
+        if not post_id:
+            raise ValueError('post_id is required')
+        envelope = self._client.request(
+            'POST',
+            '/2/users/%s/likes' % self.account.twitter_user_id,
+            body={'tweet_id': post_id},
+        )
+        return twitter_envelope.TwitterEnvelope.like(envelope, post_id)
+
+    # ------------------------------------------------------------- comment
+    def comment(self, post, text=None, **kwargs):
+        """Reply to a post via the X API.
+
+        ``post`` follows the same normalized reference contract as
+        :meth:`repost`. ``text`` is the reply body; when omitted a generic
+        acknowledgement is used so channel automation can reply without
+        requiring a message payload.
+        """
+        post_id = self._post_id(post)
+        if not post_id:
+            raise ValueError('post_id is required')
+        text = (text or '').strip() or 'Thanks for sharing!'
+        envelope = self._client.request(
+            'POST',
+            '/2/tweets',
+            body={
+                'text': text,
+                'reply': {'in_reply_to_tweet_id': post_id},
+            },
+        )
+        return twitter_envelope.TwitterEnvelope.comment(envelope, post_id, text)
+
+    # -------------------------------------------------------------- follow
+    def follow(self, screen_name=None, target_user_id=None, **kwargs):
+        """Follow a user via the X API.
+
+        Follows the ``target_user_id`` when given; otherwise resolves
+        ``screen_name`` (with or without the leading ``@``) through
+        ``/2/users/by/username``. Returns the normalized provider result DTO.
+        """
+        user_id = str(target_user_id or '').strip()
+        if not user_id:
+            handle = str(screen_name or '').strip().lstrip('@')
+            if not handle:
+                raise ValueError('target_user_id or screen_name is required')
+            envelope = self._client.request(
+                'GET',
+                '/2/users/by/username/%s' % handle,
+            )
+            user_id = str(((envelope or {}).get('data') or {}).get('id') or '')
+            if not user_id:
+                raise ValueError('Could not resolve X user %r' % handle)
+        data = self._client.request(
+            'POST',
+            '/2/users/%s/following' % self.account.twitter_user_id,
+            body={'target_user_id': user_id},
+        )
+        return twitter_envelope.TwitterEnvelope.follow(data, user_id)
+
     # --------------------------------------------------------------- groups
     def fetch_groups(self, account, limit=100):
         """Sync the account's X group-DM conversations into discuss channels."""
@@ -341,8 +408,8 @@ class TwitterProvider:
     # account's OAuth scopes actually permit.
 
     def supported_operations(self):
-        return ('validate_session', 'repost', 'fetch_groups',
-                'fetch_group_messages', 'get_dms',
+        return ('validate_session', 'like', 'comment', 'repost', 'follow',
+                'fetch_groups', 'fetch_group_messages', 'get_dms',
                 'process_webhook_event', 'register_webhook',
                 'validate_webhook_registration', 'unsubscribe_all_events',
                 'delete_webhook_registration')

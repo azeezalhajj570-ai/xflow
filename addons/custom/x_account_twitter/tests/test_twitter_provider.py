@@ -208,6 +208,86 @@ class TestTwitterProviderRepost(XAccountTwitterTestBase):
         self.assertEqual(ctx.exception.code, 'not_found')
         self.assertFalse(ctx.exception.retryable)
 
+    # -------------------------------------------------------------- like
+    def test_like_calls_api_and_normalizes(self):
+        with patch.object(TwitterApiClient, 'request', return_value={
+            'data': {'liked': True},
+        }) as req:
+            result = self.provider.like({'post_id': '123456'})
+        self.assertTrue(result['success'])
+        self.assertEqual(result['operation'], 'like')
+        self.assertEqual(result['platform'], 'x')
+        self.assertEqual(result['post_id'], '123456')
+        self.assertEqual(req.call_args.args[1], '/2/users/12345/likes')
+        self.assertEqual(req.call_args.kwargs['body'], {'tweet_id': '123456'})
+
+    def test_like_requires_post_id(self):
+        with self.assertRaises(ValueError):
+            self.provider.like({})
+
+    # ------------------------------------------------------------- comment
+    def test_comment_calls_api_and_normalizes(self):
+        with patch.object(TwitterApiClient, 'request', return_value={
+            'data': {'id': '777', 'text': 'Nice!'},
+        }) as req:
+            result = self.provider.comment({'post_id': '123456'}, 'Nice!')
+        self.assertTrue(result['success'])
+        self.assertEqual(result['operation'], 'comment')
+        self.assertEqual(result['post_id'], '123456')
+        self.assertEqual(result['external_id'], '777')
+        self.assertEqual(req.call_args.args[1], '/2/tweets')
+        self.assertEqual(req.call_args.kwargs['body'], {
+            'text': 'Nice!',
+            'reply': {'in_reply_to_tweet_id': '123456'},
+        })
+
+    def test_comment_defaults_text_when_omitted(self):
+        with patch.object(TwitterApiClient, 'request', return_value={
+            'data': {'id': '778', 'text': 'Thanks for sharing!'},
+        }) as req:
+            result = self.provider.comment({'post_id': '123456'})
+        self.assertIn('Thanks for sharing!', req.call_args.kwargs['body']['text'])
+        self.assertEqual(result['text'], 'Thanks for sharing!')
+
+    def test_comment_requires_post_id(self):
+        with self.assertRaises(ValueError):
+            self.provider.comment({}, 'Hi')
+
+    # -------------------------------------------------------------- follow
+    def test_follow_with_target_user_id(self):
+        with patch.object(TwitterApiClient, 'request', return_value={
+            'data': {'following': True, 'pending_follow': False},
+        }) as req:
+            result = self.provider.follow(target_user_id='424242')
+        self.assertTrue(result['success'])
+        self.assertEqual(result['operation'], 'follow')
+        self.assertEqual(result['user_id'], '424242')
+        self.assertEqual(req.call_args.args[1], '/2/users/12345/following')
+        self.assertEqual(req.call_args.kwargs['body'], {'target_user_id': '424242'})
+
+    def test_follow_resolves_screen_name(self):
+        with patch.object(TwitterApiClient, 'request',
+                          side_effect=[
+                              {'data': {'id': '424242', 'name': 'Some User'}},
+                              {'data': {'following': True, 'pending_follow': False}},
+                          ]) as req:
+            result = self.provider.follow(screen_name='@someone')
+        self.assertEqual(result['user_id'], '424242')
+        self.assertEqual(req.call_args_list[0].args[0], 'GET')
+        self.assertEqual(req.call_args_list[0].args[1], '/2/users/by/username/someone')
+        self.assertEqual(req.call_args_list[1].args[0], 'POST')
+        self.assertEqual(req.call_args_list[1].args[1], '/2/users/12345/following')
+        self.assertEqual(req.call_args_list[1].kwargs['body'], {'target_user_id': '424242'})
+
+    def test_follow_requires_target(self):
+        with self.assertRaises(ValueError):
+            self.provider.follow()
+
+    def test_follow_resolution_failure(self):
+        with patch.object(TwitterApiClient, 'request', return_value={'data': {}}):
+            with self.assertRaises(ValueError):
+                self.provider.follow(screen_name='@nobody')
+
 
 @tagged('post_install', '-at_install', 'x_account_twitter')
 class TestTwitterProviderWebhookSubscriptions(XAccountTwitterTestBase):
