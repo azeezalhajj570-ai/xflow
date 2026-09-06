@@ -529,6 +529,27 @@ class SocialAccount(models.Model):
                 channels.unlink()
         return super().unlink()
 
+    def action_relink(self):
+        """Re-run the OAuth 2.0 authorization flow for this account.
+
+        The callback matches the returning account by ``twitter_user_id``, so a
+        successful authorization refreshes the tokens on this very record.
+        """
+        self.ensure_one()
+        auth_method = self.env['ir.config_parameter'].sudo().get_param(
+            'x_account.auth_method', 'session_cookie')
+        if auth_method in ('oauth1', 'oauth2'):
+            return {
+                'name': 'Relink X Account',
+                'type': 'ir.actions.act_url',
+                'url': '/x_account/twitter/oauth2/authorize',
+                'target': 'self',
+            }
+        return self._display_notification(
+            'Relink',
+            'Relinking is only available for OAuth 2.0 accounts.',
+            kind='warning')
+
     def action_delete_x_subscriptions(self):
         """Delete XAA subscriptions for this account via the X API."""
         self.ensure_one()
