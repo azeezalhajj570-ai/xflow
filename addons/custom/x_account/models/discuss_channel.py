@@ -2,7 +2,7 @@
 
 import logging
 
-from odoo import api, fields, models, tools
+from odoo import api, fields, models
 
 _logger = logging.getLogger(__name__)
 
@@ -91,39 +91,41 @@ class DiscussChannel(models.Model):
             self.env.user.partner_id.id
         ]
         try:
-            channel = self.create({
-                'channel_type': channel_type,
-                'x_account_id': x_account.id,
-                'x_partner_id': partner.id if partner else False,
-                'x_conversation_id': conversation_id,
-                'name': conversation_id or getattr(partner, 'name', False) or 'X Conversation',
-            })
-            self.env.cr.flush()
-            self._invalidate_x_channel_cache(x_account, partner, conversation_id, channel_type)
+            # Savepoint (not rollback): a concurrent worker may create the
+            # same channel first; only this insert is undone and the
+            # transaction keeps its earlier work (task claims, event states).
+            with self.env.cr.savepoint():
+                channel = self.create({
+                    'channel_type': channel_type,
+                    'x_account_id': x_account.id,
+                    'x_partner_id': partner.id if partner else False,
+                    'x_conversation_id': conversation_id,
+                    'name': conversation_id or getattr(partner, 'name', False) or 'X Conversation',
+                })
         except Exception:
-            self.env.cr.rollback()
             channel = self._find_x_channel(x_account, partner, conversation_id, channel_type)
             if not channel:
                 raise
         if channel:
             try:
-                existing = set(channel.channel_member_ids.partner_id.ids)
-                self.env['discuss.channel.member'].sudo().create([
-                    {'channel_id': channel.id, 'partner_id': pid}
-                    for pid in dict.fromkeys(member_ids)
-                    if pid and pid not in existing
-                ])
-                self.env.cr.flush()
+                with self.env.cr.savepoint():
+                    existing = set(channel.channel_member_ids.partner_id.ids)
+                    self.env['discuss.channel.member'].sudo().create([
+                        {'channel_id': channel.id, 'partner_id': pid}
+                        for pid in dict.fromkeys(member_ids)
+                        if pid and pid not in existing
+                    ])
             except Exception:
-                self.env.cr.rollback()
                 pass
         return channel
 
     @api.model
-    @tools.ormcache('x_account.id', 'partner.id if partner else None',
-                    'conversation_id', 'channel_type')
     def _find_x_channel(self, x_account, partner=None, conversation_id=None,
                         channel_type='x'):
+        # No ormcache here: this method returns a recordset, and a cached
+        # recordset stays bound to the cursor that produced it — once that
+        # cursor closes, any later use raises "Cursor already closed". A
+        # fresh search per call is cheap and always uses the live cursor.
         self = self.sudo()
         if not x_account:
             raise ValueError('x_account is required to resolve an X channel')
@@ -133,11 +135,6 @@ class DiscussChannel(models.Model):
         elif partner:
             domain.append(('x_partner_id', '=', partner.id))
         return self.search(domain, limit=1)
-
-    @api.model
-    def _invalidate_x_channel_cache(self, x_account, partner=None,
-                                      conversation_id=None, channel_type='x'):
-        self.env.registry.clear_cache()
 
     def _save_x_message(self, direction, external_id, body, external_created_at,
                         author_partner=None, **kw):
