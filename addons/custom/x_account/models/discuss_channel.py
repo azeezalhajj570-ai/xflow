@@ -142,7 +142,11 @@ class DiscussChannel(models.Model):
     def _save_x_message(self, direction, external_id, body, external_created_at,
                         author_partner=None, **kw):
         self.ensure_one()
-        if not body:
+        # An empty body is dropped for regular messages (legacy DM payloads are
+        # often nothing but escaping artifacts), but encrypted XChat events must
+        # still be recorded with the ``encrypted`` marker so undecryptable
+        # messages remain visible instead of silently disappearing.
+        if not body and not kw.get('encrypted'):
             return self.env['x.message']
         # OmniX delivers timestamps in several shapes: ISO-8601 strings
         # ("2026-08-31T12:00:00Z") or Unix epoch milliseconds (ints). Odoo
