@@ -92,20 +92,50 @@ class GetXAPITweetService:
         data = self._client.post('/twitter/tweet/edit', json=body)
         return getxapi_envelope.GetXAPIEnvelopeParser.create_tweet_result(data)
 
-    def like(self, tweet_id):
+    def like(self, tweet_id, **kwargs):
         """Like (favorite) a tweet.
 
         :param tweet_id: The tweet ID to like.
+        :param kwargs: Extra body fields (auth_token, ct0, twid, proxy).
         :returns: Normalized like result DTO.
         """
-        data = self._client.post('/twitter/tweet/favorite', json={'tweet_id': str(tweet_id)})
+        body = {'tweet_id': str(tweet_id)}
+        body.update(kwargs)
+        data = self._client.post('/twitter/tweet/favorite', json=body)
         return getxapi_envelope.GetXAPIEnvelopeParser.like_result(data, tweet_id)
 
-    def retweet(self, tweet_id):
+    def retweet(self, tweet_id, **kwargs):
         """Retweet a tweet.
 
         :param tweet_id: The tweet ID to retweet.
+        :param kwargs: Extra body fields (auth_token, ct0, twid, proxy).
         :returns: Normalized retweet result DTO.
         """
-        data = self._client.post('/twitter/tweet/retweet', json={'tweet_id': str(tweet_id)})
+        body = {'tweet_id': str(tweet_id)}
+        body.update(kwargs)
+        data = self._client.post('/twitter/tweet/retweet', json=body)
         return getxapi_envelope.GetXAPIEnvelopeParser.retweet_result(data, tweet_id)
+
+    def bookmark(self, tweet_id, **kwargs):
+        """Bookmark a tweet.
+
+        :param tweet_id: The tweet ID to bookmark.
+        :param kwargs: Extra body fields (auth_token, ct0, twid, proxy).
+        :returns: Normalized bookmark result DTO.
+        """
+        body = {'tweet_id': str(tweet_id)}
+        body.update(kwargs)
+        data = self._client.post('/twitter/tweet/bookmark', json=body)
+        return getxapi_envelope.GetXAPIEnvelopeParser.bookmark_result(data, tweet_id)
+
+    def unbookmark(self, tweet_id, **kwargs):
+        """Remove a tweet from bookmarks.
+
+        :param tweet_id: The tweet ID to remove from bookmarks.
+        :param kwargs: Extra body fields (auth_token, ct0, twid, proxy).
+        :returns: Normalized unbookmark result DTO.
+        """
+        body = {'tweet_id': str(tweet_id)}
+        body.update(kwargs)
+        data = self._client.post('/twitter/tweet/unbookmark', json=body)
+        return getxapi_envelope.GetXAPIEnvelopeParser.unbookmark_result(data, tweet_id)

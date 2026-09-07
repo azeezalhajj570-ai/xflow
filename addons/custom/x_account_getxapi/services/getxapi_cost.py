@@ -17,6 +17,8 @@ ENDPOINT_COSTS = {
     'twitter/tweet/edit': 0.002,
     'twitter/tweet/favorite': 0.001,
     'twitter/tweet/retweet': 0.001,
+    'twitter/tweet/bookmark': 0.001,
+    'twitter/tweet/unbookmark': 0.001,
     'twitter/user/search': 0.001,
     'twitter/user/status': 0.001,
     'twitter/user/info': 0.001,

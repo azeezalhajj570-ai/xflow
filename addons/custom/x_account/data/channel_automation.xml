@@ -51,5 +51,27 @@ for record in records:
     record._run_channel_follow()
             </field>
         </record>
+
+        <!-- Bookmark Server Action -->
+        <record id="ir_actions_server_x_message_bookmark" model="ir.actions.server">
+            <field name="name">X: Channel Bookmark</field>
+            <field name="model_id" ref="model_x_message"/>
+            <field name="state">code</field>
+            <field name="code">
+for record in records:
+    record._run_channel_bookmark()
+            </field>
+        </record>
+
+        <!-- Unbookmark Server Action -->
+        <record id="ir_actions_server_x_message_unbookmark" model="ir.actions.server">
+            <field name="name">X: Channel Unbookmark</field>
+            <field name="model_id" ref="model_x_message"/>
+            <field name="state">code</field>
+            <field name="code">
+for record in records:
+    record._run_channel_unbookmark()
+            </field>
+        </record>
     </data>
 </odoo>

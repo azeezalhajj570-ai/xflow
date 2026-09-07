@@ -310,3 +310,29 @@ class GetXAPIEnvelopeParser:
             'success': bool(media_id),
             'media_id': str(media_id),
         }
+
+    @staticmethod
+    def bookmark_result(envelope, tweet_id):
+        """Return the normalized bookmark result DTO."""
+        data = (envelope or {}).get('data') or envelope or {}
+        result = data.get('result') or data
+        return {
+            'success': bool(result.get('bookmarked') or data.get('success', True)),
+            'operation': 'bookmark',
+            'platform': 'x',
+            'post_id': str(tweet_id),
+            'external_id': str(result.get('id') or tweet_id),
+        }
+
+    @staticmethod
+    def unbookmark_result(envelope, tweet_id):
+        """Return the normalized unbookmark result DTO."""
+        data = (envelope or {}).get('data') or envelope or {}
+        result = data.get('result') or data
+        return {
+            'success': bool(result.get('unbookmarked') or data.get('success', True)),
+            'operation': 'unbookmark',
+            'platform': 'x',
+            'post_id': str(tweet_id),
+            'external_id': str(result.get('id') or tweet_id),
+        }

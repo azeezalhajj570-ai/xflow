@@ -76,7 +76,9 @@ class GetXAPIProvider:
         post_id = self._post_id(post)
         if not post_id:
             raise ValueError('post_id is required')
-        return self._tweets.like(post_id)
+        if self._auth_token:
+            kwargs['auth_token'] = self._auth_token
+        return self._tweets.like(post_id, **kwargs)
 
     def comment(self, post, text=None, **kwargs):
         """Reply to a post via GetXAPI."""
@@ -84,14 +86,36 @@ class GetXAPIProvider:
         if not post_id:
             raise ValueError('post_id is required')
         text = (text or '').strip() or 'Thanks for sharing!'
-        return self._tweets.create(text, reply_to_tweet_id=post_id)
+        if self._auth_token:
+            kwargs['auth_token'] = self._auth_token
+        return self._tweets.create(text, reply_to_tweet_id=post_id, **kwargs)
 
     def repost(self, post, **kwargs):
         """Repost (retweet) a post via GetXAPI."""
         post_id = self._post_id(post)
         if not post_id:
             raise ValueError('post_id is required')
-        return self._tweets.retweet(post_id)
+        if self._auth_token:
+            kwargs['auth_token'] = self._auth_token
+        return self._tweets.retweet(post_id, **kwargs)
+
+    def bookmark(self, post, **kwargs):
+        """Bookmark a post via GetXAPI."""
+        post_id = self._post_id(post)
+        if not post_id:
+            raise ValueError('post_id is required')
+        if self._auth_token:
+            kwargs['auth_token'] = self._auth_token
+        return self._tweets.bookmark(post_id, **kwargs)
+
+    def unbookmark(self, post, **kwargs):
+        """Remove a post from bookmarks via GetXAPI."""
+        post_id = self._post_id(post)
+        if not post_id:
+            raise ValueError('post_id is required')
+        if self._auth_token:
+            kwargs['auth_token'] = self._auth_token
+        return self._tweets.unbookmark(post_id, **kwargs)
 
     def follow(self, screen_name=None, target_user_id=None, **kwargs):
         """Follow a user via GetXAPI."""
@@ -203,6 +227,7 @@ class GetXAPIProvider:
         """Operations this provider supports for the task queue."""
         return (
             'validate_session', 'like', 'comment', 'repost', 'follow',
+            'bookmark', 'unbookmark',
             'post_tweet', 'get_dms', 'send_dm', 'fetch_groups',
             'fetch_group_messages',
         )

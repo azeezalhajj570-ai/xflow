@@ -27,6 +27,7 @@ class XAccountGroup(models.Model):
             ('like', 'Like'),
             ('comment', 'Comment'),
             ('repost', 'Repost'),
+            ('bookmark', 'Bookmark'),
             ('follow', 'Follow'),
         ],
         string='Automation Action',
