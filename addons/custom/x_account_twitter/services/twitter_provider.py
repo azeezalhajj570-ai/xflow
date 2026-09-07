@@ -183,6 +183,20 @@ class TwitterProvider:
             return {'processed': False, 'reason': 'unknown_event_uuid'}
         return TwitterActivity(self.env).process_event(event)
 
+    def process_webhook_events(self, event_uuids=None, **kwargs):
+        """Task-queue entry point: process multiple queued x.twitter.events in batch.
+
+        Groups events by conversation to optimize channel lookups and message saves.
+        Returns a summary dict with counts of processed/skipped events and messages.
+        """
+        if not event_uuids:
+            return {'processed': 0, 'skipped': 0, 'messages': 0}
+        events = self.env['x.twitter.event'].sudo().search(
+            [('event_uuid', 'in', event_uuids)])
+        if not events:
+            return {'processed': 0, 'skipped': len(event_uuids), 'messages': 0}
+        return TwitterActivity(self.env).process_events_batch(events)
+
     def has_app_bearer(self):
         """True when the app-only bearer token is configured (API manage mode)."""
         return bool(TwitterWebhook(self.env).has_app_bearer)

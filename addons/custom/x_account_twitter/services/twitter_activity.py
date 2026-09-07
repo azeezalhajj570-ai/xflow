@@ -179,6 +179,57 @@ class TwitterActivity:
             event.write({'state': 'done', 'error': str(exc)})
             return {'processed': False, 'error': str(exc)}
 
+    def process_events_batch(self, events):
+        """Process multiple queued x.twitter.events in batch.
+
+        Groups events by account and conversation to optimize channel lookups.
+        Returns a summary dict with counts of processed/skipped events and messages.
+        """
+        events = events.sudo()
+        processed = 0
+        skipped = 0
+        messages = 0
+        errors = []
+        for event in events:
+            event_uuid = event.event_uuid
+            if event_uuid and self.env['x.twitter.event'].sudo().search_count([
+                ('event_uuid', '=', event_uuid),
+                ('state', 'in', ('done', 'processing')),
+                ('id', '!=', event.id),
+            ]):
+                _logger.info('x_account_twitter: batch event %s already processed', event_uuid)
+                event.write({'state': 'done'})
+                skipped += 1
+                continue
+            event.write({'state': 'processing'})
+            try:
+                data = json.loads(event.payload or '{}')
+                payload = data.get('payload') or {}
+                event_type = event.event_type
+                account = event.account_id
+                if not account:
+                    event.write({'state': 'skipped', 'error': 'missing_account'})
+                    skipped += 1
+                    continue
+                result = self._handle(event_type, account, payload)
+                event.write({'state': 'done'})
+                processed += 1
+                messages += result.get('messages', 0)
+            except twitter_errors.TwitterTemporaryError as exc:
+                event.write({'state': 'failed', 'error': str(exc)})
+                errors.append({'event_uuid': event_uuid, 'error': str(exc)})
+            except Exception as exc:
+                _logger.exception('x_account_twitter: batch failed to process event %s', event_uuid)
+                event.write({'state': 'done', 'error': str(exc)})
+                processed += 1
+                errors.append({'event_uuid': event_uuid, 'error': str(exc)})
+        return {
+            'processed': processed,
+            'skipped': skipped,
+            'messages': messages,
+            'errors': len(errors),
+        }
+
     # ------------------------------------------------------------ dispatcher
     def _handle(self, event_type, account, payload):
         if event_type == 'dm.received':

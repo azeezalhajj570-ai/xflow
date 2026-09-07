@@ -2,7 +2,7 @@
 
 import logging
 
-from odoo import api, fields, models
+from odoo import api, fields, models, tools
 
 _logger = logging.getLogger(__name__)
 
@@ -21,7 +21,7 @@ class DiscussChannel(models.Model):
         'social.account',
         string='X Account',
         index=True,
-        ondelete='set null',
+        ondelete='cascade',
     )
     x_partner_id = fields.Many2one(
         'res.partner',
@@ -83,6 +83,47 @@ class DiscussChannel(models.Model):
     def _get_x_channel(self, x_account, partner=None, conversation_id=None,
                        channel_type='x', create_if_not_found=False,
                        member_ids=None):
+        channel = self._find_x_channel(x_account, partner, conversation_id, channel_type)
+        if channel or not create_if_not_found:
+            return channel
+        self = self.sudo()
+        member_ids = member_ids or ([partner.id] if partner else []) + [
+            self.env.user.partner_id.id
+        ]
+        try:
+            channel = self.create({
+                'channel_type': channel_type,
+                'x_account_id': x_account.id,
+                'x_partner_id': partner.id if partner else False,
+                'x_conversation_id': conversation_id,
+                'name': conversation_id or getattr(partner, 'name', False) or 'X Conversation',
+            })
+            self.env.cr.flush()
+            self._invalidate_x_channel_cache(x_account, partner, conversation_id, channel_type)
+        except Exception:
+            self.env.cr.rollback()
+            channel = self._find_x_channel(x_account, partner, conversation_id, channel_type)
+            if not channel:
+                raise
+        if channel:
+            try:
+                existing = set(channel.channel_member_ids.partner_id.ids)
+                self.env['discuss.channel.member'].sudo().create([
+                    {'channel_id': channel.id, 'partner_id': pid}
+                    for pid in dict.fromkeys(member_ids)
+                    if pid and pid not in existing
+                ])
+                self.env.cr.flush()
+            except Exception:
+                self.env.cr.rollback()
+                pass
+        return channel
+
+    @api.model
+    @tools.ormcache('x_account.id', 'partner.id if partner else None',
+                    'conversation_id', 'channel_type')
+    def _find_x_channel(self, x_account, partner=None, conversation_id=None,
+                        channel_type='x'):
         self = self.sudo()
         if not x_account:
             raise ValueError('x_account is required to resolve an X channel')
@@ -91,45 +132,12 @@ class DiscussChannel(models.Model):
             domain.append(('x_conversation_id', '=', conversation_id))
         elif partner:
             domain.append(('x_partner_id', '=', partner.id))
-        channel = self.search(domain, limit=1)
-        if not channel and create_if_not_found:
-            member_ids = member_ids or ([partner.id] if partner else []) + [
-                self.env.user.partner_id.id
-            ]
-            # Use try-except with flush for race conditions
-            try:
-                channel = self.create({
-                    'channel_type': channel_type,
-                    'x_account_id': x_account.id,
-                    'x_partner_id': partner.id if partner else False,
-                    'x_conversation_id': conversation_id,
-                    'name': conversation_id or getattr(partner, 'name', False) or 'X Conversation',
-                })
-                self.env.cr.flush()
-            except Exception:
-                self.env.cr.rollback()
-                # Race condition: another thread created it first. Search again.
-                channel = self.search(domain, limit=1)
-                if not channel:
-                    # Re-raise if still not found (different error)
-                    raise
-            # Add members after creation (mail's discuss.channel.create() does
-            # not accept Command.create on channel_member_ids). The creator is
-            # auto-added by mail, so only add members not already present.
-            if channel:
-                try:
-                    existing = set(channel.channel_member_ids.partner_id.ids)
-                    self.env['discuss.channel.member'].sudo().create([
-                        {'channel_id': channel.id, 'partner_id': pid}
-                        for pid in dict.fromkeys(member_ids)
-                        if pid and pid not in existing
-                    ])
-                    self.env.cr.flush()
-                except Exception:
-                    self.env.cr.rollback()
-                    # Channel was deleted by another thread, ignore
-                    pass
-        return channel
+        return self.search(domain, limit=1)
+
+    @api.model
+    def _invalidate_x_channel_cache(self, x_account, partner=None,
+                                      conversation_id=None, channel_type='x'):
+        self.env.registry.clear_cache()
 
     def _save_x_message(self, direction, external_id, body, external_created_at,
                         author_partner=None, **kw):
