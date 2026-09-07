@@ -7,6 +7,20 @@
         <field name="arch" type="xml">
             <xpath expr="//group[@name='x_account']" position="inside">
                 <field name="x_provider" invisible="x_provider != 'getxapi'"/>
+                <field name="x_getxapi_auth_token" password="True"
+                    invisible="x_action_provider != 'getxapi'"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="x_account_getxapi_social_account_view_form_standalone" model="ir.ui.view">
+        <field name="name">x.account.getxapi.social.account.view.form.standalone</field>
+        <field name="model">social.account</field>
+        <field name="inherit_id" ref="x_account.x_account_social_account_view_form_standalone"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='x_action_provider']" position="after">
+                <field name="x_getxapi_auth_token" password="True"
+                    invisible="x_action_provider != 'getxapi'"/>
             </xpath>
         </field>
     </record>

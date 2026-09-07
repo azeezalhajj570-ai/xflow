@@ -86,7 +86,8 @@ class XTwitterSubscription(models.Model):
         'Only one subscription per event type on an X account.',
     )
     _subscription_id_uniq = models.Constraint(
-        'UNIQUE(subscription_id)',
+        'UNIQUE(subscription_id) WHERE subscription_id IS NOT NULL AND subscription_id != \'\''
+        ,
         'An X subscription id must be unique.',
     )
 

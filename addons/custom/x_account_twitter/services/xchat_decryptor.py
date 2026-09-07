@@ -351,9 +351,9 @@ class XChatDecryptor:
         
         # Log diagnostic info for key version tracking
         _LOGGER.info(
-            'Account %s key selection: persisted=%s api_versions=%s selected=%s',
+            'Account %s key selection: persisted=%s api_versions=%s selected=%s record_keys=%s',
             self.account.id, persisted_version or 'unset',
-            api_versions, latest_version)
+            api_versions, latest_version, list(latest_record.keys()))
         
         return latest_record
 
