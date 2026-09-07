@@ -28,6 +28,7 @@ Highlights:
     'depends': [
         'x_account',
         'mail',
+        'social_twitter',
     ],
     'data': [
         'security/getxapi_security.xml',

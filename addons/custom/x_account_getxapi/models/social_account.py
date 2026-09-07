@@ -18,3 +18,21 @@ class SocialAccount(models.Model):
         ],
         ondelete={'getxapi': 'cascade'},
     )
+
+    x_getxapi_auth_token = fields.Char(
+        string='GetXAPI Auth Token',
+        help='Twitter session auth_token for GetXAPI write operations.',
+    )
+
+    def _skip_oauth_stats(self):
+        """Skip OAuth-based stats for GetXAPI accounts (no OAuth tokens)."""
+        skip = super()._skip_oauth_stats()
+        return skip | self.filtered(
+            lambda a: a.media_type == 'twitter' and a.x_provider == 'getxapi')
+
+    def _get_twitter_oauth_header(self, url, headers=None, params=None, method='GET'):
+        """Return empty headers for GetXAPI accounts (no OAuth tokens)."""
+        self.ensure_one()
+        if self.x_provider == 'getxapi':
+            return headers or {}
+        return super()._get_twitter_oauth_header(url, headers=headers, params=params, method=method)

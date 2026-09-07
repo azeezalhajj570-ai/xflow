@@ -12,6 +12,13 @@ from odoo import fields, models
 class ResConfigSettings(models.TransientModel):
     _inherit = 'res.config.settings'
 
+    x_provider = fields.Selection(
+        selection_add=[
+            ('getxapi', 'GetXAPI REST API'),
+        ],
+        ondelete={'getxapi': 'cascade'},
+    )
+
     x_getxapi_api_key = fields.Char(
         string='GetXAPI API Key',
         config_parameter='x_account.getxapi_api_key',

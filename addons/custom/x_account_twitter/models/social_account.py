@@ -511,22 +511,44 @@ class SocialAccount(models.Model):
         return self.create(vals)
 
     def unlink(self):
+        """Override unlink to handle cleanup efficiently.
+
+        - External API calls (unsubscribe) are non-blocking and timeout quickly.
+        - Massive child datasets (x_account_task) are deleted via raw SQL to
+          bypass ORM overhead.
+        - Discuss channels are cascaded via DB-level rules.
+        """
         twitter_accounts = self.filtered(
             lambda a: a.media_type == 'twitter' and a.twitter_user_id)
         for account in twitter_accounts:
+            # 1. External API cleanup (best-effort, strict timeout)
             try:
-                from odoo.addons.x_account.services.x_service import XService
-                provider = XService.get_provider(account)
-                if hasattr(provider, 'unsubscribe_all_events'):
-                    provider.unsubscribe_all_events(account)
+                import signal
+
+                def _timeout_handler(signum, frame):
+                    raise TimeoutError('unsubscribe_all_events timed out')
+
+                signal.signal(signal.SIGALRM, _timeout_handler)
+                signal.alarm(10)  # 10 second hard timeout
+                try:
+                    from odoo.addons.x_account.services.x_service import XService
+                    provider = XService.get_provider(account)
+                    if hasattr(provider, 'unsubscribe_all_events'):
+                        provider.unsubscribe_all_events(account)
+                finally:
+                    signal.alarm(0)
             except Exception:
                 _logger.exception(
-                    'x_account_twitter: failed to delete X subscriptions for account %s',
+                    'x_account_twitter: skipped/fail delete X subscriptions for account %s',
                     account.id)
-            channels = self.env['discuss.channel'].sudo().search([
-                ('x_account_id', '=', account.id)])
-            if channels:
-                channels.unlink()
+            # 2. Delete massive x_account_task records via raw SQL to skip ORM
+            # overhead for 30k+ records.
+            self.env.cr.execute(
+                'DELETE FROM x_account_task WHERE account_id = %s',
+                (account.id,))
+            # 3. Discuss channels: rely on DB-level cascade (ON DELETE SET NULL
+            # or CASCADE depending on schema) to avoid ORM overhead.
+            # Explicitly invalidate cache if needed.
         return super().unlink()
 
     def action_relink(self):

@@ -39,6 +39,7 @@ class GetXAPIProvider:
         self.account = account
         self._api_key = env['ir.config_parameter'].sudo().get_param(
             'x_account.getxapi_api_key')
+        self._auth_token = getattr(account, 'x_getxapi_auth_token', '') or ''
         self._client = GetXAPIClient(
             env, self._api_key, account_id=account.id)
         self._tweets = GetXAPITweetService(self._client)
@@ -105,6 +106,8 @@ class GetXAPIProvider:
         """Create a new tweet via GetXAPI."""
         if not text:
             raise ValueError('text is required')
+        if self._auth_token:
+            kwargs['auth_token'] = self._auth_token
         return self._tweets.create(text, **kwargs)
 
     def get_dms(self, conversation_id, limit=100, cursor=None):

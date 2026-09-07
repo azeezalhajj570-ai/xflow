@@ -157,9 +157,57 @@ class XAccountTask(models.Model):
                 continue
             task.write({'status': 'running', 'claimed_at': now})
             claimed |= task
-        for task in claimed:
-            task._execute_operation()
+        self._execute_operation_batch(claimed)
         return claimed
+
+    def _execute_operation_batch(self, tasks, operation=None, **extra_ctx):
+        """Execute multiple tasks' operations in batch when supported.
+
+        Groups tasks by account and operation, then calls the batch method
+        if available (e.g., process_webhook_events). Falls back to individual
+        execution for operations without batch support.
+        """
+        if not tasks:
+            return
+        import json as _json
+        grouped = {}
+        for task in tasks:
+            key = (task.account_id.id, operation or task.operation)
+            if key not in grouped:
+                grouped[key] = self.env['x.account.task']
+            grouped[key] |= task
+        for (account_id, op), group_tasks in grouped.items():
+            account = group_tasks[0].account_id
+            if not account:
+                for task in group_tasks:
+                    task._schedule_retry('Missing account')
+                continue
+            try:
+                from odoo.addons.x_account.services.x_service import XService
+                provider = XService.get_provider(account)
+                batch_op = op + 's' if not op.endswith('s') else op
+                batch_fn = getattr(provider, batch_op, None)
+                if batch_fn and callable(batch_fn) and len(group_tasks) > 1:
+                    ctx_list = []
+                    for task in group_tasks:
+                        try:
+                            ctx = _json.loads(task.task_context or '{}')
+                        except ValueError:
+                            ctx = {}
+                        ctx.update(extra_ctx)
+                        ctx_list.append(ctx)
+                    if op == 'process_webhook_event':
+                        event_uuids = [ctx.get('event_uuid') for ctx in ctx_list if ctx.get('event_uuid')]
+                        if event_uuids:
+                            result = batch_fn(event_uuids=event_uuids)
+                            for task in group_tasks:
+                                task.write({'status': 'success', 'result': str(result)})
+                            continue
+                for task in group_tasks:
+                    task._execute_operation(operation=op, **extra_ctx)
+            except Exception as exc:
+                for task in group_tasks:
+                    task._schedule_retry(str(exc))
 
     def _execute_operation(self, operation=None, **extra_ctx):
         """Execute one task's operation via the account provider.
