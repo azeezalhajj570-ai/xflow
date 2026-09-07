@@ -174,8 +174,13 @@ class TwitterActivity:
             event.write({'state': 'failed', 'error': str(exc)})
             raise
         except Exception as exc:
-            # Non-retryable (bad payload): mark done-with-error and move on.
+            # Non-retryable (bad payload): mark done-with-error and move on —
+            # unless the cursor/connection itself died: then no further write
+            # can succeed and the event must NOT be consumed. Re-raise so the
+            # task queue / cron rolls the whole transaction back and retries.
             _logger.exception('x_account_twitter: failed to process event %s', event_uuid)
+            if self._is_fatal_db_error(exc):
+                raise
             event.write({'state': 'done', 'error': str(exc)})
             return {'processed': False, 'error': str(exc)}
 
@@ -192,17 +197,17 @@ class TwitterActivity:
         errors = []
         for event in events:
             event_uuid = event.event_uuid
-            if event_uuid and self.env['x.twitter.event'].sudo().search_count([
-                ('event_uuid', '=', event_uuid),
-                ('state', 'in', ('done', 'processing')),
-                ('id', '!=', event.id),
-            ]):
-                _logger.info('x_account_twitter: batch event %s already processed', event_uuid)
-                event.write({'state': 'done'})
-                skipped += 1
-                continue
-            event.write({'state': 'processing'})
             try:
+                if event_uuid and self.env['x.twitter.event'].sudo().search_count([
+                    ('event_uuid', '=', event_uuid),
+                    ('state', 'in', ('done', 'processing')),
+                    ('id', '!=', event.id),
+                ]):
+                    _logger.info('x_account_twitter: batch event %s already processed', event_uuid)
+                    event.write({'state': 'done'})
+                    skipped += 1
+                    continue
+                event.write({'state': 'processing'})
                 data = json.loads(event.payload or '{}')
                 payload = data.get('payload') or {}
                 event_type = event.event_type
@@ -220,7 +225,16 @@ class TwitterActivity:
                 errors.append({'event_uuid': event_uuid, 'error': str(exc)})
             except Exception as exc:
                 _logger.exception('x_account_twitter: batch failed to process event %s', event_uuid)
-                event.write({'state': 'done', 'error': str(exc)})
+                if self._is_fatal_db_error(exc):
+                    # The cursor/connection is dead: every remaining event in
+                    # this batch would fail the same way and be wrongly marked
+                    # done. Abort the batch and let the caller roll back the
+                    # transaction; unprocessed events stay queued for retry.
+                    raise
+                try:
+                    event.write({'state': 'done', 'error': str(exc)})
+                except Exception:
+                    pass
                 processed += 1
                 errors.append({'event_uuid': event_uuid, 'error': str(exc)})
         return {
@@ -526,6 +540,20 @@ class TwitterActivity:
         return '', False
 
     # --------------------------------------------------------------- helpers
+    def _is_fatal_db_error(self, exc):
+        """True when the error broke the cursor/connection itself.
+
+        After such an error no further write can succeed in this transaction;
+        callers must abort (re-raise) instead of marking events done so the
+        queue/cron rolls back and retries the batch later.
+        """
+        if isinstance(exc, (psycopg2.InterfaceError, psycopg2.OperationalError)):
+            return True
+        try:
+            return bool(self.env.cr.closed)
+        except Exception:
+            return True
+
     @staticmethod
     def _envelope_data(envelope):
         if not isinstance(envelope, dict):
