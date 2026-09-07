@@ -18,8 +18,7 @@
                 <button name="action_relink" type="object"
                     string="Relink Account"
                     class="btn-secondary"
-                    confirm="Re-running the X OAuth 2.0 flow will issue new tokens on X's side. Continue?"
-                    invisible="x_connection_status not in ('active', 'reauth_required', 'disconnected', 'error', 'invalid')"/>
+                    confirm="Re-running the X OAuth 2.0 flow will issue new tokens on X's side. Continue?"/>
             </xpath>
         </field>
     </record>
@@ -42,8 +41,7 @@
                 <button name="action_relink" type="object"
                     string="Relink Account"
                     class="btn-primary"
-                    confirm="Re-running the X OAuth 2.0 flow will issue new tokens on X's side. Continue?"
-                    invisible="x_connection_status not in ('active', 'reauth_required', 'disconnected', 'error', 'invalid')"/>
+                    confirm="Re-running the X OAuth 2.0 flow will issue new tokens on X's side. Continue?"/>
             </xpath>
         </field>
     </record>

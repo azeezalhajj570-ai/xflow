@@ -206,8 +206,7 @@ class DiscussChannel(models.Model):
         account = self.x_account_id
         if not account:
             raise ValueError('This group has no linked X account.')
-        from odoo.addons.x_account.services.x_service import XService
-        provider = XService.get_provider(account)
+        provider = account.get_action_provider()
         if getattr(provider, '_needs_encryption_code', True) and not account.x_encryption_code:
             raise ValueError(
                 'Set the XChat Encryption Code on the account first — it is '

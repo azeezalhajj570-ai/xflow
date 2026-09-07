@@ -3,8 +3,31 @@
 import logging
 
 from odoo import _, api, fields, models
+from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
+
+_EVENT_PROVIDER_REGISTRY_MAP = {
+    'official': 'twitter',
+}
+
+_ACTION_PROVIDER_REGISTRY_MAP = {
+    'official': 'twitter',
+    'getxapi': 'getxapi',
+}
+
+_EVENT_OPERATIONS = frozenset({
+    'process_webhook_event', 'process_webhook_events',
+    'register_webhook', 'validate_webhook_registration',
+    'unsubscribe_all_events', 'delete_webhook_registration',
+    'subscribe_account',
+})
+
+_ACTION_OPERATIONS = frozenset({
+    'like', 'comment', 'repost', 'follow', 'post_tweet',
+    'send_dm', 'bookmark', 'unbookmark', 'validate_session',
+    'edit_tweet', 'unfollow',
+})
 
 
 class SocialAccount(models.Model):
@@ -42,6 +65,23 @@ class SocialAccount(models.Model):
         help='Provider implementation used for this account. Additional providers '
              '(e.g. OmniX REST API) are provided by optional modules that register '
              'themselves with XProviderRegistry.',
+    )
+    x_event_provider = fields.Selection(
+        [
+            ('official', 'Official X API'),
+        ],
+        string='Event Provider',
+        help='Provider for webhooks, event subscriptions, and incoming event '
+             'processing. When empty, falls back to x_provider.',
+    )
+    x_action_provider = fields.Selection(
+        [
+            ('getxapi', 'GetXAPI'),
+            ('official', 'Official X API'),
+        ],
+        string='Action Provider',
+        help='Provider for mutations (retweet, reply, like, follow, send DM, etc.) '
+             'and data reads. When empty, falls back to x_provider.',
     )
     x_auth_method = fields.Selection(
         [
@@ -143,6 +183,48 @@ class SocialAccount(models.Model):
     def _filter_x_accounts(self):
         return self.filtered(lambda a: a.media_type == 'twitter')
 
+    def _resolve_provider_code(self, field_value, registry_map):
+        self.ensure_one()
+        code = field_value or self.x_provider
+        return registry_map.get(code, code)
+
+    def get_event_provider(self):
+        self.ensure_one()
+        registry_code = self._resolve_provider_code(
+            self.x_event_provider, _EVENT_PROVIDER_REGISTRY_MAP)
+        if registry_code == 'twitter':
+            has_oauth2 = getattr(self, 'x_oauth2_access_token', False)
+            has_oauth1 = getattr(self, 'twitter_oauth_token', False)
+            if not (has_oauth2 or has_oauth1):
+                raise UserError(
+                    'Official X API credentials are not configured for this account. '
+                    'Link the account via OAuth to enable event processing.')
+        from odoo.addons.x_account.services.x_service import XService
+        return XService.get_provider_by_code(self, registry_code)
+
+    def get_action_provider(self):
+        self.ensure_one()
+        registry_code = self._resolve_provider_code(
+            self.x_action_provider, _ACTION_PROVIDER_REGISTRY_MAP)
+        if registry_code == 'getxapi':
+            api_key = self.env['ir.config_parameter'].sudo().get_param(
+                'x_account.getxapi_api_key')
+            if not api_key:
+                raise UserError(
+                    'GetXAPI is not configured for this X account. '
+                    'Set the GetXAPI API key in Settings > X Account.')
+        from odoo.addons.x_account.services.x_service import XService
+        return XService.get_provider_by_code(self, registry_code)
+
+    def get_provider_for_operation(self, operation):
+        self.ensure_one()
+        if operation in _EVENT_OPERATIONS:
+            return self.get_event_provider()
+        if operation in _ACTION_OPERATIONS:
+            return self.get_action_provider()
+        from odoo.addons.x_account.services.x_service import XService
+        return XService.get_provider(self)
+
     def action_link_account(self):
         """Open the X link-account wizard (used by the X Accounts list 'New')."""
         return {
@@ -197,8 +279,7 @@ class SocialAccount(models.Model):
         self.ensure_one()
         if not self._filter_x_accounts():
             raise ValueError('Fetch groups is only available on X accounts.')
-        from odoo.addons.x_account.services.x_service import XService
-        provider = XService.get_provider(self)
+        provider = self.get_action_provider()
         fetch = getattr(provider, 'fetch_groups', None)
         if not fetch:
             return self._groups_not_supported(
@@ -225,8 +306,7 @@ class SocialAccount(models.Model):
         self.ensure_one()
         if not self._filter_x_accounts():
             raise ValueError('Fetch group messages is only available on X accounts.')
-        from odoo.addons.x_account.services.x_service import XService
-        provider = XService.get_provider(self)
+        provider = self.get_action_provider()
         if getattr(provider, '_needs_encryption_code', True) and not self.x_encryption_code:
             raise ValueError(
                 'Set the XChat Encryption Code on this account first — it is '
@@ -258,7 +338,7 @@ class SocialAccount(models.Model):
     def action_initialize_x_chat_encryption(self):
         """Initialize the account's XChat encryption via its provider.
 
-        Dispatches to the provider's ``initialize_x_chat_encryption`` so the
+        Dispatches to the event provider's ``initialize_x_chat_encryption`` so the
         official-X (blob import / Juicebox unlock) and any other provider can
         implement it with their own key material. Marks ``x_chat_initialized``
         on success and clears it on failure. Returns a dialog/notification
@@ -267,8 +347,7 @@ class SocialAccount(models.Model):
         self.ensure_one()
         if not self._filter_x_accounts():
             raise ValueError('X Chat encryption is only available on X accounts.')
-        from odoo.addons.x_account.services.x_service import XService
-        provider = XService.get_provider(self)
+        provider = self.get_event_provider()
         initialize = getattr(provider, 'initialize_x_chat_encryption', None)
         if not initialize:
             return self._display_notification(

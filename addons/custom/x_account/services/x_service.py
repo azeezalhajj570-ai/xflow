@@ -35,6 +35,23 @@ class XService:
         return provider
 
     @staticmethod
+    def get_provider_by_code(account, provider_code):
+        """Return a provider client for a specific provider code."""
+        account.ensure_one()
+        provider_cls = XProviderRegistry.resolve(provider_code)
+        if provider_cls is None:
+            raise RuntimeError('No X provider registered for %r' % provider_code)
+        needs_cookies = getattr(provider_cls, '_needs_cookies', True)
+        if needs_cookies:
+            cookies_str = XSessionManager.load(account)
+            cookies = SessionWebProvider.parse_cookie_string(cookies_str or '')
+            provider = provider_cls(account.env, account, cookies)
+        else:
+            provider = provider_cls(account.env, account)
+        XSessionManager.register_runtime(account, provider)
+        return provider
+
+    @staticmethod
     def validate(account):
         provider = XService.get_provider(account)
         result = provider.validate_session()

@@ -473,6 +473,8 @@ class SocialAccount(models.Model):
             raise UserError(error_message)
         handle = user.get('username') or ''
         name = user.get('name') or handle or 'X Account'
+        default_action_provider = self.env['ir.config_parameter'].sudo().get_param(
+            'x_account.action_provider', 'getxapi')
         vals = {
             'active': True,
             'media_id': media.id,
@@ -485,6 +487,7 @@ class SocialAccount(models.Model):
             'x_oauth2_token_expires_at': fields.Datetime.now() + timedelta(
                 seconds=int(tokens.get('expires_in') or expires_in or 7200)),
             'x_auth_method': 'oauth2',
+            'x_action_provider': default_action_provider,
             # The callback just exchanged tokens and fetched /users/me, which
             # proves the credentials work: mark the account live immediately.
             # A fresh create defaults to 'new' and nothing later promotes

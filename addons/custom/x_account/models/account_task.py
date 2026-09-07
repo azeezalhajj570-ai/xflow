@@ -130,9 +130,13 @@ class XAccountTask(models.Model):
         ]
         if company_ids:
             domain.append(('company_id', 'in', list(company_ids)))
+        import logging
+        _logger = logging.getLogger(__name__)
+        _logger.info('Task queue: searching with domain=%s', domain)
         grouped = self.sudo()._read_group(
             domain, ['account_id'], ['account_id:count'], order='account_id')
         account_ids = [account.id for g in grouped for account in g[0]]
+        _logger.info('Task queue: found account_ids=%s grouped=%s', account_ids, grouped)
         if not account_ids:
             return self.env['x.account.task']
         share = max(limit // len(account_ids), 1)
@@ -183,8 +187,7 @@ class XAccountTask(models.Model):
                     task._schedule_retry('Missing account')
                 continue
             try:
-                from odoo.addons.x_account.services.x_service import XService
-                provider = XService.get_provider(account)
+                provider = account.get_provider_for_operation(op)
                 batch_op = op + 's' if not op.endswith('s') else op
                 batch_fn = getattr(provider, batch_op, None)
                 if batch_fn and callable(batch_fn) and len(group_tasks) > 1:
@@ -224,9 +227,8 @@ class XAccountTask(models.Model):
             self._schedule_retry('Missing account')
             return None
         try:
-            from odoo.addons.x_account.services.x_service import XService
-            provider = XService.get_provider(account)
             op = operation or self.operation
+            provider = account.get_provider_for_operation(op)
             fn = getattr(provider, op, None)
             if not fn or not callable(fn):
                 self._schedule_retry('Unknown operation %s' % op)

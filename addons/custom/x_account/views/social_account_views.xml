@@ -13,6 +13,8 @@
                             decoration-warning="x_connection_status == 'reauth_required'"
                             decoration-danger="x_connection_status in ('disconnected', 'error', 'invalid')"/>
                         <field name="x_provider"/>
+                        <field name="x_event_provider"/>
+                        <field name="x_action_provider"/>
                         <field name="twitter_user_id" readonly="1"/>
                     </group>
                     <group string="X Chat Encryption" groups="base.group_system">
@@ -39,16 +41,16 @@
                         class="btn-primary"
                         confirm="Initialize X Chat encryption using the configured key source?"
                         groups="base.group_system"
-                        invisible="x_connection_status not in ('active', 'reauth_required', 'error')"/>
+                        invisible="x_connection_status not in ('active', 'reauth_required', 'error') or x_chat_initialized"/>
                     <button name="action_delete_x_subscriptions" type="object"
                         string="Delete X Subscriptions"
                         class="btn-secondary"
                         confirm="Delete all X Activity API subscriptions for this account?"
-                        invisible="x_provider != 'twitter' or not twitter_user_id"/>
+                        invisible="(not x_action_provider and not x_provider) or not twitter_user_id"/>
                     <button name="action_resubscribe_x_subscriptions" type="object"
                         string="Resubscribe"
                         class="btn-secondary"
-                        invisible="x_provider != 'twitter' or not twitter_user_id"/>
+                        invisible="(not x_action_provider and not x_provider) or not twitter_user_id"/>
                 </header>
                 <sheet>
                     <div class="oe_title">
@@ -58,6 +60,8 @@
                         <group string="Account Info">
                             <field name="social_account_handle" placeholder="@handle"/>
                             <field name="x_provider"/>
+                            <field name="x_event_provider"/>
+                            <field name="x_action_provider"/>
                             <field name="twitter_user_id" readonly="1"/>
                             <field name="x_connection_status" widget="badge"
                                 decoration-success="x_connection_status == 'active'"
