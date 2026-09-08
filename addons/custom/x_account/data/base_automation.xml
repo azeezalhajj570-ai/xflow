@@ -30,8 +30,10 @@
         <record id="base_automation_x_task_like" model="base.automation">
             <field name="name">X: Run Like Task</field>
             <field name="model_id" ref="model_x_account_task"/>
-            <field name="trigger">on_create</field>
-            <field name="active" eval="True"/>
+            <field name="trigger">on_time_created</field>
+            <field name="trg_date_range">1</field>
+            <field name="trg_date_range_type">minutes</field>
+            <field name="active" eval="False"/>
             <field name="filter_domain">[('operation', '=', 'like'), ('status', '=', 'pending')]</field>
         </record>
         <record id="ir_actions_server_x_task_like" model="ir.actions.server">
@@ -45,8 +47,10 @@
         <record id="base_automation_x_task_repost" model="base.automation">
             <field name="name">X: Run Repost Task</field>
             <field name="model_id" ref="model_x_account_task"/>
-            <field name="trigger">on_create</field>
-            <field name="active" eval="True"/>
+            <field name="trigger">on_time_created</field>
+            <field name="trg_date_range">1</field>
+            <field name="trg_date_range_type">minutes</field>
+            <field name="active" eval="False"/>
             <field name="filter_domain">[('operation', '=', 'repost'), ('status', '=', 'pending')]</field>
         </record>
         <record id="ir_actions_server_x_task_repost" model="ir.actions.server">
@@ -60,8 +64,10 @@
         <record id="base_automation_x_task_comment" model="base.automation">
             <field name="name">X: Run Comment Task</field>
             <field name="model_id" ref="model_x_account_task"/>
-            <field name="trigger">on_create</field>
-            <field name="active" eval="True"/>
+            <field name="trigger">on_time_created</field>
+            <field name="trg_date_range">1</field>
+            <field name="trg_date_range_type">minutes</field>
+            <field name="active" eval="False"/>
             <field name="filter_domain">[('operation', '=', 'comment'), ('status', '=', 'pending')]</field>
         </record>
         <record id="ir_actions_server_x_task_comment" model="ir.actions.server">
@@ -75,7 +81,9 @@
         <record id="base_automation_x_task_follow" model="base.automation">
             <field name="name">X: Run Follow Task</field>
             <field name="model_id" ref="model_x_account_task"/>
-            <field name="trigger">on_create</field>
+            <field name="trigger">on_time_created</field>
+            <field name="trg_date_range">1</field>
+            <field name="trg_date_range_type">minutes</field>
             <field name="active" eval="True"/>
             <field name="filter_domain">[('operation', '=', 'follow'), ('status', '=', 'pending')]</field>
         </record>
@@ -90,7 +98,9 @@
         <record id="base_automation_x_task_send_dm" model="base.automation">
             <field name="name">X: Run Send DM Task</field>
             <field name="model_id" ref="model_x_account_task"/>
-            <field name="trigger">on_create</field>
+            <field name="trigger">on_time_created</field>
+            <field name="trg_date_range">1</field>
+            <field name="trg_date_range_type">minutes</field>
             <field name="active" eval="True"/>
             <field name="filter_domain">[('operation', '=', 'send_dm'), ('status', '=', 'pending')]</field>
         </record>
@@ -105,8 +115,10 @@
         <record id="base_automation_x_task_bookmark" model="base.automation">
             <field name="name">X: Run Bookmark Task</field>
             <field name="model_id" ref="model_x_account_task"/>
-            <field name="trigger">on_create</field>
-            <field name="active" eval="True"/>
+            <field name="trigger">on_time_created</field>
+            <field name="trg_date_range">1</field>
+            <field name="trg_date_range_type">minutes</field>
+            <field name="active" eval="False"/>
             <field name="filter_domain">[('operation', '=', 'bookmark'), ('status', '=', 'pending')]</field>
         </record>
         <record id="ir_actions_server_x_task_bookmark" model="ir.actions.server">
@@ -120,8 +132,10 @@
         <record id="base_automation_x_task_unbookmark" model="base.automation">
             <field name="name">X: Run Unbookmark Task</field>
             <field name="model_id" ref="model_x_account_task"/>
-            <field name="trigger">on_create</field>
-            <field name="active" eval="True"/>
+            <field name="trigger">on_time_created</field>
+            <field name="trg_date_range">1</field>
+            <field name="trg_date_range_type">minutes</field>
+            <field name="active" eval="False"/>
             <field name="filter_domain">[('operation', '=', 'unbookmark'), ('status', '=', 'pending')]</field>
         </record>
         <record id="ir_actions_server_x_task_unbookmark" model="ir.actions.server">
