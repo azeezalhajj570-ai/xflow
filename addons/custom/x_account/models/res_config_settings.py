@@ -26,6 +26,23 @@ class ResConfigSettings(models.TransientModel):
         default='session_web',
         help='Provider implementation used for X HTTP operations.',
     )
+    x_event_provider = fields.Selection(
+        [
+            ('official', 'Official X API'),
+        ],
+        string='Event Provider',
+        config_parameter='x_account.event_provider',
+        help='Provider for webhooks, event subscriptions, and incoming event processing.',
+    )
+    x_action_provider = fields.Selection(
+        [
+            ('getxapi', 'GetXAPI'),
+            ('official', 'Official X API'),
+        ],
+        string='Action Provider',
+        config_parameter='x_account.action_provider',
+        help='Provider for mutations (retweet, reply, like, follow, send DM, etc.) and data reads.',
+    )
     x_encryption_key_configured = fields.Boolean(
         string='X Session Encryption Key Configured',
         config_parameter='x_account.encryption_key_configured',

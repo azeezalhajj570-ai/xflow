@@ -13,10 +13,6 @@
                         </div>
                         <div class="o_setting_right_pane">
                             <field name="x_getxapi_api_key" password="True"/>
-                            <div class="text-muted">
-                                GetXAPI API key (Authorization: Bearer). Used only by the
-                                optional GetXAPI provider for paid per-call X/Twitter data access.
-                            </div>
                         </div>
                     </div>
                 </div>

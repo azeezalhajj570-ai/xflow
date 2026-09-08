@@ -61,7 +61,8 @@ class SocialAccount(models.Model):
             ('official_publish', 'Official Publish'),
         ],
         string='X Provider',
-        default='session_web',
+        compute='_compute_x_provider',
+        inverse='_inverse_x_provider',
         help='Provider implementation used for this account. Additional providers '
              '(e.g. OmniX REST API) are provided by optional modules that register '
              'themselves with XProviderRegistry.',
@@ -71,6 +72,8 @@ class SocialAccount(models.Model):
             ('official', 'Official X API'),
         ],
         string='Event Provider',
+        compute='_compute_x_event_provider',
+        inverse='_inverse_x_event_provider',
         help='Provider for webhooks, event subscriptions, and incoming event '
              'processing. When empty, falls back to x_provider.',
     )
@@ -80,6 +83,8 @@ class SocialAccount(models.Model):
             ('official', 'Official X API'),
         ],
         string='Action Provider',
+        compute='_compute_x_action_provider',
+        inverse='_inverse_x_action_provider',
         help='Provider for mutations (retweet, reply, like, follow, send DM, etc.) '
              'and data reads. When empty, falls back to x_provider.',
     )
@@ -179,6 +184,36 @@ class SocialAccount(models.Model):
                 ('channel_type', '=', 'x_group'),
                 ('x_account_id', '=', account.id),
             ])
+
+    @api.depends_context('force_company')
+    def _compute_x_provider(self):
+        param = self.env['ir.config_parameter'].sudo().get_param
+        default_provider = param('x_account.provider', 'session_web')
+        for account in self:
+            account.x_provider = default_provider
+
+    def _inverse_x_provider(self):
+        pass
+
+    @api.depends_context('force_company')
+    def _compute_x_event_provider(self):
+        param = self.env['ir.config_parameter'].sudo().get_param
+        default_provider = param('x_account.event_provider')
+        for account in self:
+            account.x_event_provider = default_provider
+
+    def _inverse_x_event_provider(self):
+        pass
+
+    @api.depends_context('force_company')
+    def _compute_x_action_provider(self):
+        param = self.env['ir.config_parameter'].sudo().get_param
+        default_provider = param('x_account.action_provider')
+        for account in self:
+            account.x_action_provider = default_provider
+
+    def _inverse_x_action_provider(self):
+        pass
 
     def _filter_x_accounts(self):
         return self.filtered(lambda a: a.media_type == 'twitter')
