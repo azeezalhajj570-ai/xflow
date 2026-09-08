@@ -99,6 +99,7 @@ class TwitterActivity:
                     'event_type': event_type}
 
         existing = self.env['x.twitter.event'].sudo().search([
+            ('account_id', '=', account.id),
             ('event_uuid', '=', event_uuid),
         ], limit=1)
         if existing:
