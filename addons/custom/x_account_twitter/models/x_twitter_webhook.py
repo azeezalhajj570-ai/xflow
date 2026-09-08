@@ -145,7 +145,7 @@ class XTwitterEvent(models.Model):
     )
 
     _event_uuid_uniq = models.Constraint(
-        'UNIQUE(event_uuid)',
-        'An X event uuid may only be processed once.',
+        'UNIQUE(account_id, event_uuid)',
+        'An X event uuid may only be processed once per account.',
     )
 
