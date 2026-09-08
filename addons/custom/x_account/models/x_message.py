@@ -1,8 +1,11 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 import json
+import logging
 
 from odoo import fields, models
+
+_logger = logging.getLogger(__name__)
 
 
 class XMessage(models.Model):
@@ -109,28 +112,32 @@ class XMessage(models.Model):
         """
         self.ensure_one()
         if not self.body_plain:
+            _logger.info(
+                'Channel automation skipped (operation=%s): empty body for x.message id=%s',
+                operation, self.id,
+            )
             return
 
         account = self.account_id.sudo()
         if not account or not account.active or account.x_connection_status in ('disabled', 'new'):
             account = self._get_company_x_account()
         if not account:
-            return
-
-        today_start = fields.Datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-
-        existing = self.env['x.account.task'].sudo().search_count([
-            ('account_id', '=', account.id),
-            ('operation', '=', operation),
-            ('create_date', '>=', today_start),
-            ('task_context', 'ilike', self.author_x_id or ''),
-        ])
-        if existing:
+            _logger.info(
+                'Channel automation skipped (operation=%s): no valid X account for x.message id=%s '
+                '(account_id=%s, status=%s)',
+                operation, self.id, self.account_id.id,
+                self.account_id.x_connection_status if self.account_id else 'missing',
+            )
             return
 
         if operation in ('like', 'repost', 'comment', 'bookmark', 'unbookmark'):
             tweet_ids = self._extract_tweet_ids()
             if not tweet_ids:
+                _logger.info(
+                    'Channel automation skipped (operation=%s): no tweet IDs found in body '
+                    'for x.message id=%s, body=%r',
+                    operation, self.id, self.body_plain[:200] if self.body_plain else '',
+                )
                 return
 
             for tweet_id in tweet_ids:
@@ -140,14 +147,24 @@ class XMessage(models.Model):
                     'author_x_id': self.author_x_id,
                     'source': 'channel_automation',
                 }
-                self.env['x.account.task'].sudo().create({
+                task = self.env['x.account.task'].sudo().create({
                     'account_id': account.id,
                     'operation': operation,
                     'priority': 1,
                     'task_context': json.dumps(task_ctx),
                 })
+                _logger.info(
+                    'Channel automation created task id=%s (operation=%s) for x.message id=%s, '
+                    'tweet_id=%s, account_id=%s',
+                    task.id, operation, self.id, tweet_id, account.id,
+                )
         elif operation == 'follow':
             if not self.author_x_username:
+                _logger.info(
+                    'Channel automation skipped (operation=%s): missing author_x_username '
+                    'for x.message id=%s, author_x_id=%s',
+                    operation, self.id, self.author_x_id,
+                )
                 return
             task_ctx = {
                 'screen_name': self.author_x_username,
@@ -155,12 +172,17 @@ class XMessage(models.Model):
                 'author_x_id': self.author_x_id,
                 'source': 'channel_automation',
             }
-            self.env['x.account.task'].sudo().create({
+            task = self.env['x.account.task'].sudo().create({
                 'account_id': account.id,
                 'operation': 'follow',
                 'priority': 1,
                 'task_context': json.dumps(task_ctx),
             })
+            _logger.info(
+                'Channel automation created task id=%s (operation=follow) for x.message id=%s, '
+                'screen_name=%s, account_id=%s',
+                task.id, self.id, self.author_x_username, account.id,
+            )
 
     def _run_channel_like(self):
         """Execute like automation for this message."""
