@@ -94,4 +94,11 @@ class XImportSession(models.TransientModel):
         })
         XSessionManager.create_store(account, cookie_string, source='wizard')
         XSessionManager.register_runtime(account, provider)
-        return {'type': 'ir.actions.act_window_close'}
+        return {
+            'type': 'ir.actions.act_window',
+            'res_model': 'social.account',
+            'view_mode': 'form',
+            'res_id': account.id,
+            'target': 'main',
+            'name': account.name,
+        }

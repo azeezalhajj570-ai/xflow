@@ -127,7 +127,7 @@ class SocialAccount(models.Model):
                     and record.media_type == 'twitter'):
                 self._x_align_account_medium(record, vals['name'])
         for record, vals in zip(records, vals_list):
-            if record.media_type != 'twitter' or vals.get('x_provider'):
+            if record.media_type != 'twitter':
                 continue
             if record.twitter_oauth_token and not vals.get('x_oauth2_access_token'):
                 record.write(self._get_oauth1_defaults())

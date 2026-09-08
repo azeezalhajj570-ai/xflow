@@ -144,4 +144,5 @@ class XAccountTwitterOAuth2Controller(http.Controller):
         except UserError as exc:
             return self._error(str(exc))
 
-        return request.redirect('/odoo/action-social.action_social_stream_post')
+        return request.redirect(
+            '/web#id=%d&model=social.account&view_type=form' % account.id)

@@ -81,7 +81,6 @@ class XMessage(models.Model):
         self.ensure_one()
         return self.env['social.account'].sudo().search([
             ('company_id', '=', self.env.company.id),
-            ('x_provider', '!=', False),
             ('active', '=', True),
             ('x_connection_status', 'not in', ('disabled', 'new')),
         ], limit=1)
