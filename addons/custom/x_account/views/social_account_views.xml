@@ -17,7 +17,7 @@
                         <field name="x_action_provider" invisible="1"/>
                         <field name="twitter_user_id" readonly="1"/>
                     </group>
-                    <group string="X Chat Encryption" groups="base.group_system">
+                    <group string="X Chat Encryption" groups="social.group_social_user">
                         <field name="x_chat_key_mode" widget="radio"/>
                         <field name="x_encryption_code" password="True" placeholder="Your XChat PIN"
                             invisible="x_chat_key_mode != 'juicebox'"/>
@@ -40,7 +40,7 @@
                         string="Initialize Encryption"
                         class="btn-primary"
                         confirm="Initialize X Chat encryption using the configured key source?"
-                        groups="base.group_system"
+                        groups="social.group_social_user"
                         invisible="x_connection_status not in ('active', 'reauth_required', 'error') or x_chat_initialized"/>
                     <button name="action_delete_x_subscriptions" type="object"
                         string="Delete X Subscriptions"
@@ -68,7 +68,7 @@
                                 decoration-warning="x_connection_status == 'reauth_required'"
                                 decoration-danger="x_connection_status in ('disconnected', 'error', 'invalid')"/>
                         </group>
-                        <group string="X Chat Encryption" groups="base.group_system">
+                        <group string="X Chat Encryption" groups="social.group_social_user">
                             <field name="x_chat_key_mode" widget="radio"/>
                             <field name="x_encryption_code" password="True" placeholder="Your XChat PIN"
                                 invisible="x_chat_key_mode != 'juicebox'"/>

@@ -105,14 +105,14 @@ class SocialAccount(models.Model):
     )
     x_encryption_code = fields.Char(
         string='XChat Encryption Code',
-        groups='base.group_system',
+        groups='social.group_social_user',
         help='Your XChat PIN — the code you set when enabling encrypted chats on '
              'X. Used to recover your key so encrypted DM messages can be '
              'decrypted and outgoing events signed.',
     )
     x_chat_key_blob = fields.Text(
         string='X Chat Key Blob',
-        groups='base.group_system',
+        groups='social.group_social_user',
         help='Opaque private-key blob exported from the official Chat XDK '
              '(chatxdk export_keys), stored base64-encoded (hex or a Python '
              'bytes repr are also accepted). Imported with import_keys to '
@@ -121,7 +121,7 @@ class SocialAccount(models.Model):
     )
     x_chat_signing_key_version = fields.Char(
         string='X Chat Signing Key Version',
-        groups='base.group_system',
+        groups='social.group_social_user',
         help='public_key_version of the account\'s registered Chat public key; '
              'passed to chatxdk set_identity.',
     )
@@ -132,7 +132,7 @@ class SocialAccount(models.Model):
         ],
         string='X Chat Key Source',
         default='juicebox',
-        groups='base.group_system',
+        groups='social.group_social_user',
         help='Where the account\'s XChat private keys come from. "Imported Key '
              'Blob" stores the native export_keys() blob on the account; '
              '"Secure Backup / PIN" recovers keys from X\'s secure key backup '
@@ -141,14 +141,14 @@ class SocialAccount(models.Model):
     )
     x_chat_initialized = fields.Boolean(
         string='X Chat Encryption Initialized',
-        groups='base.group_system',
+        groups='social.group_social_user',
         help='True once the Chat XDK has successfully imported/recovered the '
              'account\'s keys (via the configured key source) and set the '
              'identity. Cleared whenever the PIN/blob changes.',
     )
     x_chat_pin_locked = fields.Boolean(
         string='X Chat PIN Rejected',
-        groups='base.group_system',
+        groups='social.group_social_user',
         copy=False,
         readonly=True,
         help='Set when X rejected the configured X Chat PIN. Unlock attempts '

@@ -17,7 +17,7 @@ class SocialRedditController(SocialController):
 
     @http.route(['/social_reddit/callback'], type='http', auth='user')
     def social_reddit_account_callback(self, code=None, state=None, error=None, **kw):
-        if not request.env.user.has_group('social.group_social_manager'):
+        if not (request.env.user.has_group('social.group_social_manager') or request.env.user.has_group('social.group_social_user')):
             return request.render(
                 'social.social_http_error_view',
                 {'error_message': _('Unauthorized. Please contact your administrator.')})

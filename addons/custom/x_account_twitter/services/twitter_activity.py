@@ -150,14 +150,6 @@ class TwitterActivity:
         """
         event = event.sudo()
         event_uuid = event.event_uuid
-        if event_uuid and self.env['x.twitter.event'].sudo().search_count([
-            ('event_uuid', '=', event_uuid),
-            ('state', 'in', ('done', 'processing')),
-            ('id', '!=', event.id),
-        ]):
-            _logger.info('x_account_twitter: event %s already processed', event_uuid)
-            event.write({'state': 'done'})
-            return {'processed': False, 'duplicate': True}
         event.write({'state': 'processing'})
         try:
             data = json.loads(event.payload or '{}')
@@ -199,15 +191,6 @@ class TwitterActivity:
         for event in events:
             event_uuid = event.event_uuid
             try:
-                if event_uuid and self.env['x.twitter.event'].sudo().search_count([
-                    ('event_uuid', '=', event_uuid),
-                    ('state', 'in', ('done', 'processing')),
-                    ('id', '!=', event.id),
-                ]):
-                    _logger.info('x_account_twitter: batch event %s already processed', event_uuid)
-                    event.write({'state': 'done'})
-                    skipped += 1
-                    continue
                 event.write({'state': 'processing'})
                 data = json.loads(event.payload or '{}')
                 payload = data.get('payload') or {}
@@ -398,6 +381,16 @@ class TwitterActivity:
             existing_partners = set(channel.channel_member_ids.partner_id.ids)
         except Exception:
             return
+        if account.create_uid and account.create_uid.partner_id:
+            if account.create_uid.partner_id.id not in existing_partners:
+                try:
+                    member_model.create({
+                        'channel_id': channel.id,
+                        'partner_id': account.create_uid.partner_id.id,
+                    })
+                    existing_partners.add(account.create_uid.partner_id.id)
+                except Exception:
+                    pass
         for x_uid in sorted(want, key=lambda s: (len(s), s)):
             if not x_uid:
                 continue
