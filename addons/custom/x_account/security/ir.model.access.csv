@@ -8,3 +8,11 @@ access_x_account_task_manager,x.account.task.manager,model_x_account_task,social
 access_x_message_user,x.message.user,model_x_message,social.group_social_user,1,1,1,1
 access_x_message_manager,x.message.manager,model_x_message,social.group_social_manager,1,1,1,1
 access_x_import_session_user,x.import.session.user,model_x_import_session,base.group_user,1,1,1,0
+access_base_automation_user,base.automation.user,base_automation.model_base_automation,social.group_social_user,1,0,0,0
+access_base_automation_manager,base.automation.manager,base_automation.model_base_automation,social.group_social_manager,1,1,1,1
+access_ir_actions_server_user,ir.actions.server.user,base.model_ir_actions_server,social.group_social_user,1,0,0,0
+access_ir_actions_server_manager,ir.actions.server.manager,base.model_ir_actions_server,social.group_social_manager,1,1,1,1
+access_ir_model_fields_user,ir.model.fields.user,base.model_ir_model_fields,social.group_social_user,1,0,0,0
+access_ir_model_fields_manager,ir.model.fields.manager,base.model_ir_model_fields,social.group_social_manager,1,1,1,1
+access_ir_model_user,ir.model.user,base.model_ir_model,social.group_social_user,1,0,0,0
+access_ir_model_manager,ir.model.manager,base.model_ir_model,social.group_social_manager,1,1,1,1
