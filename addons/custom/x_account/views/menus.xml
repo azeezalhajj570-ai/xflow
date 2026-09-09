@@ -83,7 +83,8 @@
         name="Server Actions"
         parent="menu_x_account_root"
         action="action_x_account_server_actions"
-        sequence="46"/>
+        sequence="46"
+        groups="social.group_social_manager"/>
 
     <menuitem
         id="menu_x_account_settings"
