@@ -73,5 +73,51 @@ for record in records:
     record._run_channel_unbookmark()
             </field>
         </record>
+
+        <!--
+            Channel automation rules. These fire when an x.message is created
+            and trigger the corresponding channel operation (bookmark/unbookmark).
+            Follows the same pattern as the like/repost/comment rules.
+        -->
+
+        <!-- Bookmark Automation Rule -->
+        <record id="base_automation_x_channel_bookmark" model="base.automation">
+            <field name="name">X: Channel Bookmark</field>
+            <field name="model_id" ref="model_x_message"/>
+            <field name="trigger">on_time_created</field>
+            <field name="trg_date_range">1</field>
+            <field name="trg_date_range_type">minutes</field>
+            <field name="active" eval="True"/>
+        </record>
+        <record id="ir_actions_server_x_channel_bookmark" model="ir.actions.server">
+            <field name="name">X: Channel Bookmark</field>
+            <field name="model_id" ref="model_x_message"/>
+            <field name="state">code</field>
+            <field name="code">
+for record in records:
+    record._run_channel_bookmark()
+            </field>
+            <field name="base_automation_id" ref="base_automation_x_channel_bookmark"/>
+        </record>
+
+        <!-- Unbookmark Automation Rule -->
+        <record id="base_automation_x_channel_unbookmark" model="base.automation">
+            <field name="name">X: Channel Unbookmark</field>
+            <field name="model_id" ref="model_x_message"/>
+            <field name="trigger">on_time_created</field>
+            <field name="trg_date_range">1</field>
+            <field name="trg_date_range_type">minutes</field>
+            <field name="active" eval="True"/>
+        </record>
+        <record id="ir_actions_server_x_channel_unbookmark" model="ir.actions.server">
+            <field name="name">X: Channel Unbookmark</field>
+            <field name="model_id" ref="model_x_message"/>
+            <field name="state">code</field>
+            <field name="code">
+for record in records:
+    record._run_channel_unbookmark()
+            </field>
+            <field name="base_automation_id" ref="base_automation_x_channel_unbookmark"/>
+        </record>
     </data>
 </odoo>
