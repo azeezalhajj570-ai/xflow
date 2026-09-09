@@ -6,21 +6,9 @@
             <field name="model_id" ref="base_automation.model_base_automation"/>
             <field name="state">code</field>
             <field name="code">
-automations = env['base.automation'].search([])
+automations = env['base.automation'].search([('company_id', '=', False)])
 for automation in automations:
-    model_name = automation.model_id.model
-    try:
-        if 'company_id' in env[model_name]._fields:
-            sample_record = env[model_name].search([], limit=1)
-            if sample_record and sample_record.company_id:
-                automation.company_id = sample_record.company_id
-            else:
-                automation.company_id = env.company
-        else:
-            automation.company_id = False
-    except Exception as e:
-        automation.company_id = env.company
-env.cr.commit()
+    automation.write({'company_id': env.company.id})
             </field>
         </record>
     </data>
