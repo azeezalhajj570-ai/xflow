@@ -637,8 +637,11 @@ class SocialAccount(models.Model):
         ], limit=1)
         if not first:
             return {'enabled': True, 'accounts': 0}
-        from odoo.addons.x_account.services.x_service import XService
-        provider = XService.get_provider(first)
+        provider = first.get_provider_for_operation('register_webhook')
+        if not hasattr(provider, 'has_app_bearer'):
+            # Provider doesn't support app bearer token (e.g. GetXAPI provider)
+            # Webhook management is handled differently for this provider
+            return {'enabled': True, 'managed': 'provider_specific'}
         if not provider.has_app_bearer():
             # App-Only Bearer Token not configured: the webhook + subscriptions
             # are being managed manually in the X Developer Portal, so there is
@@ -657,12 +660,12 @@ class SocialAccount(models.Model):
         self.ensure_one()
         if not self._filter_x_accounts() or not self.twitter_user_id:
             return {'account_id': self.id, 'skipped': True}
-        from odoo.addons.x_account.services.x_service import XService
         try:
-            provider = XService.get_provider(self)
+            provider = self.get_provider_for_operation('subscribe_account')
             subscribe = getattr(provider, 'subscribe_account', None)
             if not subscribe:
-                return {'account_id': self.id, 'skipped': True}
+                return {'account_id': self.id, 'skipped': True,
+                        'reason': 'no_provider'}
             return subscribe(self)
         except Exception:
             _logger.exception(
