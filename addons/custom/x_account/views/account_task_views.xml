@@ -4,7 +4,7 @@
         <field name="name">x.account.task.view.tree</field>
         <field name="model">x.account.task</field>
         <field name="arch" type="xml">
-            <list string="X Account Tasks">
+            <list string="X Account Tasks" create="false">
                 <field name="account_id"/>
                 <field name="operation"/>
                 <field name="status"/>
