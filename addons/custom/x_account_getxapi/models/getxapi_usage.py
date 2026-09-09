@@ -23,6 +23,13 @@ class GetXAPIUsage(models.Model):
         ondelete='set null',
         help='The X account that triggered this API call.',
     )
+    company_id = fields.Many2one(
+        'res.company',
+        string='Company',
+        related='account_id.company_id',
+        store=True,
+        index=True,
+    )
     endpoint = fields.Char(
         string='Endpoint',
         index=True,
