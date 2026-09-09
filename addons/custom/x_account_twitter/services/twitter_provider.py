@@ -176,9 +176,19 @@ class TwitterProvider:
 
         Loaded by event_uuid (set at enqueue time) so the payload survives retry
         in the queue instead of depending on the original HTTP delivery.
+
+        Scoped to this provider's account: the same webhook delivery can land
+        on several linked X accounts that share a conversation (one
+        ``x.twitter.event`` row per account, same ``event_uuid`` — uniqueness
+        is ``(account_id, event_uuid)``). Without the account filter
+        ``limit=1`` always returned the lowest-id event, so one account's task
+        processed (and consumed) another account's event and its own event sat
+        ``queued`` forever — the message never appeared in its channel.
         """
-        event = self.env['x.twitter.event'].sudo().search(
-            [('event_uuid', '=', event_uuid)], limit=1)
+        event = self.env['x.twitter.event'].sudo().search([
+            ('event_uuid', '=', event_uuid),
+            ('account_id', '=', self.account.id),
+        ], limit=1)
         if not event:
             return {'processed': False, 'reason': 'unknown_event_uuid'}
         return TwitterActivity(self.env).process_event(event)
@@ -188,11 +198,14 @@ class TwitterProvider:
 
         Groups events by conversation to optimize channel lookups and message saves.
         Returns a summary dict with counts of processed/skipped events and messages.
+        Same per-account scoping rule as :meth:`process_webhook_event`.
         """
         if not event_uuids:
             return {'processed': 0, 'skipped': 0, 'messages': 0}
-        events = self.env['x.twitter.event'].sudo().search(
-            [('event_uuid', 'in', event_uuids)])
+        events = self.env['x.twitter.event'].sudo().search([
+            ('event_uuid', 'in', event_uuids),
+            ('account_id', '=', self.account.id),
+        ])
         if not events:
             return {'processed': 0, 'skipped': len(event_uuids), 'messages': 0}
         return TwitterActivity(self.env).process_events_batch(events)

@@ -44,6 +44,7 @@ Highlights:
         'views/x_message_views.xml',
         'views/account_group_views.xml',
         'views/account_task_views.xml',
+        'views/automation_views.xml',
         'views/menus.xml',
     ],
     'external_dependencies': {

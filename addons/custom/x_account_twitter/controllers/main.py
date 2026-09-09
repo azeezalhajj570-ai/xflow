@@ -58,7 +58,7 @@ class XAccountTwitterOAuth2Controller(http.Controller):
     @http.route('/x_account/twitter/oauth2/authorize', type='http', auth='user',
                 methods=['GET'], csrf=False)
     def oauth2_authorize(self, **kwargs):
-        if not request.env.user.has_group('social.group_social_manager'):
+        if not (request.env.user.has_group('social.group_social_manager') or request.env.user.has_group('social.group_social_user')):
             return self._error(_('Unauthorized. Please contact your administrator.'))
 
         media = self._twitter_media()
@@ -87,7 +87,7 @@ class XAccountTwitterOAuth2Controller(http.Controller):
     @http.route('/x_account/twitter/oauth2/callback', type='http', auth='user',
                 methods=['GET'], csrf=False)
     def oauth2_callback(self, state=None, code=None, error=None, **kwargs):
-        if not request.env.user.has_group('social.group_social_manager'):
+        if not (request.env.user.has_group('social.group_social_manager') or request.env.user.has_group('social.group_social_user')):
             return self._error(_('Unauthorized. Please contact your administrator.'))
 
         if error:

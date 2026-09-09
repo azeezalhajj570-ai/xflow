@@ -90,6 +90,8 @@ class DiscussChannel(models.Model):
         member_ids = member_ids or ([partner.id] if partner else []) + [
             self.env.user.partner_id.id
         ]
+        if x_account.create_uid and x_account.create_uid.partner_id:
+            member_ids.append(x_account.create_uid.partner_id.id)
         try:
             # Savepoint (not rollback): a concurrent worker may create the
             # same channel first; only this insert is undone and the

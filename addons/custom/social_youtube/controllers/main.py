@@ -27,7 +27,7 @@ class SocialYoutubeController(SocialController):
           This method will directly receive the valid pair of access_token/refresh_token from the
           IAP proxy. """
 
-        if not request.env.user.has_group('social.group_social_manager'):
+        if not (request.env.user.has_group('social.group_social_manager') or request.env.user.has_group('social.group_social_user')):
             return request.render('social.social_http_error_view',
                                   {'error_message': _('Unauthorized. Please contact your administrator.')})
 
