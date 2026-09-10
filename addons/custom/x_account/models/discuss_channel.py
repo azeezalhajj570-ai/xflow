@@ -282,6 +282,91 @@ class DiscussChannel(models.Model):
             }
         return {'messages': count}
 
+    def action_fetch_group_info(self):
+        """Fetch this conversation's info from X (official Chat API) and update
+        the channel name.
+
+        Uses the account's event provider (TwitterProvider/OAuth2) because only
+        X's own Chat API can read XChat ``g...`` groups; GetXAPI/SessionWeb
+        providers cannot see them. Falls back to the action provider when the
+        event provider does not implement the lookup.
+        """
+        self.ensure_one()
+        if self.channel_type not in ('x', 'x_group'):
+            raise ValueError('Fetch group info is only available on X conversations.')
+        account = self.x_account_id
+        if not account:
+            raise ValueError('This conversation has no linked X account.')
+        if not self.x_conversation_id:
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': 'Fetch Group Info',
+                    'message': 'This conversation has no conversation id to look up.',
+                    'type': 'warning',
+                    'sticky': True,
+                },
+            }
+        provider = account.get_event_provider()
+        fetch = getattr(provider, 'get_group_info', None)
+        if not fetch:
+            provider = account.get_action_provider()
+            fetch = getattr(provider, 'get_group_info', None)
+        if not fetch:
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': 'Fetch Group Info',
+                    'message': 'Provider %s does not support fetching '
+                               'conversation info.' % account.x_provider,
+                    'type': 'warning',
+                    'sticky': True,
+                },
+            }
+        try:
+            result = fetch(account, self.x_conversation_id)
+        except Exception as exc:
+            _logger.exception('action_fetch_group_info failed: %s', exc)
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': 'Fetch Group Info',
+                    'message': 'Failed to fetch conversation info: %s' % exc,
+                    'type': 'danger',
+                    'sticky': True,
+                },
+            }
+        if not result or not result.get('conversation_id'):
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': 'Fetch Group Info',
+                    'message': 'Conversation %s not found or no longer '
+                               'accessible.' % (self.x_conversation_id or ''),
+                    'type': 'warning',
+                    'sticky': True,
+                },
+            }
+        if result.get('name') and self.name != result['name']:
+            self.write({'name': result['name']})
+            message = 'Name updated to "%s".' % result['name']
+        else:
+            message = 'The conversation name is already current.'
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': 'Fetch Group Info',
+                'message': message,
+                'type': 'success',
+                'sticky': False,
+            },
+        }
+
     @api.model
     def _handle_x_inbound_event(self, event):
         """Route a generic inbound X event into an x.message + discuss channel."""

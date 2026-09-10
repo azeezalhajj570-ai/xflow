@@ -19,6 +19,12 @@
         <field name="model">discuss.channel</field>
         <field name="arch" type="xml">
             <form string="Chat" create="false">
+                <header>
+                    <button name="action_fetch_group_info" type="object"
+                        string="Fetch Info" class="btn-primary"
+                        groups="social.group_social_user"
+                        confirm="Fetch this conversation's info from X and update its name?"/>
+                </header>
                 <sheet>
                     <div class="oe_title">
                         <h1><field name="name" placeholder="Chat name (editable)"/></h1>

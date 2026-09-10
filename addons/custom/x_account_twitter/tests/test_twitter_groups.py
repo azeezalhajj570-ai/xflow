@@ -249,6 +249,65 @@ class TestTwitterGroups(XAccountTwitterTestBase):
                               side_effect=error), self.assertRaises(type(error)):
                 account.action_fetch_groups()
 
+    # ------------------------------------------------- get conversation info
+    def test_action_fetch_group_info_updates_group_name(self):
+        account = self._make_account()
+        channel = self.env['discuss.channel'].sudo().create({
+            'name': 'Stale Group Name',
+            'channel_type': 'x_group',
+            'x_account_id': account.id,
+            'x_conversation_id': CHAT_GROUP_ID,
+        })
+        payload = {
+            'data': {'id': CHAT_GROUP_ID, 'type': 'group',
+                     'group_name': 'Design Team',
+                     'member_ids': ['111', '222'], 'admin_ids': ['111'],
+                     'participant_ids': ['111', '222']},
+            'includes': {'users': [
+                {'id': '111', 'name': 'Alice', 'username': 'alice'},
+                {'id': '222', 'name': 'Bob', 'username': 'bob'}]},
+        }
+        with patch.object(TwitterApiClient, 'request', return_value=payload) as mocked:
+            result = channel.action_fetch_group_info()
+        self.assertEqual(mocked.call_args.args[:2],
+                         ('GET', '/2/chat/conversations/%s' % CHAT_GROUP_ID))
+        self.assertEqual(channel.name, 'Design Team')
+        self.assertEqual(result['type'], 'ir.actions.client')
+        self.assertEqual(result['params']['type'], 'success')
+        self.assertIn('Design Team', result['params']['message'])
+
+    def test_action_fetch_group_info_direct_names_from_other_participant(self):
+        account = self._make_account()
+        channel = self.env['discuss.channel'].sudo().create({
+            'name': 'Old Direct Name',
+            'channel_type': 'x',
+            'x_account_id': account.id,
+            'x_conversation_id': DIRECT_ID,
+        })
+        payload = {
+            'data': {'id': DIRECT_ID, 'type': 'direct',
+                     'participant_ids': ['111', '222']},
+            'includes': {'users': [
+                {'id': '111', 'name': 'Alice', 'username': 'alice'},
+                {'id': '222', 'name': 'Bob', 'username': 'bob'}]},
+        }
+        with patch.object(TwitterApiClient, 'request', return_value=payload):
+            channel.action_fetch_group_info()
+        self.assertEqual(channel.name, 'alice, bob')
+
+    def test_action_fetch_group_info_not_found_warns(self):
+        account = self._make_account()
+        channel = self.env['discuss.channel'].sudo().create({
+            'name': 'Kept Name',
+            'channel_type': 'x_group',
+            'x_account_id': account.id,
+            'x_conversation_id': CHAT_GROUP_ID,
+        })
+        with patch.object(TwitterApiClient, 'request', return_value={}):
+            result = channel.action_fetch_group_info()
+        self.assertEqual(channel.name, 'Kept Name')
+        self.assertEqual(result['params']['type'], 'warning')
+
     # ----------------------------------------------------------- messages
     def test_fetch_group_messages_stores_x_messages(self):
         account = self._make_account()

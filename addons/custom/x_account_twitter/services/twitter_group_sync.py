@@ -61,6 +61,89 @@ class TwitterGroupSync:
         self.client = client
 
     # ------------------------------------------------------------------ public
+    def get_conversation_info(self, conversation_id):
+        """Fetch one X conversation via ``GET /2/chat/conversations/{id}``.
+
+        Returns normalized info for naming a channel -- ``{conversation_id,
+        type, channel_type, name, group_name, member_ids, member_names}`` --
+        or ``{}`` when the conversation does not exist / cannot be read.
+        Group names are decrypted when the API returns ciphertext.
+        """
+        if not conversation_id:
+            raise ValueError('conversation_id is required')
+        params = {
+            'chat_conversation.fields':
+                'admin_ids,created_at,group_name,member_ids,participant_ids,type',
+            'expansions': 'admin_ids,member_ids,participant_ids',
+            'user.fields': 'name,username,profile_image_url',
+        }
+        data = self.client.request(
+            'GET', '/2/chat/conversations/%s' % conversation_id, params=params)
+        page = (data or {}).get('data') or {}
+        conv = page if isinstance(page, dict) else {}
+        conv_id = str(conv.get('id') or '').strip()
+        if not conv_id:
+            return {}
+        users = self._users_by_id(data)
+        conv_type = conv.get('type') or (
+            'x_group' if _CHAT_GROUP_ID_RE.match(conv_id) else 'x')
+        if conv_type == 'group':
+            channel_type = 'x_group'
+        elif conv_type == 'direct':
+            channel_type = 'x'
+        else:
+            channel_type = 'x_group' if _CHAT_GROUP_ID_RE.match(conv_id) else 'x'
+
+        member_ids = set()
+        for key in ('member_ids', 'participant_ids', 'admin_ids'):
+            for x_uid in conv.get(key) or []:
+                if x_uid:
+                    member_ids.add(str(x_uid))
+        owner_uid = str(self.client.account.twitter_user_id) \
+            if self.client.account.twitter_user_id else ''
+        if owner_uid:
+            member_ids.add(owner_uid)
+        if channel_type == 'x' and _DIRECT_CONVERSATION_RE.match(conv_id):
+            for half in conv_id.split('-'):
+                if half and half != owner_uid:
+                    member_ids.add(half)
+                    break
+
+        member_names = []
+        for x_uid in sorted(member_ids, key=lambda s: (len(s), s)):
+            user = users.get(x_uid) or {}
+            member_names.append(user.get('username') or user.get('name') or x_uid)
+
+        group_name = self._safe_group_name(conv.get('group_name'))
+        if not group_name and conv.get('group_name'):
+            try:
+                decryptor = self._xchat_decryptor()
+                if decryptor.available:
+                    plain = decryptor.decrypt_metadata(conv.get('group_name'))
+                    group_name = self._safe_group_name(plain)
+            except Exception:
+                _LOGGER.warning(
+                    'Failed to decrypt group_name for conversation %s', conv_id,
+                    exc_info=False)
+        if channel_type == 'x':
+            other_names = [n for uid, n in zip(
+                sorted(member_ids, key=lambda s: (len(s), s)), member_names)
+                if uid != owner_uid]
+            channel_name = group_name or ', '.join(other_names[:4]) or (
+                ', '.join(member_names[:4])) or conv_id
+        else:
+            channel_name = group_name or ', '.join(member_names[:4]) or conv_id
+
+        return {
+            'conversation_id': conv_id,
+            'type': conv_type,
+            'channel_type': channel_type,
+            'name': channel_name,
+            'group_name': group_name,
+            'member_ids': sorted(member_ids, key=lambda s: (len(s), s)),
+            'member_names': member_names,
+        }
+
     def fetch_groups(self, account, limit=100):
         """Fetch the account's X conversations + members and sync them into
         discuss.channel (channel_type 'x_group' / 'x') and res.partner.
