@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!--
+            Generic DM automation: reusable server actions + draft example
+            automation rules for sending a direct message to an X user or an
+            X group conversation.
+
+            The generic actions only ENQUEUE an x.account.task; the "Run Send
+            DM Task" / "Run Send Group DM Task" rules (or the queue cron)
+            perform the actual X HTTP call.
+        -->
+
+        <!-- Generic server action on discuss.channel: send a DM to this
+             conversation (1:1 user or group, decided by channel_type). -->
+        <record id="ir_actions_server_channel_send_dm" model="ir.actions.server">
+            <field name="name">X: Send DM to Conversation</field>
+            <field name="model_id" ref="mail.model_discuss_channel"/>
+            <field name="state">code</field>
+            <field name="code">
+for record in records:
+    record._enqueue_send_dm()
+            </field>
+        </record>
+
+        <!-- Generic server action on x.message: send a DM back to this
+             message's conversation (user or group). -->
+        <record id="ir_actions_server_x_message_send_dm" model="ir.actions.server">
+            <field name="name">X: Send DM Back</field>
+            <field name="model_id" ref="model_x_message"/>
+            <field name="state">code</field>
+            <field name="code">
+for record in records:
+    record._run_channel_send_dm()
+            </field>
+        </record>
+
+        <!-- Draft rule: auto-reply a DM to the 1:1 user conversation when a
+             new inbound message arrives. Filtering (channel type, encrypted,
+             content) can be adjusted in the Automation Rules UI. -->
+        <record id="base_automation_x_dm_auto_reply_user" model="base.automation">
+            <field name="name">X: Auto-reply DM to User</field>
+            <field name="model_id" ref="model_x_message"/>
+            <field name="trigger">on_time_created</field>
+            <field name="trg_date_range">1</field>
+            <field name="trg_date_range_type">minutes</field>
+            <field name="active" eval="False"/>
+            <field name="filter_domain">[('direction', '=', 'inbound'), ('encrypted', '=', False), ('body_plain', '!=', False), ('channel_id.channel_type', '=', 'x')]</field>
+        </record>
+        <record id="ir_actions_server_x_dm_auto_reply_user" model="ir.actions.server">
+            <field name="name">X: Auto-reply DM to User</field>
+            <field name="model_id" ref="model_x_message"/>
+            <field name="state">code</field>
+            <field name="code">
+for record in records:
+    record._run_channel_send_dm(text='Thanks for your message! How can I help you today?')
+            </field>
+            <field name="base_automation_id" ref="base_automation_x_dm_auto_reply_user"/>
+        </record>
+
+        <!-- Draft rule: post a message into the group conversation when a new
+             inbound group message arrives. -->
+        <record id="base_automation_x_dm_auto_reply_group" model="base.automation">
+            <field name="name">X: Auto-reply DM to Group</field>
+            <field name="model_id" ref="model_x_message"/>
+            <field name="trigger">on_time_created</field>
+            <field name="trg_date_range">1</field>
+            <field name="trg_date_range_type">minutes</field>
+            <field name="active" eval="False"/>
+            <field name="filter_domain">[('direction', '=', 'inbound'), ('encrypted', '=', False), ('body_plain', '!=', False), ('channel_id.channel_type', '=', 'x_group')]</field>
+        </record>
+        <record id="ir_actions_server_x_dm_auto_reply_group" model="ir.actions.server">
+            <field name="name">X: Auto-reply DM to Group</field>
+            <field name="model_id" ref="model_x_message"/>
+            <field name="state">code</field>
+            <field name="code">
+for record in records:
+    record._run_channel_send_dm(text='Thanks for the update in our group!')
+            </field>
+            <field name="base_automation_id" ref="base_automation_x_dm_auto_reply_group"/>
+        </record>
+    </data>
+</odoo>

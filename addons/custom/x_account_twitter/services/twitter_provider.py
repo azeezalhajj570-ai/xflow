@@ -157,6 +157,54 @@ class TwitterProvider:
         )
         return twitter_envelope.TwitterEnvelope.follow(data, user_id)
 
+    # ------------------------------------------------------------------- dm
+    def send_dm(self, recipient_id=None, participant_id=None, text=None,
+                **kwargs):
+        """Send a direct message to a user via the X API v2.
+
+        Requires the account's OAuth 2.0 ``dm.write`` scope. ``recipient_id``
+        is the recipient X user id; ``participant_id`` is accepted as an alias
+        for the same value (the API endpoint names it participant_id).
+        Returns the normalized provider result DTO.
+        """
+        user_id = str(recipient_id or participant_id or '').strip()
+        if not user_id:
+            raise ValueError('recipient_id is required')
+        text = (text or '').strip()
+        if not text:
+            raise ValueError('text must be non-empty')
+        envelope = self._client.request(
+            'POST',
+            '/2/dm_conversations/with/%s/messages' % user_id,
+            body={'text': text},
+        )
+        return twitter_envelope.TwitterEnvelope.dm_sent(
+            envelope, user_id, text, 'send_dm')
+
+    def send_group_dm(self, conversation_id=None, dm_conversation_id=None,
+                      text=None, **kwargs):
+        """Send a direct message into an existing group conversation via the
+        X API v2.
+
+        Only the official X API can write into an existing group conversation,
+        so this operation is dispatched to the account's event provider.
+        Requires the account's OAuth 2.0 ``dm.write`` scope. Returns the
+        normalized provider result DTO.
+        """
+        conv_id = str(conversation_id or dm_conversation_id or '').strip()
+        if not conv_id:
+            raise ValueError('conversation_id is required')
+        text = (text or '').strip()
+        if not text:
+            raise ValueError('text must be non-empty')
+        envelope = self._client.request(
+            'POST',
+            '/2/dm_conversations/%s/messages' % conv_id,
+            body={'text': text},
+        )
+        return twitter_envelope.TwitterEnvelope.dm_sent(
+            envelope, conv_id, text, 'send_group_dm')
+
     # --------------------------------------------------------------- groups
     def fetch_groups(self, account, limit=100):
         """Sync the account's X group-DM conversations into discuss channels."""
@@ -440,6 +488,7 @@ class TwitterProvider:
 
     def supported_operations(self):
         return ('validate_session', 'like', 'comment', 'repost', 'follow',
+                'send_dm', 'send_group_dm',
                 'fetch_groups', 'fetch_group_messages', 'get_dms',
                 'process_webhook_event', 'register_webhook',
                 'validate_webhook_registration', 'unsubscribe_all_events',

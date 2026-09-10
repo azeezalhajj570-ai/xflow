@@ -89,3 +89,22 @@ class TwitterEnvelope:
             'username': data.get('username', ''),
             'name': data.get('name', ''),
         }
+
+    @staticmethod
+    def dm_sent(envelope, target, text, operation):
+        """Return the normalized DM-send result DTO.
+
+        X API v2 DM message endpoints return ``{"data": {"dm_conversation_id":
+        ..., "dm_event_id": ...}}``. ``target`` is the participant id for 1:1
+        sends (``with/{participant_id}``) or the conversation id for group
+        sends (``{dm_conversation_id}``).
+        """
+        data = (envelope or {}).get('data') or {}
+        return {
+            'success': bool(data.get('dm_event_id')),
+            'operation': operation,
+            'platform': 'x',
+            'message_id': str(data.get('dm_event_id') or ''),
+            'conversation_id': str(data.get('dm_conversation_id') or target),
+            'text': text,
+        }

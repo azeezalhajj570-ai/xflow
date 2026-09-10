@@ -206,3 +206,12 @@ class XMessage(models.Model):
     def _run_channel_follow(self):
         """Execute follow automation for this message."""
         return self._run_channel_automation('follow')
+
+    def _run_channel_send_dm(self, text=None):
+        """Enqueue a direct-message reply to this message's X conversation.
+
+        Routes to the 1:1 user conversation (``x``) or the group conversation
+        (``x_group``) automatically via ``discuss.channel._enqueue_send_dm``.
+        """
+        self.ensure_one()
+        return self.channel_id._enqueue_send_dm(text=text)

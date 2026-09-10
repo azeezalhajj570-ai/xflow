@@ -6,3 +6,4 @@ from . import test_twitter_provider
 from . import test_twitter_groups
 from . import test_twitter_webhook
 from . import test_xchat_decryptor
+from . import test_twitter_dm

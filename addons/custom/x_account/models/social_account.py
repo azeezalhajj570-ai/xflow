@@ -21,6 +21,7 @@ _EVENT_OPERATIONS = frozenset({
     'register_webhook', 'validate_webhook_registration',
     'unsubscribe_all_events', 'delete_webhook_registration',
     'subscribe_account',
+    'send_group_dm',
 })
 
 _ACTION_OPERATIONS = frozenset({
