@@ -1,5 +1,6 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
+import json
 import logging
 
 from odoo import api, fields, models
@@ -415,5 +416,62 @@ class DiscussChannel(models.Model):
             author_x_id=author_x_id,
             author_x_username=event.get('author_x_username'),
         )
+
+    def _enqueue_send_dm(self, text=None):
+        """Enqueue an X direct-message task for this conversation (user or group).
+
+        Routes by channel_type: 1:1 ``x`` conversations send via the action
+        provider (``send_dm``), ``x_group`` conversations via the event
+        provider (``send_group_dm``, the official X API is the only one that
+        can write into an existing group conversation). Only enqueues an
+        ``x.account.task`` — the task auto-execution rule or the queue worker
+        performs the X HTTP call.
+        """
+        self.ensure_one()
+        if self.channel_type not in ('x', 'x_group'):
+            raise ValueError(
+                'Send DM is only available on X conversations, got %r'
+                % self.channel_type)
+        text = (text or '').strip()
+        if not text:
+            text = ('Thanks for your message!' if self.channel_type == 'x'
+                    else 'Thanks for the update in our group!')
+        account = self.x_account_id
+        if not account or not account.active or account.x_connection_status == 'disabled':
+            raise ValueError(
+                'No valid X account for channel id=%s (account_id=%s)'
+                % (self.id, self.x_account_id.id if self.x_account_id else None))
+        conversation_id = self.x_conversation_id
+        if not conversation_id:
+            raise ValueError(
+                'This X conversation has no conversation id to send to.')
+        if self.channel_type == 'x':
+            recipient_id = self.x_partner_id.x_user_id
+            if not recipient_id:
+                raise ValueError(
+                    'Cannot resolve the recipient X user id for channel id=%s'
+                    % self.id)
+            task_ctx = {
+                'recipient_id': recipient_id,
+                'text': text,
+            }
+            operation = 'send_dm'
+        else:
+            task_ctx = {
+                'conversation_id': conversation_id,
+                'text': text,
+            }
+            operation = 'send_group_dm'
+        task = self.env['x.account.task'].sudo().create({
+            'account_id': account.id,
+            'operation': operation,
+            'priority': 1,
+            'task_context': json.dumps(task_ctx),
+        })
+        _logger.info(
+            'Enqueued DM task id=%s (operation=%s) for channel id=%s, '
+            'conversation_id=%s, account_id=%s',
+            task.id, operation, self.id, conversation_id, account.id)
+        return task
 
 

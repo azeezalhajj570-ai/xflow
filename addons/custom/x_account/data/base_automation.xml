@@ -112,6 +112,23 @@
             <field name="base_automation_id" ref="base_automation_x_task_send_dm"/>
         </record>
 
+        <record id="base_automation_x_task_send_group_dm" model="base.automation">
+            <field name="name">X: Run Send Group DM Task</field>
+            <field name="model_id" ref="model_x_account_task"/>
+            <field name="trigger">on_time_created</field>
+            <field name="trg_date_range">1</field>
+            <field name="trg_date_range_type">minutes</field>
+            <field name="active" eval="True"/>
+            <field name="filter_domain">[('operation', '=', 'send_group_dm'), ('status', '=', 'pending')]</field>
+        </record>
+        <record id="ir_actions_server_x_task_send_group_dm" model="ir.actions.server">
+            <field name="name">X: Task Send Group DM</field>
+            <field name="model_id" ref="model_x_account_task"/>
+            <field name="state">code</field>
+            <field name="code">records._execute_operation(operation='send_group_dm')</field>
+            <field name="base_automation_id" ref="base_automation_x_task_send_group_dm"/>
+        </record>
+
         <record id="base_automation_x_task_bookmark" model="base.automation">
             <field name="name">X: Run Bookmark Task</field>
             <field name="model_id" ref="model_x_account_task"/>
