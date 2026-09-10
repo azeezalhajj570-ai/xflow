@@ -589,16 +589,85 @@ class XChatDecryptor:
         return chat.decrypt_event(raw_event, self._conversation_keys or None,
                                   signing_keys)
 
-    def decrypt_metadata(self, ciphertext):
+    def collect_conversation_keys(self, conversation_id, key_change_events):
+        """Recover conversation keys from raw key-change events and cache them.
+
+        Stores ``{conversation_id: {public_key_version: base64 key}}`` on the
+        account's ``x_chat_conversation_keys`` so group metadata/messages can
+        be decrypted later without re-scanning the events feed. Returns the
+        merged per-version cache dict for this conversation (may be partially
+        populated on per-event failures).
+        """
+        merged = {}
+        try:
+            chat = self._chat_instance()
+            extracted = chat.extract_conversation_keys(list(key_change_events or []))
+            extracted_keys = (extracted or {}).get('keys') or {}
+            cached = {}
+            try:
+                cached = (self.account.x_chat_conversation_keys or {}).get(
+                    str(conversation_id)) or {}
+            except Exception:
+                cached = {}
+            for version, key in extracted_keys.items():
+                if isinstance(key, (bytes, bytearray)):
+                    encoded = base64.b64encode(bytes(key)).decode()
+                else:
+                    encoded = str(key)
+                cached[str(version)] = encoded
+            account_cache = dict(self.account.x_chat_conversation_keys or {})
+            account_cache[str(conversation_id)] = cached
+            self.account.sudo().write({'x_chat_conversation_keys': account_cache})
+            merged = cached
+        except Exception as exc:
+            _LOGGER.warning(
+                'Failed to cache conversation keys for %s: %s',
+                conversation_id, str(exc)[:200], exc_info=False)
+        return merged
+
+    def _conversation_key_material(self, cached_keys=None):
+        """Yield (version, bytes) key material from a cached-keys dict."""
+        for version, encoded in (cached_keys or {}).items():
+            try:
+                yield str(version), base64.b64decode(str(encoded))
+            except Exception:
+                continue
+
+    def decrypt_metadata(self, ciphertext, key_change_events=None,
+                         cached_keys=None):
         """Decrypt an encrypted conversation metadata field (e.g. group_name).
 
-        Uses the Chat XDK's generic ``decrypt`` with the raw conversation key.
+        The Chat XDK's ``decrypt`` needs the conversation key. ``cached_keys``
+        (recovered earlier via ``collect_conversation_keys``) are tried first;
+        otherwise ``key_change_events`` (the ``meta.conversation_key_events``
+        from the Chat events API) are fed to ``extract_conversation_keys``.
+        Every recovered key version is tried so groups whose key rotated still
+        decrypt. Falls back to a bare ``decrypt(ciphertext, None)`` when no key
+        material is given (best effort).
+
         Returns the plaintext string, or None if it cannot be decrypted.
         """
         if not ciphertext:
             return None
         try:
             chat = self._chat_instance()
+            keys = dict(self._conversation_key_material(cached_keys))
+            if key_change_events:
+                extracted = chat.extract_conversation_keys(list(key_change_events))
+                if isinstance(extracted, dict):
+                    for version, key in (extracted.get('keys') or {}).items():
+                        if isinstance(key, (bytes, bytearray)):
+                            keys[str(version)] = bytes(key)
+            if keys:
+                for key in keys.values():
+                    try:
+                        raw = chat.decrypt(ciphertext, key)
+                        if isinstance(raw, (bytes, bytearray)):
+                            raw = raw.decode('utf-8', errors='replace')
+                        return raw
+                    except Exception:
+                        continue
+                return None
             raw = chat.decrypt(ciphertext, None)
             if isinstance(raw, (bytes, bytearray)):
                 raw = raw.decode('utf-8', errors='replace')

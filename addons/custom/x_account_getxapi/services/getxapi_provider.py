@@ -136,7 +136,9 @@ class GetXAPIProvider:
 
     def get_dms(self, conversation_id, limit=100, cursor=None):
         """Return normalized messages for one conversation."""
-        return self._dms.list(conversation_id=conversation_id)
+        return self._dms.conversation(
+            conversation_id, auth_token=self._auth_token,
+            count=limit, cursor=cursor)
 
     def send_dm(self, recipient_id, text):
         """Send a direct message via GetXAPI."""
@@ -144,7 +146,7 @@ class GetXAPIProvider:
 
     def fetch_groups(self, account, limit=100):
         """Fetch group-DM conversations and sync them into discuss channels."""
-        result = self._dms.list(limit=limit)
+        result = self._dms.list(auth_token=self._auth_token, count=limit)
         conversations = result.get('conversations', [])
         groups = [c for c in conversations if c.get('group')]
         channel_model = self.env['discuss.channel'].sudo()
@@ -185,6 +187,72 @@ class GetXAPIProvider:
         return {'groups': len(groups), 'created': created, 'updated': updated,
                 'members': members}
 
+    @staticmethod
+    def _chat_name_from_conversation(conv, my_user_id=''):
+        """Derive a human name for one GetXAPI conversation entry."""
+        participants = conv.get('participants') or []
+
+        def _label(p):
+            return str(p.get('userName') or p.get('username')
+                       or p.get('name') or '')
+
+        is_group = bool(conv.get('group')) or conv.get('type') == 'group'
+        if is_group:
+            name = conv.get('name') or ''
+            if name:
+                return name, 'x_group'
+            names = [_label(p) for p in participants
+                     if _label(p) and str(p.get('id')) != str(my_user_id)]
+            return ', '.join(names[:4]), 'x_group'
+        for p in participants:
+            if str(p.get('id')) != str(my_user_id) and _label(p):
+                return _label(p), 'x'
+        return '', 'x'
+
+    def sync_chat_names(self, account, limit=200):
+        """Refresh the names of existing X chat channels from GetXAPI.
+
+        Lists DM/group conversations (cursor-paginated, max 5 pages) and only
+        updates discuss channels that already exist for this account; missing
+        channels are counted, never created. Returns conversation counts.
+        """
+        channel_model = self.env['discuss.channel'].sudo()
+        if not self._auth_token:
+            raise ValueError(
+                'Set the GetXAPI Auth Token on this account first — the '
+                'inbox list requires it.')
+        my_user_id = str(getattr(account, 'twitter_user_id', '') or '')
+        updated = unchanged = missing = seen = 0
+        cursor = None
+        for _page in range(10):  # ~50 conversations per page, max 10 pages
+            result = self._dms.list(
+                auth_token=self._auth_token, count=limit, cursor=cursor)
+            conversations = result.get('conversations', [])
+            seen += len(conversations)
+            for conv in conversations:
+                conv_id = conv.get('conversation_id')
+                if not conv_id:
+                    continue
+                name, _ctype = self._chat_name_from_conversation(conv, my_user_id)
+                channel = channel_model.search([
+                    ('x_account_id', '=', account.id),
+                    ('x_conversation_id', '=', str(conv_id)),
+                    ('channel_type', 'in', ('x', 'x_group')),
+                ], limit=1)
+                if not channel:
+                    missing += 1
+                    continue
+                if name and channel.name != name:
+                    channel.write({'name': name})
+                    updated += 1
+                else:
+                    unchanged += 1
+            cursor = result.get('cursor')
+            if not cursor or not result.get('has_more', bool(cursor)):
+                break
+        return {'conversations': seen, 'updated': updated,
+                'unchanged': unchanged, 'missing': missing}
+
     def fetch_group_messages(self, account, limit=100):
         """Fetch messages from X group-DM conversations and store them."""
         channels = self.env['discuss.channel'].sudo().search([
@@ -221,7 +289,8 @@ class GetXAPIProvider:
 
     def get_conversations(self, limit=50, cursor=None):
         """Return DM conversations."""
-        return self._dms.list(limit=limit)
+        return self._dms.list(
+            auth_token=self._auth_token, count=limit, cursor=cursor)
 
     def supported_operations(self):
         """Operations this provider supports for the task queue."""
@@ -229,7 +298,7 @@ class GetXAPIProvider:
             'validate_session', 'like', 'comment', 'repost', 'follow',
             'bookmark', 'unbookmark',
             'post_tweet', 'get_dms', 'send_dm', 'fetch_groups',
-            'fetch_group_messages',
+            'fetch_group_messages', 'sync_chat_names',
         )
 
     @staticmethod

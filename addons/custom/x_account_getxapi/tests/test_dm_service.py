@@ -36,27 +36,34 @@ class TestGetXAPIDMService(XAccountGetXAPITestBase):
             self.service.send('9', '')
 
     def test_list_conversations(self):
-        with patch.object(GetXAPIClient, 'get', return_value={
-            'data': {
-                'conversations': [
-                    {'conversation_id': 'conv-1', 'type': 'one_to_one'},
-                ],
-            }
+        with patch.object(GetXAPIClient, 'post', return_value={
+            'conversations': [
+                {'conversation_id': 'conv-1', 'type': 'ONE_TO_ONE',
+                 'participants': [{'id': '9', 'screen_name': 'peer'}]},
+            ],
+            'next_cursor': 'c2', 'has_more': True,
         }) as mocked:
-            result = self.service.list()
+            result = self.service.list(auth_token='tok')
         self.assertEqual(len(result['conversations']), 1)
         self.assertEqual(result['conversations'][0]['conversation_id'], 'conv-1')
+        self.assertEqual(result['cursor'], 'c2')
+        self.assertTrue(result['has_more'])
+        body = mocked.call_args.kwargs['json']
+        self.assertEqual(body['auth_token'], 'tok')
 
-    def test_list_messages(self):
+    def test_list_conversations_requires_auth_token(self):
+        with self.assertRaises(ValueError):
+            self.service.list()
+
+    def test_conversation_messages(self):
         with patch.object(GetXAPIClient, 'post', return_value={
-            'data': {
-                'messages': [
-                    {'id': 'm1', 'text': 'hello', 'sender_id': '9'},
-                ],
-            }
+            'messages': [
+                {'id': 'm1', 'text': 'hello', 'sender_id': '9'},
+            ],
         }) as mocked:
-            result = self.service.list(conversation_id='conv-1')
+            result = self.service.conversation('conv-1', auth_token='tok')
         self.assertEqual(len(result['messages']), 1)
         self.assertEqual(result['messages'][0]['id'], 'm1')
+        self.assertEqual(mocked.call_args.args[0], '/twitter/dm/conversation')
         body = mocked.call_args.kwargs['json']
         self.assertEqual(body['conversation_id'], 'conv-1')

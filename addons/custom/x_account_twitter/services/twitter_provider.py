@@ -170,6 +170,10 @@ class TwitterProvider:
         """Return normalized messages for one conversation (1:1 or group)."""
         return self._group_sync.get_dms(conversation_id, limit=limit)
 
+    def get_group_info(self, account, conversation_id):
+        """Fetch one X conversation's info (name/members) via the Chat API."""
+        return self._group_sync.get_conversation_info(conversation_id)
+
     # -------------------------------------------------------------- webhooks
     def process_webhook_event(self, event_uuid=None, **kwargs):
         """Task-queue entry point: process one queued x.twitter.event.
