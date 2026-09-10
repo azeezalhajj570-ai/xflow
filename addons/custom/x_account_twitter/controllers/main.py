@@ -145,4 +145,4 @@ class XAccountTwitterOAuth2Controller(http.Controller):
             return self._error(str(exc))
 
         return request.redirect(
-            '/web#id=%d&model=social.account&view_type=form' % account.id)
+            '/odoo/action-x_account.action_x_account_social_accounts')
