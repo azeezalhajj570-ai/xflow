@@ -20,8 +20,10 @@ class GetXAPIUsage(models.Model):
         'social.account',
         string='X Account',
         index=True,
-        ondelete='set null',
-        help='The X account that triggered this API call.',
+        ondelete='restrict',
+        help='The X account that triggered this API call. Cannot be deleted '
+             'while usage records reference it so spend never loses '
+             'ownership; archive accounts instead of deleting them.',
     )
     company_id = fields.Many2one(
         'res.company',
