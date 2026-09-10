@@ -61,6 +61,34 @@ class TwitterGroupSync:
         self.client = client
 
     # ------------------------------------------------------------------ public
+    def _fetch_conversation_key_events(self, conversation_id,
+                                       max_pages=10, per_page=50):
+        """Collect ``meta.conversation_key_events`` for one conversation.
+
+        The group-name ciphertext decrypts only with the conversation key
+        recovered from these key-change events. A single events page carries
+        only the current rotation's key-change events, so keep paginating
+        (capped) to gather every key version the SDK can try.
+        """
+        key_events = []
+        pagination_token = None
+        for _ in range(int(max_pages)):
+            params = {
+                'chat_event.fields': 'id',
+                'max_results': min(int(per_page), 100),
+            }
+            if pagination_token:
+                params['pagination_token'] = pagination_token
+            data = self.client.request(
+                'GET', '/2/chat/conversations/%s/events' % conversation_id,
+                params=params)
+            meta = (data or {}).get('meta') or {}
+            key_events.extend(meta.get('conversation_key_events') or [])
+            pagination_token = meta.get('next_token')
+            if not pagination_token:
+                break
+        return key_events
+
     def get_conversation_info(self, conversation_id):
         """Fetch one X conversation via ``GET /2/chat/conversations/{id}``.
 
@@ -115,12 +143,16 @@ class TwitterGroupSync:
             member_names.append(user.get('username') or user.get('name') or x_uid)
 
         group_name = self._safe_group_name(conv.get('group_name'))
-        if not group_name and conv.get('group_name'):
+        if not group_name and conv.get('group_name') and channel_type == 'x_group':
             try:
                 decryptor = self._xchat_decryptor()
                 if decryptor.available:
-                    plain = decryptor.decrypt_metadata(conv.get('group_name'))
-                    group_name = self._safe_group_name(plain)
+                    key_events = self._fetch_conversation_key_events(conv_id)
+                    if key_events:
+                        plain = decryptor.decrypt_metadata(
+                            conv.get('group_name'),
+                            key_change_events=key_events)
+                        group_name = self._safe_group_name(plain)
             except Exception:
                 _LOGGER.warning(
                     'Failed to decrypt group_name for conversation %s', conv_id,

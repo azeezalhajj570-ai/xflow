@@ -589,16 +589,36 @@ class XChatDecryptor:
         return chat.decrypt_event(raw_event, self._conversation_keys or None,
                                   signing_keys)
 
-    def decrypt_metadata(self, ciphertext):
+    def decrypt_metadata(self, ciphertext, key_change_events=None):
         """Decrypt an encrypted conversation metadata field (e.g. group_name).
 
-        Uses the Chat XDK's generic ``decrypt`` with the raw conversation key.
+        The Chat XDK's ``decrypt`` needs the conversation key; pass it via
+        ``key_change_events`` (the ``meta.conversation_key_events`` from the
+        Chat events API), recovered with ``extract_conversation_keys``. Every
+        recovered key version is tried so groups whose key rotated still
+        decrypt. Falls back to a bare ``decrypt(ciphertext, None)`` when no key
+        events are given (best effort).
+
         Returns the plaintext string, or None if it cannot be decrypted.
         """
         if not ciphertext:
             return None
         try:
             chat = self._chat_instance()
+            if key_change_events:
+                extracted = chat.extract_conversation_keys(list(key_change_events))
+                keys = {}
+                if isinstance(extracted, dict):
+                    keys = extracted.get('keys') or {}
+                for key in keys.values():
+                    try:
+                        raw = chat.decrypt(ciphertext, key)
+                        if isinstance(raw, (bytes, bytearray)):
+                            raw = raw.decode('utf-8', errors='replace')
+                        return raw
+                    except Exception:
+                        continue
+                return None
             raw = chat.decrypt(ciphertext, None)
             if isinstance(raw, (bytes, bytearray)):
                 raw = raw.decode('utf-8', errors='replace')

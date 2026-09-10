@@ -308,6 +308,47 @@ class TestTwitterGroups(XAccountTwitterTestBase):
         self.assertEqual(channel.name, 'Kept Name')
         self.assertEqual(result['params']['type'], 'warning')
 
+    def test_action_fetch_group_info_decrypts_group_name_via_key_events(self):
+        """Encrypted group_name needs the conversation key recovered from the
+        events API's ``meta.conversation_key_events``; without it the channel
+        would fall back to member names."""
+        account = self._make_account()
+        account.write({'x_chat_key_blob': 'fake-blob',
+                       'x_chat_signing_key_version': '1',
+                       'x_chat_key_mode': 'key_blob'})
+        channel = self.env['discuss.channel'].sudo().create({
+            'name': 'Members-only Name',
+            'channel_type': 'x_group',
+            'x_account_id': account.id,
+            'x_conversation_id': CHAT_GROUP_ID,
+        })
+        cipher = 'A' * 88  # long base64-like ciphertext rejected by _safe_group_name
+        conv_page = {
+            'data': {'id': CHAT_GROUP_ID, 'type': 'group',
+                     'group_name': cipher, 'member_ids': ['111'],
+                     'participant_ids': ['111'], 'admin_ids': ['111']},
+            'includes': {'users': [
+                {'id': '111', 'name': 'Alice', 'username': 'alice'}]},
+        }
+        events_page = {
+            'data': [],
+            'meta': {'conversation_key_events': ['kce-1'], 'has_more': False},
+        }
+        fake_chat = MagicMock()
+        fake_chat.extract_conversation_keys.return_value = {
+            'keys': {'1788994678330': b'k' * 32}}
+        fake_chat.decrypt.return_value = 'Design Team'
+
+        def _request(method, url, **kwargs):
+            return events_page if url.endswith('/events') else conv_page
+
+        with patch.object(TwitterApiClient, 'request', side_effect=_request), \
+             patch('chat_xdk.Chat', return_value=fake_chat):
+            result = channel.action_fetch_group_info()
+        self.assertEqual(channel.name, 'Design Team')
+        self.assertEqual(result['params']['type'], 'success')
+        self.assertIn('Design Team', result['params']['message'])
+
     # ----------------------------------------------------------- messages
     def test_fetch_group_messages_stores_x_messages(self):
         account = self._make_account()
