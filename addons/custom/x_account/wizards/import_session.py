@@ -101,4 +101,6 @@ class XImportSession(models.TransientModel):
             'res_id': account.id,
             'target': 'main',
             'name': account.name,
+            'view_id': self.env.ref(
+                'x_account.x_account_social_account_view_form_standalone').id,
         }
