@@ -35,18 +35,37 @@ class GetXAPIDMService:
             'created_at': result.get('created_at') or '',
         }
 
-    def list(self, conversation_id=None, **params):
-        """List DM conversations or messages in a conversation.
+    def list(self, auth_token=None, cursor=None, count=50, tab=None, **params):
+        """List the auth_token holder's DM inbox conversations.
 
-        :param conversation_id: If provided, list messages in this conversation.
-            If omitted, list conversations.
-        :returns: {conversations/messages: [...], cursor}
+        GetXAPI exposes the inbox as POST /twitter/dm/list (GET 404s);
+        ``auth_token`` is required.
         """
-        if conversation_id:
-            body = {'conversation_id': str(conversation_id)}
-            body.update(params)
-            data = self._client.post('/twitter/dm/list', json=body)
-            return getxapi_envelope.GetXAPIEnvelopeParser.dm_messages(
-                data, conversation_id)
-        data = self._client.get('/twitter/dm/list', params=params or None)
-        return getxapi_envelope.GetXAPIEnvelopeParser.dm_conversations(data)
+        if not auth_token:
+            raise ValueError('auth_token is required to list DM conversations')
+        body = {'auth_token': auth_token, 'count': min(int(count or 50), 50)}
+        if cursor:
+            body['cursor'] = cursor
+        if tab:
+            body['tab'] = tab
+        body.update(params)
+        data = self._client.post('/twitter/dm/list', json=body)
+        return getxapi_envelope.GetXAPIEnvelopeParser.dm_conversations(
+            data, limit=count)
+
+    def conversation(self, conversation_id, auth_token=None, cursor=None,
+                     count=100, **params):
+        """List messages in one conversation via POST /twitter/dm/conversation."""
+        if not conversation_id:
+            raise ValueError('conversation_id is required')
+        if not auth_token:
+            raise ValueError('auth_token is required to list DM messages')
+        body = {'auth_token': auth_token,
+                'conversation_id': str(conversation_id),
+                'count': min(int(count or 100), 50)}
+        if cursor:
+            body['cursor'] = cursor
+        body.update(params)
+        data = self._client.post('/twitter/dm/conversation', json=body)
+        return getxapi_envelope.GetXAPIEnvelopeParser.dm_messages(
+            data, conversation_id, limit=count)

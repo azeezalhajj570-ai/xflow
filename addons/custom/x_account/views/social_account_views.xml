@@ -49,7 +49,12 @@
                         invisible="(not x_action_provider and not x_provider) or not twitter_user_id"/>
                     <button name="action_resubscribe_x_subscriptions" type="object"
                         string="Resubscribe"
+                        invisible="(not x_action_provider and not x_provider) or not twitter_user_id"/>
+                    <button name="action_sync_chat_names" type="object"
+                        string="Sync Chat Names"
                         class="btn-secondary"
+                        groups="social.group_social_user"
+                        confirm="Sync chat names from GetXAPI into existing channels?"
                         invisible="(not x_action_provider and not x_provider) or not twitter_user_id"/>
                 </header>
                 <sheet>

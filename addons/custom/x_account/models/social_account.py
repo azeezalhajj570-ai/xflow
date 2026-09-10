@@ -370,6 +370,40 @@ class SocialAccount(models.Model):
             }
         return result
 
+    def action_sync_chat_names(self):
+        """Refresh names of existing X chat channels via the account's provider.
+
+        Uses the action provider (e.g. GetXAPI) to list the account's DM and
+        group conversations and update the ``name`` of the discuss channels
+        that already exist for them. Channels for unseen conversations are
+        not created here — use Fetch Groups for that.
+        """
+        self.ensure_one()
+        if not self._filter_x_accounts():
+            raise ValueError('Chat name sync is only available on X accounts.')
+        provider = self.get_action_provider()
+        sync = getattr(provider, 'sync_chat_names', None)
+        if not sync:
+            return self._display_notification(
+                'Sync Chat Names',
+                'Provider %s does not support syncing chat names'
+                % self.x_provider, kind='warning')
+        try:
+            result = sync(self, limit=200)
+        except Exception as exc:
+            _logger.exception(
+                'action_sync_chat_names failed for account %s', self.id)
+            return self._display_notification(
+                'Sync Chat Names', 'Sync failed: %s' % exc, kind='danger')
+        kind = 'success' if (result.get('updated') or result.get('unchanged')) \
+            else 'warning'
+        return self._display_notification(
+            'Sync Chat Names',
+            'Conversations: %s, updated: %s, unchanged: %s, no channel: %s' % (
+                result.get('conversations', 0), result.get('updated', 0),
+                result.get('unchanged', 0), result.get('missing', 0)),
+            kind=kind)
+
     def action_initialize_x_chat_encryption(self):
         """Initialize the account's XChat encryption via its provider.
 

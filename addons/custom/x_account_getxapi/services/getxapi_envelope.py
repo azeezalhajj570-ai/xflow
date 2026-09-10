@@ -143,7 +143,13 @@ class GetXAPIEnvelopeParser:
 
     @staticmethod
     def dm_conversations(envelope, limit=50):
-        """Return {conversations: [...], cursor} from a DM list envelope."""
+        """Return {conversations: [...], cursor, has_more} from a DM list envelope.
+
+        GetXAPI's POST /twitter/dm/list answers with a flat body (no ``data``
+        wrapper): ``type`` is ``ONE_TO_ONE`` or ``GROUP_DM`` and participant
+        profiles carry ``screen_name`` rather than ``userName``. Normalize both
+        spellings so provider code stays endpoint-agnostic.
+        """
         data = (envelope or {}).get('data') or envelope or {}
         conversations = data.get('conversations') or data.get('entries') or []
         if isinstance(conversations, dict):
@@ -156,11 +162,17 @@ class GetXAPIEnvelopeParser:
                         or conv.get('id')
                         or conv.get('conversationId')
                     ),
-                    'type': conv.get('type', 'one_to_one'),
-                    'participants': conv.get('participants') or [],
+                    'type': conv.get('type', 'ONE_TO_ONE'),
+                    'participants': [
+                        dict(p, userName=p.get('userName') or p.get('screen_name')
+                             or p.get('username') or '')
+                        for p in (conv.get('participants') or [])
+                    ],
                     'participant_count': conv.get('participant_count', 0),
+                    'name': conv.get('name') or conv.get('title') or '',
                     'last_message': conv.get('last_message'),
-                    'group': conv.get('type') == 'group',
+                    'group': str(conv.get('type', '')).upper() not in (
+                        '', 'ONE_TO_ONE', 'ONE_TO_ONE_DM'),
                 }
                 for conv in conversations[:limit]
             ],
@@ -172,6 +184,7 @@ class GetXAPIEnvelopeParser:
             ) if isinstance(data.get('next_cursor'), dict) else (
                 data.get('next_cursor') or data.get('cursor') or ''
             ),
+            'has_more': bool(data.get('has_more')),
         }
 
     @staticmethod

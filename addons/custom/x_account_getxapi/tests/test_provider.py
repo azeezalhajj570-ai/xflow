@@ -6,6 +6,7 @@ from odoo.addons.x_account.services.x_provider import XProviderRegistry
 from odoo.addons.x_account.services.x_service import XService
 
 from odoo.addons.x_account_getxapi.services.getxapi_client import GetXAPIClient
+from odoo.addons.x_account_getxapi.services.getxapi_dm_service import GetXAPIDMService
 from odoo.addons.x_account_getxapi.services.getxapi_provider import GetXAPIProvider
 
 from .common import XAccountGetXAPITestBase
@@ -17,6 +18,10 @@ class TestGetXAPIProvider(XAccountGetXAPITestBase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
+        # x_provider is a compute backed by the ir.config_parameter default,
+        # so XService.get_provider only resolves GetXAPI while the param is set.
+        cls.env['ir.config_parameter'].sudo().set_param(
+            'x_account.provider', 'getxapi')
         cls.account = cls.env['social.account'].create({
             'name': 'GetXAPI Account',
             'media_id': cls.twitter_media.id,
@@ -114,3 +119,84 @@ class TestGetXAPIProvider(XAccountGetXAPITestBase):
             result = XService.validate(self.account)
         self.assertTrue(result['valid'])
         self.assertEqual(self.account.x_connection_status, 'active')
+
+
+@tagged('post_install', '-at_install', 'x_account_getxapi')
+class TestSyncChatNames(XAccountGetXAPITestBase):
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.account = cls.env['social.account'].create({
+            'name': 'GetXAPI Names Account',
+            'media_id': cls.twitter_media.id,
+            'social_account_handle': 'getxapi_names',
+            'twitter_user_id': '12345',
+            'x_provider': 'getxapi',
+            'x_getxapi_auth_token': 'test_auth_token',
+            'x_auth_method': 'session_cookie',
+        })
+        cls.provider = GetXAPIProvider(cls.env, cls.account)
+
+    def _conv(self, conv_id, ctype='group', name='', participants=None):
+        return {
+            'conversation_id': conv_id,
+            'type': ctype,
+            'group': ctype == 'group',
+            'name': name,
+            'participants': participants if participants is not None else [
+                {'id': '12345', 'userName': 'getxapi_names'},
+                {'id': '999', 'userName': 'peer_user'},
+            ],
+            'cursor': '',
+        }
+
+    def test_sync_updates_existing_group_channel_name(self):
+        channel = self.env['discuss.channel'].sudo()._get_x_channel(
+            self.account, conversation_id='c1', channel_type='x_group',
+            create_if_not_found=True)
+        self.assertEqual(channel.name, 'c1')
+        conversations = [self._conv('c1', name='Team Chat')]
+        with patch.object(GetXAPIDMService, 'list', return_value={
+                'conversations': conversations, 'cursor': ''}):
+            result = self.provider.sync_chat_names(self.account)
+        self.assertEqual(result['updated'], 1)
+        self.assertEqual(result['missing'], 0)
+        self.assertEqual(channel.name, 'Team Chat')
+
+    def test_sync_skips_channels_that_do_not_exist(self):
+        with patch.object(GetXAPIDMService, 'list', return_value={
+                'conversations': [self._conv('ghost', name='Ghost Chat')],
+                'cursor': ''}):
+            result = self.provider.sync_chat_names(self.account)
+        self.assertEqual(result['missing'], 1)
+        self.assertEqual(result['updated'], 0)
+        self.assertFalse(self.env['discuss.channel'].sudo().search_count([
+            ('x_conversation_id', '=', 'ghost')]))
+
+    def test_sync_one_to_one_uses_peer_handle(self):
+        channel = self.env['discuss.channel'].sudo()._get_x_channel(
+            self.account, conversation_id='c2', channel_type='x',
+            create_if_not_found=True)
+        with patch.object(GetXAPIDMService, 'list', return_value={
+                'conversations': [self._conv('c2', ctype='one_to_one')],
+                'cursor': ''}):
+            result = self.provider.sync_chat_names(self.account)
+        self.assertEqual(result['updated'], 1)
+        self.assertEqual(channel.name, 'peer_user')
+
+    def test_sync_counts_unchanged_and_paginates_cursor(self):
+        ch = self.env['discuss.channel'].sudo()._get_x_channel(
+            self.account, conversation_id='c3', channel_type='x_group',
+            create_if_not_found=True)
+        ch.write({'name': 'Team Chat'})
+        with patch.object(GetXAPIDMService, 'list', side_effect=[
+                {'conversations': [self._conv('c3', name='Team Chat')],
+                 'cursor': 'next1'},
+                {'conversations': [self._conv('c4', name='Other Chat')],
+                 'cursor': ''},
+        ]) as lst:
+            result = self.provider.sync_chat_names(self.account)
+        self.assertEqual(lst.call_args_list[1].kwargs.get('cursor'), 'next1')
+        self.assertEqual(result['conversations'], 2)
+        self.assertEqual(result['unchanged'], 1)
