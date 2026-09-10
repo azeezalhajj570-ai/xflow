@@ -51,6 +51,8 @@ _DM_EVENT_FIELDS = (
 _CHAT_EVENT_FIELDS = (
     'created_at,encoded_event,event_type,id,participant_ids,sender_id,text'
 )
+# A base64 blob long enough to be real key material (32 bytes + tag).
+_BASE64_BLOB_RE = re.compile(r'^[A-Za-z0-9+/]+={0,2}$')
 
 
 class TwitterGroupSync:
@@ -61,33 +63,75 @@ class TwitterGroupSync:
         self.client = client
 
     # ------------------------------------------------------------------ public
-    def _fetch_conversation_key_events(self, conversation_id,
-                                       max_pages=10, per_page=50):
-        """Collect ``meta.conversation_key_events`` for one conversation.
+    def _decrypt_conversation_group_name(self, conv_id, ciphertext):
+        """Decrypt an encrypted ``group_name`` for one conversation.
 
-        The group-name ciphertext decrypts only with the conversation key
-        recovered from these key-change events. A single events page carries
-        only the current rotation's key-change events, so keep paginating
-        (capped) to gather every key version the SDK can try.
+        Uses conversation keys cached on the account first (zero API calls);
+        otherwise scans the Chat events feed newest-first, recovering keys from
+        ``meta.conversation_key_events``, and stops as soon as a recovered key
+        decrypts the ciphertext (capped to bound cost / rate usage).
+
+        Returns the plaintext group name, or '' when it cannot be decrypted.
         """
-        key_events = []
-        pagination_token = None
-        for _ in range(int(max_pages)):
-            params = {
-                'chat_event.fields': 'id',
-                'max_results': min(int(per_page), 100),
-            }
-            if pagination_token:
-                params['pagination_token'] = pagination_token
-            data = self.client.request(
-                'GET', '/2/chat/conversations/%s/events' % conversation_id,
-                params=params)
+        try:
+            decryptor = self._xchat_decryptor()
+        except Exception:
+            return ''
+        if not decryptor.available:
+            return ''
+        account = self.client.account
+        cached = {}
+        try:
+            cached = (account.x_chat_conversation_keys or {}).get(
+                str(conv_id)) or {}
+        except Exception:
+            cached = {}
+        plain = decryptor.decrypt_metadata(ciphertext, cached_keys=cached)
+        if plain:
+            return self._safe_group_name(plain)
+        token = None
+        consecutive_throttle = 0
+        for _ in range(60):
+            params = {'chat_event.fields': 'id', 'max_results': 100}
+            if token:
+                params['pagination_token'] = token
+            try:
+                data = self.client.request(
+                    'GET', '/2/chat/conversations/%s/events' % conv_id,
+                    params=params)
+                consecutive_throttle = 0
+            except TwitterError as exc:
+                if not getattr(exc, 'retryable', False):
+                    raise
+                consecutive_throttle += 1
+                if consecutive_throttle > 4:
+                    _LOGGER.warning(
+                        'Chat events scan for %s stayed throttled; giving up '
+                        'name decrypt', conv_id)
+                    return ''
+                _LOGGER.warning(
+                    'Chat events scan throttled for %s on decrypt (%s); '
+                    'backing off', conv_id, exc.message)
+                self.client._sleep(3)
+                continue
             meta = (data or {}).get('meta') or {}
-            key_events.extend(meta.get('conversation_key_events') or [])
-            pagination_token = meta.get('next_token')
-            if not pagination_token:
+            key_events = meta.get('conversation_key_events') or []
+            if key_events:
+                collected = {}
+                try:
+                    collected = decryptor.collect_conversation_keys(
+                        conv_id, key_events)
+                except Exception:
+                    collected = {}
+                cached.update(collected or {})
+                plain = decryptor.decrypt_metadata(
+                    ciphertext, cached_keys=cached)
+                if plain:
+                    return self._safe_group_name(plain)
+            token = meta.get('next_token')
+            if not token:
                 break
-        return key_events
+        return ''
 
     def get_conversation_info(self, conversation_id):
         """Fetch one X conversation via ``GET /2/chat/conversations/{id}``.
@@ -143,30 +187,26 @@ class TwitterGroupSync:
             member_names.append(user.get('username') or user.get('name') or x_uid)
 
         group_name = self._safe_group_name(conv.get('group_name'))
-        if not group_name and conv.get('group_name') and channel_type == 'x_group':
-            try:
-                decryptor = self._xchat_decryptor()
-                if decryptor.available:
-                    key_events = self._fetch_conversation_key_events(conv_id)
-                    if key_events:
-                        plain = decryptor.decrypt_metadata(
-                            conv.get('group_name'),
-                            key_change_events=key_events)
-                        group_name = self._safe_group_name(plain)
-            except Exception:
-                _LOGGER.warning(
-                    'Failed to decrypt group_name for conversation %s', conv_id,
-                    exc_info=False)
+        undecrypted = bool(conv.get('group_name')) and not group_name \
+            and channel_type == 'x_group'
+        if undecrypted:
+            group_name = self._decrypt_conversation_group_name(
+                conv_id, conv.get('group_name'))
+            undecrypted = not group_name
         if channel_type == 'x':
             other_names = [n for uid, n in zip(
                 sorted(member_ids, key=lambda s: (len(s), s)), member_names)
                 if uid != owner_uid]
             channel_name = group_name or ', '.join(other_names[:4]) or (
                 ', '.join(member_names[:4])) or conv_id
+        elif undecrypted:
+            # Never replace a real channel name with a member list when the
+            # ciphertext simply could not be decrypted.
+            channel_name = ''
         else:
             channel_name = group_name or ', '.join(member_names[:4]) or conv_id
 
-        return {
+        result = {
             'conversation_id': conv_id,
             'type': conv_type,
             'channel_type': channel_type,
@@ -175,6 +215,9 @@ class TwitterGroupSync:
             'member_ids': sorted(member_ids, key=lambda s: (len(s), s)),
             'member_names': member_names,
         }
+        if undecrypted:
+            result['undecrypted'] = True
+        return result
 
     def fetch_groups(self, account, limit=100):
         """Fetch the account's X conversations + members and sync them into
@@ -698,7 +741,9 @@ class TwitterGroupSync:
         """Return ``group_name`` when it is readable plaintext, else ''.
 
         XChat encrypts group names in the API response; reject strings that
-        look like encoded blobs (very long, or containing control characters).
+        look like encoded blobs (very long, or containing control characters,
+        or a base64-alphabet blob long enough to be real key material) so an
+        undecrypted name never becomes a channel name.
         """
         if not group_name or not isinstance(group_name, str):
             return ''
@@ -706,6 +751,8 @@ class TwitterGroupSync:
         if not name or len(name) >= 80:
             return ''
         if any(ord(char) < 32 for char in name):
+            return ''
+        if len(name) >= 40 and _BASE64_BLOB_RE.match(name):
             return ''
         return name
 

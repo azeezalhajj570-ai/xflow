@@ -139,6 +139,15 @@ class SocialAccount(models.Model):
              '(Juicebox) with the XChat encryption code and never stores a key '
              'blob server-side.',
     )
+    x_chat_conversation_keys = fields.Json(
+        string='X Chat Conversation Keys',
+        groups='social.group_social_user',
+        help='Recovered chat conversation keys per conversation '
+             '{conversation_id: {public_key_version: base64 key}}. Cached so '
+             'encrypted group metadata/messages can be decrypted without '
+             're-scanning the events feed on every sync. Treat as a password: '
+             'never log it.',
+    )
     x_chat_initialized = fields.Boolean(
         string='X Chat Encryption Initialized',
         groups='social.group_social_user',

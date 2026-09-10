@@ -337,7 +337,13 @@ class TestTwitterGroups(XAccountTwitterTestBase):
         fake_chat = MagicMock()
         fake_chat.extract_conversation_keys.return_value = {
             'keys': {'1788994678330': b'k' * 32}}
-        fake_chat.decrypt.return_value = 'Design Team'
+
+        def _decrypt(ciphertext, key=None):
+            if key is None:
+                raise TypeError('conversation key required')
+            return 'Design Team'
+
+        fake_chat.decrypt.side_effect = _decrypt
 
         def _request(method, url, **kwargs):
             return events_page if url.endswith('/events') else conv_page
@@ -348,6 +354,62 @@ class TestTwitterGroups(XAccountTwitterTestBase):
         self.assertEqual(channel.name, 'Design Team')
         self.assertEqual(result['params']['type'], 'success')
         self.assertIn('Design Team', result['params']['message'])
+        self.assertTrue(
+            (account.x_chat_conversation_keys or {}).get(CHAT_GROUP_ID),
+            'recovered keys should be cached on the account')
+
+    def test_action_fetch_group_info_does_not_clobber_name_when_decrypt_fails(self):
+        """A ciphertext group_name we cannot decrypt must not be replaced with
+        a member list -- keep the existing channel name and warn instead."""
+        account = self._make_account()
+        account.write({'x_chat_key_blob': 'fake-blob',
+                       'x_chat_signing_key_version': '1',
+                       'x_chat_key_mode': 'key_blob'})
+        channel = self.env['discuss.channel'].sudo().create({
+            'name': 'Real Name (kept)',
+            'channel_type': 'x_group',
+            'x_account_id': account.id,
+            'x_conversation_id': CHAT_GROUP_ID,
+        })
+        cipher = 'A' * 88
+        conv_page = {
+            'data': {'id': CHAT_GROUP_ID, 'type': 'group',
+                     'group_name': cipher, 'member_ids': ['111'],
+                     'participant_ids': ['111'], 'admin_ids': ['111']},
+            'includes': {'users': [
+                {'id': '111', 'name': 'Alice', 'username': 'alice'}]},
+        }
+        events_page = {'data': [], 'meta': {}}
+        fake_chat = MagicMock()
+
+        def _decrypt(ciphertext, key=None):
+            raise TypeError('conversation key required')
+
+        fake_chat.decrypt.side_effect = _decrypt
+
+        def _request(method, url, **kwargs):
+            return events_page if url.endswith('/events') else conv_page
+
+        with patch.object(TwitterApiClient, 'request', side_effect=_request), \
+             patch('chat_xdk.Chat', return_value=fake_chat):
+            result = channel.action_fetch_group_info()
+        self.assertEqual(channel.name, 'Real Name (kept)')
+        self.assertEqual(result['params']['type'], 'warning')
+        self.assertIn('Could not decrypt', result['params']['message'])
+
+    def test_safe_group_name_rejects_short_base64_ciphertext(self):
+        """A base64 blob short enough to slip old length checks must NOT become
+        a channel name (it is ciphertext, not a readable name)."""
+        from odoo.addons.x_account_twitter.services.twitter_group_sync import (
+            TwitterGroupSync)
+        self.assertEqual(
+            TwitterGroupSync._safe_group_name(
+                'vS43RO7ag+CSJ0zts3D00G9aLkb9h3drFBNw51I/'), '')
+        self.assertEqual(TwitterGroupSync._safe_group_name('Design Team'),
+                         'Design Team')
+        self.assertEqual(
+            TwitterGroupSync._safe_group_name('لايك ومرجعيه قروب الخير'),
+            'لايك ومرجعيه قروب الخير')
 
     # ----------------------------------------------------------- messages
     def test_fetch_group_messages_stores_x_messages(self):

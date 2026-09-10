@@ -351,6 +351,19 @@ class DiscussChannel(models.Model):
                     'sticky': True,
                 },
             }
+        if result.get('undecrypted'):
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': 'Fetch Group Info',
+                    'message': 'Could not decrypt this group\'s name. Make sure '
+                               'the X Chat encryption code is set on the '
+                               'account and try again.',
+                    'type': 'warning',
+                    'sticky': True,
+                },
+            }
         if result.get('name') and self.name != result['name']:
             self.write({'name': result['name']})
             message = 'Name updated to "%s".' % result['name']
