@@ -7,3 +7,4 @@ from . import test_provider
 from . import test_tweet_service
 from . import test_user_service
 from . import test_dm_service
+from . import test_usage
