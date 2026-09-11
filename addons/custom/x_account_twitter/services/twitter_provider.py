@@ -280,6 +280,20 @@ class TwitterProvider:
         return {'initialized': True,
                 'key_mode': account.x_chat_key_mode or 'key_blob'}
 
+    def register_x_chat_public_keys(self, account=None):
+        """First-time X Chat key setup for ``account`` (or ``self.account``).
+
+        ``generate_keypairs`` + ``POST /2/users/{id}/public_keys`` + (for
+        ``juicebox`` mode) a Juicebox ``setup(pin)`` secure backup. Never
+        persists a private key blob in ``juicebox`` mode. Raises ValueError
+        with an actionable message on failure.
+        """
+        account = account or self.account
+        decryptor = XChatDecryptor(self.env, account, client=self._client)
+        result = decryptor.register_public_keys()
+        self._xchat = decryptor
+        return result
+
     def register_webhook(self, safe=True):
         """Register the app webhook with X and persist its state."""
         service = TwitterWebhook(self.env)

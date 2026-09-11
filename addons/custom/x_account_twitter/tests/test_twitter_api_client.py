@@ -140,6 +140,22 @@ class TestTwitterApiClient(XAccountTwitterTestBase):
             self.client.request('GET', '/2/users/me')
         self.assertEqual(mocked.call_args.args[1], 'https://api.twitter.com/2/users/me')
 
+    def test_chat_public_keys_uses_api_x_com_host(self):
+        """Chat public-key endpoints (GET/POST /2/users/{id}/public_keys) are
+        served by the chat host (api.x.com), not the legacy host used for the
+        other /2/users/* routes (users/me, DM lookups, ...)."""
+        from odoo.addons.social_twitter.models.social_account import SocialAccount
+        for method in ('GET', 'POST'):
+            with patch.object(SocialAccount, '_get_twitter_oauth_header',
+                              return_value={'Authorization': 'Bearer t'}), \
+                 patch('requests.request', return_value=self._mock_response(
+                     200, {})) as mocked:
+                self.client.request(method, '/2/users/12345/public_keys',
+                                    body={'public_key': {}})
+            self.assertEqual(
+                mocked.call_args.args[1],
+                'https://api.x.com/2/users/12345/public_keys')
+
     # -------------------------------------------------------------- retry
     def test_retries_temporary_5xx_with_backoff(self):
         """A 503 should be retried with bounded backoff, then classified."""

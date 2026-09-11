@@ -168,6 +168,167 @@ class XChatDecryptor:
         self._conversation_keys = None
         return chat
 
+    def register_public_keys(self):
+        """First-time setup: generate keypairs, register the public key with
+        the X API, and (``juicebox`` mode) back the private keys up in X's
+        secure key backup (Juicebox) under the account PIN.
+
+        Mirrors the official chatxdk example flow: ``generate_keypairs()`` +
+        ``POST /2/users/{id}/public_keys`` + ``setup(pin)``. Public-key
+        registration is a rare, rate-limited write (only a few per 24h), so
+        this must be an explicit, confirmed action — never run automatically.
+
+        The private key blob is held in memory only and zeroed after use; in
+        ``juicebox`` mode it is never stored on the account, so a Juicebox
+        backup failure leaves the public keys registered but unrecoverable
+        without re-registering (rate-limited). Raises ValueError with an
+        actionable message on anything that cannot be recovered automatically.
+        """
+        account = self.account
+        if not account.twitter_user_id:
+            raise ValueError(
+                'No X user id configured for account %s; cannot register X '
+                'Chat public keys.' % account.id)
+        if account.x_chat_key_mode == 'juicebox' and not account.x_encryption_code:
+            raise ValueError(
+                'No XChat encryption code (PIN) configured for account %s; set '
+                'it so the new keys can be backed up in X\'s secure backup.'
+                % account.id)
+        if self.client is None:
+            raise ValueError(
+                'No X API client available for account %s; cannot register X '
+                'Chat public keys.' % account.id)
+
+        from chat_xdk import Chat
+        from . import twitter_errors
+
+        user_id = str(account.twitter_user_id)
+        existing = self._public_key_records_for(user_id)
+        for record in existing:
+            if record.get('juicebox_config'):
+                raise ValueError(
+                    'Account %s already has an X Chat secure-backup (Juicebox) '
+                    'config; use "Initialize Encryption" instead of setting up '
+                    'keys again (public-key registration is rate-limited).'
+                    % account.id)
+
+        chat = Chat()
+        payload = chat.generate_keypairs()
+        body, version = self._build_registration_body(payload)
+        exported = chat.export_keys()
+        try:
+            if not exported:
+                raise ValueError(
+                    'Chat XDK refused to export the freshly generated keys for '
+                    'account %s; nothing to register.' % account.id)
+            blob = bytes(exported)
+
+            our_public_key = body['public_key']['public_key']
+            matched = next(
+                (r for r in existing
+                 if (r.get('public_key') or r.get('publicKey')) == our_public_key),
+                None)
+            if matched:
+                version = str(matched.get('public_key_version') or version)
+                _LOGGER.info(
+                    'X Chat public key already registered for account %s; '
+                    'adopting version %s and skipping the POST', account.id,
+                    version)
+            else:
+                _LOGGER.info(
+                    'X Chat public-key registration: account_id=%s user_id=%s '
+                    'key_mode=%s version=%s',
+                    account.id, user_id, account.x_chat_key_mode or 'key_blob',
+                    version)
+                try:
+                    data = self.client.request(
+                        'POST', '/2/users/%s/public_keys' % user_id, body=body)
+                except twitter_errors.TwitterRateLimitError as exc:
+                    raise ValueError(
+                        'X Chat public-key registration is rate limited for '
+                        'account %s (only a few registrations are allowed per '
+                        '24h); retry later — a re-run registers a fresh '
+                        'identity and consumes one more slot. %s'
+                        % (account.id, exc)) from exc
+                resp_data = (data or {}).get('data') or {}
+                if isinstance(resp_data, list):
+                    resp_data = resp_data[0] if resp_data else {}
+                version = str(resp_data.get('public_key_version') or version)
+
+            if account.x_chat_key_mode == 'juicebox':
+                # A secure-backup realm config only appears on the account's
+                # public-keys row once keys are registered; re-fetch it (the
+                # pre-registration fetch is cached and has none).
+                self._public_key_records_cache.pop(user_id, None)
+                self._public_keys_cache = None
+                config = None
+                for record in self._public_key_records_for(user_id):
+                    if record.get('juicebox_config'):
+                        config = record['juicebox_config']
+                        break
+                if not config:
+                    raise ValueError(
+                        'Public keys registered for account %s but X did not '
+                        'return a Juicebox secure-backup config, so the keys '
+                        'could not be backed up by PIN. Retry "Setup Chat '
+                        'Keys" (each retry re-registers, which is '
+                        'rate-limited).' % account.id)
+                import json as _json
+                backup_chat = Chat(_json.dumps(config))
+                backup_chat.import_keys(blob)
+                try:
+                    backup_chat.setup(account.x_encryption_code)
+                except Exception as exc:
+                    raise ValueError(
+                        'X Chat Juicebox backup failed for account %s after the '
+                        'public key was registered: %s. The private keys were '
+                        'NOT stored; retry "Setup Chat Keys" (re-registration '
+                        'is rate-limited).' % (account.id, str(exc)[:300])) from exc
+                _LOGGER.info(
+                    'X Chat Juicebox secure-backup configured for account %s '
+                    '(user_id=%s, version=%s)', account.id, user_id, version)
+            else:
+                account.sudo().write({'x_chat_key_blob': base64.b64encode(
+                    blob).decode()})
+        finally:
+            if exported:
+                exported[:] = b'\x00' * len(exported)
+
+        account.sudo().write({
+            'x_chat_signing_key_version': version,
+            'x_chat_initialized': True,
+        })
+        return {
+            'registered': True,
+            'key_mode': account.x_chat_key_mode or 'key_blob',
+            'signing_key_version': version,
+            'juicebox_backup': account.x_chat_key_mode == 'juicebox',
+        }
+
+    @staticmethod
+    def _build_registration_body(payload):
+        """Map a Chat XDK ``PublicKeyRegistrationPayload`` (from
+        ``generate_keypairs``) into the ``POST /2/users/{id}/public_keys``
+        request body. Public material only — never contains secret keys.
+        """
+        version = str(payload.version) \
+            if getattr(payload, 'version', None) is not None else '1'
+        public_key = payload.public_key
+        body = {
+            'public_key': {
+                'public_key': public_key.public_key,
+                'signing_public_key': public_key.signing_public_key,
+                'identity_public_key_signature':
+                    public_key.identity_public_key_signature,
+                'signing_public_key_signature':
+                    public_key.signing_public_key_signature,
+                'registration_method': public_key.registration_method,
+            },
+            'version': version,
+            'generate_version': bool(payload.generate_version),
+        }
+        return body, version
+
     @staticmethod
     def _decode_key_blob(blob):
         """Decode the stored ``x_chat_key_blob`` text into raw bytes.
