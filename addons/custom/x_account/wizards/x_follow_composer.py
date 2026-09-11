@@ -33,10 +33,10 @@ class XFollowComposer(models.TransientModel):
         related='channel_id.x_account_id',
         readonly=True,
     )
-    member_ids = fields.Many2many(
-        'res.partner',
-        string='Members to Follow',
-        help='X group members selected for bulk follow.',
+    line_ids = fields.One2many(
+        'x.follow.composer.line',
+        'composer_id',
+        string='Members',
     )
     cooldown_sec = fields.Integer(
         string='Cooldown (seconds)',
@@ -47,15 +47,19 @@ class XFollowComposer(models.TransientModel):
     @api.model
     def default_get(self, fields_list):
         result = super().default_get(fields_list)
-        if 'channel_id' in fields_list or 'member_ids' in fields_list:
-            active_model = self.env.context.get('active_model')
-            active_id = self.env.context.get('active_id')
-            if active_model == 'discuss.channel' and active_id:
-                result['channel_id'] = active_id
+        active_model = self.env.context.get('active_model')
+        active_id = self.env.context.get('active_id')
+        if active_model == 'discuss.channel' and active_id:
+            result['channel_id'] = active_id
+            if 'line_ids' in fields_list:
                 channel = self.env['discuss.channel'].browse(active_id)
-                members = channel.x_group_member_ids.filtered('x_username')
-                if 'member_ids' in fields_list and members:
-                    result['member_ids'] = [(6, 0, members.ids)]
+                lines = [(5, 0, 0)]
+                for member in channel.x_group_member_ids:
+                    lines.append((0, 0, {
+                        'partner_id': member.id,
+                        'do_follow': bool(member.x_username),
+                    }))
+                result['line_ids'] = lines
         return result
 
     def action_follow(self):
@@ -70,7 +74,9 @@ class XFollowComposer(models.TransientModel):
             return self._follow_result(
                 _('No valid X account for conversation %s.') % channel.name,
                 kind='danger')
-        members = self.member_ids.filtered('x_username')
+        members = self.line_ids.filtered(
+            lambda line: line.do_follow and line.partner_id.x_username
+        ).mapped('partner_id')
         if not members:
             return self._follow_result(
                 _('Select at least one member with an X username.'),
@@ -114,3 +120,26 @@ class XFollowComposer(models.TransientModel):
                 'next': {'type': 'ir.actions.act_window_close'},
             },
         }
+
+
+class XFollowComposerLine(models.TransientModel):
+    """A group member line in the bulk-follow wizard."""
+
+    _name = 'x.follow.composer.line'
+    _description = 'Bulk Follow Member Line'
+
+    composer_id = fields.Many2one(
+        'x.follow.composer',
+        string='Wizard',
+        ondelete='cascade',
+    )
+    partner_id = fields.Many2one(
+        'res.partner',
+        string='Member',
+        required=True,
+        ondelete='cascade',
+    )
+    name = fields.Char(string='Name', related='partner_id.name', readonly=True)
+    x_username = fields.Char(
+        string='Username', related='partner_id.x_username', readonly=True)
+    do_follow = fields.Boolean(string='Follow', default=True)
