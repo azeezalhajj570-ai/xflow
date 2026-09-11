@@ -91,7 +91,11 @@ class TestXBulkFollow(XAccountTestBase):
             active_model='discuss.channel', active_id=channel.id
         ).create({})
         self.assertEqual(wizard.channel_id.id, channel.id)
-        self.assertEqual(wizard.member_ids, m1)
+        self.assertEqual(wizard.line_ids.partner_id, m1 | m2)
+        self.assertTrue(
+            wizard.line_ids.filtered(lambda line: line.partner_id == m1).do_follow)
+        self.assertFalse(
+            wizard.line_ids.filtered(lambda line: line.partner_id == m2).do_follow)
         self.assertEqual(wizard.cooldown_sec, 10)
 
     def test_action_follow_enqueues_one_task_per_member_staggered(self):
@@ -141,15 +145,39 @@ class TestXBulkFollow(XAccountTestBase):
         self.assertEqual(
             len(set(tasks.mapped('next_retry_at'))), 1)
 
-    def test_action_follow_skips_members_without_username(self):
+    def test_action_follow_skips_unchecked_members(self):
         account = self._make_account('follow_skipped')
+        m1 = self._make_member('u1', username='user_one')
+        m2 = self._make_member('u2', username='user_two')
+        channel = self._make_group_channel(account, m1 | m2)
+        wizard = self.env['x.follow.composer'].with_context(
+            active_model='discuss.channel', active_id=channel.id
+        ).create({})
+        wizard.write({
+            'line_ids': [(1, line.id, {'do_follow': False})
+                         for line in wizard.line_ids
+                         if line.partner_id == m2]
+        })
+
+        result = wizard.action_follow()
+
+        self.assertEqual(result['params']['type'], 'success')
+        tasks = self.env['x.account.task'].search([
+            ('account_id', '=', account.id),
+            ('operation', '=', 'follow'),
+        ])
+        self.assertEqual(len(tasks), 1)
+        self.assertEqual(
+            json.loads(tasks.task_context)['screen_name'], 'user_one')
+
+    def test_action_follow_members_without_username_skipped(self):
+        account = self._make_account('follow_nousername')
         m1 = self._make_member('u1', username='user_one')
         m2 = self._make_member('u2', username=None)
         channel = self._make_group_channel(account, m1 | m2)
         wizard = self.env['x.follow.composer'].with_context(
             active_model='discuss.channel', active_id=channel.id
         ).create({})
-        wizard.write({'member_ids': [(6, 0, (m1 | m2).ids)]})
 
         result = wizard.action_follow()
 

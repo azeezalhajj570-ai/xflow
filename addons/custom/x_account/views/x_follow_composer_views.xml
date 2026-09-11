@@ -10,9 +10,13 @@
                     <field name="account_id" readonly="1"/>
                 </group>
                 <group string="Members to Follow">
-                    <field name="member_ids" widget="many2many_checkboxes"
-                        string="Members" required="1"
-                        domain="[('id', 'in', channel_id.x_group_member_ids)]"/>
+                    <field name="line_ids" nolabel="1">
+                        <list editable="bottom">
+                            <field name="do_follow" string="Follow"/>
+                            <field name="name" string="Member Name"/>
+                            <field name="x_username" string="Username"/>
+                        </list>
+                    </field>
                     <label for="cooldown_sec"/>
                     <div>
                         <field name="cooldown_sec" class="oe_inline"/>

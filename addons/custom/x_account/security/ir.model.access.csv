@@ -10,6 +10,7 @@ access_x_message_manager,x.message.manager,model_x_message,social.group_social_m
 access_x_import_session_user,x.import.session.user,model_x_import_session,base.group_user,1,1,1,0
 access_x_message_composer_user,x.message.composer.user,model_x_message_composer,base.group_user,1,1,1,0
 access_x_follow_composer_user,x.follow.composer.user,model_x_follow_composer,base.group_user,1,1,1,0
+access_x_follow_composer_line_user,x.follow.composer.line.user,model_x_follow_composer_line,base.group_user,1,1,1,0
 access_base_automation_user,base.automation.user,base_automation.model_base_automation,social.group_social_user,1,1,1,0
 access_base_automation_manager,base.automation.manager,base_automation.model_base_automation,social.group_social_manager,1,1,1,1
 access_ir_actions_server_user,ir.actions.server.user,base.model_ir_actions_server,social.group_social_user,1,1,1,0
