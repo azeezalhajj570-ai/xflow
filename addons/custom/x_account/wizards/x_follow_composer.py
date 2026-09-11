@@ -75,7 +75,7 @@ class XFollowComposer(models.TransientModel):
                 _('No valid X account for conversation %s.') % channel.name,
                 kind='danger')
         members = self.line_ids.filtered(
-            lambda line: line.do_follow and line.partner_id.x_username
+            lambda line: line.do_follow and line.partner_id and line.partner_id.x_username
         ).mapped('partner_id')
         if not members:
             return self._follow_result(

@@ -10,10 +10,12 @@
                     <field name="account_id" readonly="1"/>
                 </group>
                 <group string="Members to Follow">
-                    <field name="line_ids" nolabel="1">
+                    <field name="line_ids" nolabel="1" create="false">
                         <list editable="bottom">
                             <field name="do_follow" string="Follow"/>
-                            <field name="name" string="Member Name"/>
+                            <field name="partner_id" string="Member Name"
+                                column_invisible="True"/>
+                            <field name="name" string="Member Name" column_invisible="True"/>
                             <field name="x_username" string="Username"/>
                         </list>
                     </field>
