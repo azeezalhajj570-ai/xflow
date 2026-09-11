@@ -249,8 +249,8 @@ class XChatDecryptor:
                         'X Chat public-key registration is rate limited for '
                         'account %s (only a few registrations are allowed per '
                         '24h); retry later — a re-run registers a fresh '
-                        'identity and consumes one more slot. %s'
-                        % (account.id, exc)) from exc
+                        'identity and consumes one more slot.%s %s'
+                        % (account.id, self._rate_limit_reset_hint(exc), exc)) from exc
                 resp_data = (data or {}).get('data') or {}
                 if isinstance(resp_data, list):
                     resp_data = resp_data[0] if resp_data else {}
@@ -335,16 +335,32 @@ class XChatDecryptor:
             raise ValueError(
                 'Public keys registered for account %s (version %s) but X '
                 'throttled fetching the Juicebox secure-backup config (HTTP '
-                '429). Wait for the rate-limit window to reset, then re-run '
+                '429).%s Wait for the rate-limit window to reset, then re-run '
                 '"Setup Chat Keys". The current identity is NOT backed up; a '
                 're-run registers a fresh identity and consumes one more '
-                'daily registration slot.' % (account.id, version))
+                'daily registration slot.'
+                % (account.id, version, self._rate_limit_reset_hint(exc)))
         raise ValueError(
             'Public keys registered for account %s (version %s) but X did not '
             'return a Juicebox secure-backup config yet, so the keys could '
             'not be backed up by PIN. Wait a moment and re-run "Setup Chat '
             'Keys" (each re-run re-registers, which is rate-limited).'
             % (account.id, version))
+
+    @staticmethod
+    def _rate_limit_reset_hint(exc):
+        """Human-readable ``x-user-limit-24hour-reset`` hint for a rate-limit
+        error, or '' when X did not disclose a reset time."""
+        reset = getattr(exc, 'reset_epoch', None)
+        if not reset:
+            return ''
+        try:
+            import datetime as _dt
+            when = _dt.datetime.fromtimestamp(
+                int(reset), tz=_dt.timezone.utc).strftime('%Y-%m-%d %H:%M UTC')
+        except (TypeError, ValueError, OSError):
+            return ''
+        return ' The X 24h limit resets at %s.' % when
 
     @staticmethod
     def _build_registration_body(payload):

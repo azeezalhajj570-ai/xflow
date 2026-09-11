@@ -47,8 +47,11 @@ class TwitterAuthenticationError(TwitterError):
 
 
 class TwitterRateLimitError(TwitterError):
-    def __init__(self, message=''):
+    def __init__(self, message='', reset_epoch=None):
         super().__init__('rate_limit', message)
+        # Epoch (seconds, UTC) when the 24h user-limit window resets, from the
+        # ``x-user-limit-24hour-reset`` response header when X returns it.
+        self.reset_epoch = reset_epoch
 
 
 class TwitterPermissionError(TwitterError):

@@ -110,7 +110,11 @@ class TwitterApiClient:
                 return response.json()
             except ValueError:
                 raise twitter_errors.TwitterTemporaryError('non_json_response')
-        raise twitter_errors.classify(response.status_code, self._body_json(response))
+        exc = twitter_errors.classify(response.status_code, self._body_json(response))
+        if response.status_code == 429 \
+                and isinstance(exc, twitter_errors.TwitterRateLimitError):
+            exc.reset_epoch = self._reset_epoch(response)
+        raise exc
 
     # --------------------------------------------------------------- internals
     def _url_for_path(self, path):
@@ -155,6 +159,15 @@ class TwitterApiClient:
         """
         return self.account._get_twitter_oauth_header(
             url, params=params or {}, method=method)
+
+    @staticmethod
+    def _reset_epoch(response):
+        """Epoch seconds (UTC) when the 24h user-limit window resets, from X's
+        ``x-user-limit-24hour-reset`` header on a 429, or None."""
+        try:
+            return int(response.headers.get('x-user-limit-24hour-reset'))
+        except (AttributeError, TypeError, ValueError):
+            return None
 
     @staticmethod
     def _retry_delay(attempt, retry_after):
