@@ -57,6 +57,7 @@ class XChatDecryptor:
         self._signing_keys_cache = None
         self._public_keys_cache = None
         self._public_key_records_cache = {}
+        self._public_key_fetch_error = None
         self._conversation_keys = None
 
     # ------------------------------------------------------------------ setup
@@ -258,21 +259,12 @@ class XChatDecryptor:
             if account.x_chat_key_mode == 'juicebox':
                 # A secure-backup realm config only appears on the account's
                 # public-keys row once keys are registered; re-fetch it (the
-                # pre-registration fetch is cached and has none).
-                self._public_key_records_cache.pop(user_id, None)
-                self._public_keys_cache = None
-                config = None
-                for record in self._public_key_records_for(user_id):
-                    if record.get('juicebox_config'):
-                        config = record['juicebox_config']
-                        break
+                # pre-registration fetch is cached and has none). X may throttle
+                # the GET at the same instant the POST lands and the config row
+                # can lag the registration, so retry briefly before giving up.
+                config = self._retry_fetch_juicebox_config(user_id)
                 if not config:
-                    raise ValueError(
-                        'Public keys registered for account %s but X did not '
-                        'return a Juicebox secure-backup config, so the keys '
-                        'could not be backed up by PIN. Retry "Setup Chat '
-                        'Keys" (each retry re-registers, which is '
-                        'rate-limited).' % account.id)
+                    self._raise_juicebox_config_unavailable(account, version)
                 import json as _json
                 backup_chat = Chat(_json.dumps(config))
                 backup_chat.import_keys(blob)
@@ -304,6 +296,55 @@ class XChatDecryptor:
             'signing_key_version': version,
             'juicebox_backup': account.x_chat_key_mode == 'juicebox',
         }
+
+    def _retry_fetch_juicebox_config(self, user_id, attempts=4, base_delay=3.0):
+        """Re-fetch the Juicebox secure-backup config right after registering.
+
+        A backup realm config only appears on the account's public-keys row
+        once its key is registered, so the pre-registration fetch (cached) has
+        none. X can throttle the GET (HTTP 429) at the same instant the POST
+        lands and the config row can lag the registration, so retry briefly
+        with backoff instead of giving up after a single fetch. Returns the
+        first config dict found, or ``None`` after the retries are exhausted.
+        """
+        import time as _time
+        cache_key = str(user_id)
+        for attempt in range(1, attempts + 1):
+            self._public_key_records_cache.pop(cache_key, None)
+            self._public_keys_cache = None
+            self._public_key_fetch_error = None
+            for record in self._public_key_records_for(user_id):
+                config = record.get('juicebox_config')
+                if isinstance(config, dict) and config:
+                    return config
+            if attempt < attempts:
+                _LOGGER.info(
+                    'Juicebox config not visible for account %s yet '
+                    '(attempt %s/%s); waiting %ss before re-fetching',
+                    self.account.id, attempt, attempts, base_delay * attempt)
+                _time.sleep(base_delay * attempt)
+        return None
+
+    def _raise_juicebox_config_unavailable(self, account, version):
+        """Explain why the post-registration Juicebox config could not be
+        fetched, distinguishing X throttling the request (HTTP 429) from the
+        config genuinely not being returned."""
+        from . import twitter_errors
+        exc = self._public_key_fetch_error
+        if isinstance(exc, twitter_errors.TwitterRateLimitError):
+            raise ValueError(
+                'Public keys registered for account %s (version %s) but X '
+                'throttled fetching the Juicebox secure-backup config (HTTP '
+                '429). Wait for the rate-limit window to reset, then re-run '
+                '"Setup Chat Keys". The current identity is NOT backed up; a '
+                're-run registers a fresh identity and consumes one more '
+                'daily registration slot.' % (account.id, version))
+        raise ValueError(
+            'Public keys registered for account %s (version %s) but X did not '
+            'return a Juicebox secure-backup config yet, so the keys could '
+            'not be backed up by PIN. Wait a moment and re-run "Setup Chat '
+            'Keys" (each re-run re-registers, which is rate-limited).'
+            % (account.id, version))
 
     @staticmethod
     def _build_registration_body(payload):
@@ -553,12 +594,17 @@ class XChatDecryptor:
                         'identity_public_key_signature,juicebox_config'})
             rows = (data or {}).get('data') or []
             records = [row for row in rows if isinstance(row, dict)]
+            self._public_key_fetch_error = None
             self._public_key_records_cache[cache_key] = records
             return records
         except Exception as exc:
             # A failed public-key fetch is a guaranteed verification failure
             # for every event signed by this user (the XDK refuses to skip
             # verification): warn with the failure reason, metadata only.
+            # The exception is retained (not just logged) so the first-time
+            # setup flow can tell "X throttled the fetch" apart from "X
+            # returned no Juicebox config" and raise an actionable error.
+            self._public_key_fetch_error = exc
             _LOGGER.warning(
                 'Failed to fetch Chat public keys for user %s (account %s): '
                 '%s: %s', user_id, self.account.id, type(exc).__name__,
