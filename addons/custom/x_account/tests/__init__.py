@@ -13,3 +13,4 @@ from . import test_discuss_channel
 from . import test_orphan_backfill
 from . import test_dual_provider
 from . import test_dm_automation
+from . import test_bulk_follow

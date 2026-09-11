@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="x_follow_composer_view_form" model="ir.ui.view">
+        <field name="name">x.follow.composer.view.form</field>
+        <field name="model">x.follow.composer</field>
+        <field name="arch" type="xml">
+            <form string="Follow Members">
+                <group>
+                    <field name="channel_id" readonly="1"/>
+                    <field name="account_id" readonly="1"/>
+                </group>
+                <group string="Members to Follow">
+                    <field name="member_ids" widget="many2many_checkboxes"
+                        string="Members" required="1"
+                        domain="[('id', 'in', channel_id.x_group_member_ids)]"/>
+                    <label for="cooldown_sec"/>
+                    <div>
+                        <field name="cooldown_sec" class="oe_inline"/>
+                        <span>seconds between each follow request</span>
+                    </div>
+                </group>
+                <footer>
+                    <button name="action_follow" string="Follow Members" type="object"
+                        class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_x_follow_composer" model="ir.actions.act_window">
+        <field name="name">Follow Members</field>
+        <field name="res_model">x.follow.composer</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="view_id" ref="x_follow_composer_view_form"/>
+    </record>
+</odoo>

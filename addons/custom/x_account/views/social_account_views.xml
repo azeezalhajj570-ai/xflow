@@ -40,8 +40,7 @@
                         string="Initialize Encryption"
                         class="btn-primary"
                         confirm="Initialize X Chat encryption using the configured key source?"
-                        groups="social.group_social_user"
-                        invisible="x_connection_status not in ('active', 'reauth_required', 'error') or x_chat_initialized"/>
+                        groups="social.group_social_user"/>
                     <button name="action_delete_x_subscriptions" type="object"
                         string="Delete X Subscriptions"
                         class="btn-secondary"

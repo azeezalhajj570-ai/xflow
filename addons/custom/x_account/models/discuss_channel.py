@@ -474,4 +474,48 @@ class DiscussChannel(models.Model):
             task.id, operation, self.id, conversation_id, account.id)
         return task
 
+    def action_send_message(self):
+        """Open the Send Message wizard for this X conversation.
+
+        The wizard sends a message directly (synchronously) to the 1:1 user
+        conversation (``x``) or the group conversation (``x_group``).
+        """
+        self.ensure_one()
+        if self.channel_type not in ('x', 'x_group'):
+            raise ValueError(
+                'Send Message is only available on X conversations, got %r'
+                % self.channel_type)
+        return {
+            'name': 'Send Message',
+            'type': 'ir.actions.act_window',
+            'res_model': 'x.message.composer',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {
+                'default_channel_id': self.id,
+                'active_model': 'discuss.channel',
+                'active_id': self.id,
+            },
+        }
+
+    def action_bulk_follow(self):
+        """Open the bulk-follow wizard for this X conversation's members."""
+        self.ensure_one()
+        if self.channel_type not in ('x', 'x_group'):
+            raise ValueError(
+                'Bulk follow is only available on X conversations, got %r'
+                % self.channel_type)
+        return {
+            'name': 'Follow Members',
+            'type': 'ir.actions.act_window',
+            'res_model': 'x.follow.composer',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {
+                'default_channel_id': self.id,
+                'active_model': 'discuss.channel',
+                'active_id': self.id,
+            },
+        }
+
 

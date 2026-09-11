@@ -42,6 +42,8 @@ Highlights:
         'views/social_account_views.xml',
         'views/import_session_views.xml',
         'views/x_group_channel_views.xml',
+        'views/x_composer_views.xml',
+        'views/x_follow_composer_views.xml',
         'views/x_message_views.xml',
         'views/account_group_views.xml',
         'views/account_task_views.xml',

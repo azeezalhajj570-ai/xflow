@@ -1,9 +1,11 @@
 import json
+from unittest.mock import patch
 
 from odoo import fields
 from odoo.tests import tagged
 
 from odoo.addons.x_account.tests.common import XAccountTestBase
+from odoo.addons.x_account.services.providers.session_web import SessionWebProvider
 
 
 @tagged('post_install', '-at_install', 'x_account')
@@ -156,3 +158,102 @@ class TestXDMEnqueue(XAccountTestBase):
         self.assertEqual(
             json.loads(task.task_context),
             {'recipient_id': '55555', 'text': 'Auto reply'})
+
+    def test_channel_action_send_message_opens_composer(self):
+        account = self._make_account('sender_page')
+        partner = self.env['res.partner'].create({
+            'name': 'X User',
+            'x_user_id': '66666',
+        })
+        channel = self._make_user_channel(account, partner, 'abc-123')
+        action = channel.action_send_message()
+        self.assertEqual(action['type'], 'ir.actions.act_window')
+        self.assertEqual(action['res_model'], 'x.message.composer')
+        self.assertEqual(action['context']['default_channel_id'], channel.id)
+        self.assertEqual(action['target'], 'new')
+
+    def test_channel_action_send_message_rejects_non_x(self):
+        channel = self.env['discuss.channel'].create({
+            'channel_type': 'channel',
+            'name': 'Internal',
+        })
+        with self.assertRaises(ValueError):
+            channel.action_send_message()
+
+    def test_composer_default_get_prefills_channel(self):
+        account = self._make_account('sender_defaultget')
+        partner = self.env['res.partner'].create({
+            'name': 'X User',
+            'x_user_id': '77777',
+        })
+        channel = self._make_user_channel(account, partner, 'conv-1')
+        composer = self.env['x.message.composer'].with_context(
+            active_model='discuss.channel', active_id=channel.id
+        ).create({'body': 'hi'})
+        self.assertEqual(composer.channel_id.id, channel.id)
+
+    def test_composer_send_dm_calls_provider(self):
+        account = self._make_account('sender_comp_dm')
+        partner = self.env['res.partner'].create({
+            'name': 'X User',
+            'x_user_id': '88888',
+        })
+        channel = self._make_user_channel(account, partner, 'conv-dm')
+        composer = self.env['x.message.composer'].with_context(
+            active_model='discuss.channel', active_id=channel.id
+        ).create({'body': 'Hello DM'})
+        with patch.object(SessionWebProvider, 'send_dm',
+                          return_value={'success': True}) as mock_send:
+            result = composer.action_send()
+        mock_send.assert_called_once_with(
+            recipient_id='88888', text='Hello DM')
+        self.assertEqual(result['tag'], 'display_notification')
+        self.assertEqual(result['params']['type'], 'success')
+
+    def test_composer_send_group_dm_calls_provider(self):
+        account = self._make_account('sender_comp_group')
+        channel = self.env['discuss.channel'].create({
+            'channel_type': 'x_group',
+            'x_account_id': account.id,
+            'x_conversation_id': 'g-conv-group-1',
+            'name': 'X Group',
+        })
+        composer = self.env['x.message.composer'].with_context(
+            active_model='discuss.channel', active_id=channel.id
+        ).create({'body': 'Group hello'})
+        with patch.object(SessionWebProvider, 'send_group_dm',
+                          return_value={'success': True}, create=True) as mock_send:
+            result = composer.action_send()
+        mock_send.assert_called_once_with(
+            conversation_id='g-conv-group-1', text='Group hello')
+        self.assertEqual(result['params']['type'], 'success')
+
+    def test_composer_send_failure_surfaces_error(self):
+        account = self._make_account('sender_comp_fail')
+        partner = self.env['res.partner'].create({
+            'name': 'X User',
+            'x_user_id': '99999',
+        })
+        channel = self._make_user_channel(account, partner, 'conv-fail')
+        composer = self.env['x.message.composer'].with_context(
+            active_model='discuss.channel', active_id=channel.id
+        ).create({'body': 'Hello'})
+        with patch.object(SessionWebProvider, 'send_dm',
+                          side_effect=Exception('Too Many Requests')):
+            result = composer.action_send()
+        self.assertEqual(result['params']['type'], 'danger')
+        self.assertIn('Too Many Requests', result['params']['message'])
+
+    def test_composer_requires_body(self):
+        account = self._make_account('sender_comp_nobody')
+        partner = self.env['res.partner'].create({
+            'name': 'X User',
+            'x_user_id': '101010',
+        })
+        channel = self._make_user_channel(account, partner, 'conv-nobody')
+        composer = self.env['x.message.composer'].with_context(
+            active_model='discuss.channel', active_id=channel.id
+        ).create({'body': '   '})
+        from odoo.exceptions import ValidationError
+        with self.assertRaises(ValidationError):
+            composer.action_send()
