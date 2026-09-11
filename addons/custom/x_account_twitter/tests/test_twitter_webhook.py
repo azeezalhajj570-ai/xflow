@@ -1057,6 +1057,68 @@ class TestXChatFirstTimeSetup(XAccountTwitterTestBase):
         self.assertFalse(account.x_chat_initialized)
         self.assertFalse(account.x_chat_key_blob)
 
+    @patch('time.sleep')
+    def test_register_public_keys_retries_config_fetch_then_succeeds(
+            self, _sleep):
+        """If the post-registration config GET returns no juicebox_config on
+        the first try (the config row can lag the registration / HTTP
+        throttling), setup re-fetches and completes once the config appears."""
+        account = self._new_account(mode='juicebox', pin='9999')
+        client = Mock()
+        cfg = {'realm_id': 'test-realm',
+               'juicebox_service_url': 'https://j.example'}
+        client.request.side_effect = [
+            {'data': []},                                    # reconcile
+            {'data': {'public_key_version': '1712'}},        # registration POST
+            {'data': []},                                    # config GET: not yet
+            {'data': [{'public_key_version': '1712',
+                       'juicebox_config': cfg}]},            # config GET: visible
+        ]
+        chain = self._setup_chat_patch()
+        with chain['patcher']:
+            chain['fake_gen'].generate_keypairs.return_value = \
+                self._gen_payload()
+            chain['fake_gen'].export_keys.return_value = \
+                bytearray(b'\x00\x01\x02' * 21)
+            result = XChatDecryptor(
+                self.env, account, client=client).register_public_keys()
+        self.assertEqual(client.request.call_count, 4)
+        chain['fake_backup'].import_keys.assert_called_once_with(
+            b'\x00\x01\x02' * 21)
+        chain['fake_backup'].setup.assert_called_once_with('9999')
+        self.assertTrue(result['registered'])
+        self.assertTrue(account.x_chat_initialized)
+        self.assertEqual(account.x_chat_signing_key_version, '1712')
+
+    @patch('time.sleep')
+    def test_register_public_keys_throttled_config_fetch_raises_honest_error(
+            self, _sleep):
+        """An HTTP 429 on the post-registration config GET must surface an
+        honest 'throttled' error (not a misleading 'no config returned') and
+        must NOT mark the account initialized."""
+        account = self._new_account(mode='juicebox', pin='9999')
+        client = Mock()
+        client.request.side_effect = [
+            {'data': []},                                    # reconcile
+            {'data': {'public_key_version': '1712'}},        # registration POST
+        ] + [twitter_errors.TwitterRateLimitError('Too Many Requests')] * 4
+        chain = self._setup_chat_patch()
+        with chain['patcher']:
+            chain['fake_gen'].generate_keypairs.return_value = \
+                self._gen_payload()
+            chain['fake_gen'].export_keys.return_value = \
+                bytearray(b'\x00\x01\x02' * 21)
+            with self.assertRaises(ValueError) as ctx:
+                XChatDecryptor(self.env, account,
+                               client=client).register_public_keys()
+        message = str(ctx.exception)
+        self.assertIn('throttled', message)
+        self.assertIn('429', message)
+        self.assertNotIn('did not return', message)
+        self.assertFalse(account.x_chat_initialized)
+        self.assertFalse(account.x_chat_key_blob)
+        chain['fake_backup'].import_keys.assert_not_called()
+
     def test_register_public_keys_adopts_existing_key_skips_post(self):
         """If the generated public key is already registered on the account,
         the POST is skipped and the existing version is adopted (rate budget
