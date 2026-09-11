@@ -447,6 +447,40 @@ class SocialAccount(models.Model):
             'X Chat Encryption',
             'Initialized (key source: %s).' % source, kind='success')
 
+    def action_register_x_chat_public_keys(self):
+        """First-time X Chat key setup: generate keypairs, register the public
+        key with X, and (PIN mode) back the keys up in X's secure backup.
+
+        Dispatches to the event provider's ``register_x_chat_public_keys``.
+        Public-key registration is a rate-limited, one-time write, so this is
+        an explicit, user-confirmed action. Marks ``x_chat_initialized`` on
+        success and clears it on failure. Returns a dialog/notification
+        result.
+        """
+        self.ensure_one()
+        if not self._filter_x_accounts():
+            raise ValueError('X Chat encryption is only available on X accounts.')
+        provider = self.get_event_provider()
+        register = getattr(provider, 'register_x_chat_public_keys', None)
+        if not register:
+            return self._display_notification(
+                'X Chat Encryption',
+                'Provider %s does not support X Chat key setup'
+                % self.x_provider, kind='warning')
+        try:
+            register(self)
+        except Exception as exc:
+            self.write({'x_chat_initialized': False})
+            return self._display_notification(
+                'X Chat Encryption',
+                'Key setup failed: %s' % exc, kind='danger')
+        self.write({'x_chat_initialized': True})
+        mode = self.x_chat_key_mode or 'key_blob'
+        source = 'X secure backup (PIN)' if mode == 'juicebox' else 'key blob'
+        return self._display_notification(
+            'X Chat Encryption',
+            'Keys registered; backups enabled (%s).' % source, kind='success')
+
     def action_delete_x_subscriptions(self):
         """Delete X Activity API subscriptions for this account.
 

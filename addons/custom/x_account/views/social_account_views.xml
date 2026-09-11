@@ -41,6 +41,12 @@
                         class="btn-primary"
                         confirm="Initialize X Chat encryption using the configured key source?"
                         groups="social.group_social_user"/>
+                    <button name="action_register_x_chat_public_keys" type="object"
+                        string="Setup Chat Keys"
+                        class="btn-primary"
+                        confirm="Register a fresh X Chat identity? This is a one-time, rate-limited write that generates keys, registers them with X and backs them up (PIN mode)."
+                        groups="social.group_social_user"
+                        invisible="x_chat_initialized"/>
                     <button name="action_delete_x_subscriptions" type="object"
                         string="Delete X Subscriptions"
                         class="btn-secondary"

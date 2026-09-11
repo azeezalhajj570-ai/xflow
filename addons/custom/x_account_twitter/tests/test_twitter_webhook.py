@@ -929,6 +929,284 @@ class TestXChatKeyModes(XAccountTwitterTestBase):
 
 
 @tagged('post_install', '-at_install', 'x_account_twitter')
+class TestXChatFirstTimeSetup(XAccountTwitterTestBase):
+    """First-time X Chat key setup: generate_keypairs + register public keys
+    + (juicebox mode) Juicebox setup(pin) secure backup."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.twitter_media = cls.env.ref('social_twitter.social_media_twitter')
+
+    def _new_account(self, mode='juicebox', pin='9999', user_id=OWNER_ID):
+        account = self.env['social.account'].create({
+            'name': 'Setup Account (%s)' % mode,
+            'media_id': self.twitter_media.id,
+            'social_account_handle': 'owner',
+            'twitter_user_id': user_id,
+            'x_provider': 'twitter',
+            'x_auth_method': 'oauth2',
+            'x_oauth2_access_token': 'fake-at',
+            'x_oauth2_refresh_token': 'fake-rt',
+            'x_chat_key_mode': mode,
+            'x_encryption_code': pin,
+        })
+        return account
+
+    def _gen_payload(self, public_key='identity-pub-1711', version='1711'):
+        """A PublicKeyRegistrationPayload stand-in from generate_keypairs."""
+        pub = Mock()
+        pub.public_key = public_key
+        pub.signing_public_key = 'signing-pub-1711'
+        pub.identity_public_key_signature = 'id-sig-1711'
+        pub.signing_public_key_signature = 'sign-sig-1711'
+        pub.registration_method = 'identity_and_signing_key'
+        payload = Mock()
+        payload.version = version
+        payload.generate_version = True
+        payload.public_key = pub
+        return payload
+
+    def _setup_chat_patch(self):
+        """Patch chat_xdk.Chat so the no-arg generate instance and the
+        juicebox-config backup instance return distinct fakes."""
+        fake_gen = Mock()
+        fake_backup = Mock()
+        calls = []
+
+        def ctor(*args, **kwargs):
+            calls.append(args)
+            return fake_gen if not args else fake_backup
+
+        return {
+            'patcher': patch('chat_xdk.Chat', side_effect=ctor),
+            'fake_gen': fake_gen,
+            'fake_backup': fake_backup,
+            'ctor_calls': calls,
+        }
+
+    def test_register_public_keys_registers_and_backs_up(self):
+        """juicebox flow: generate -> POST /public_keys -> re-fetch the
+        juicebox_config -> Chat(config).import_keys + setup(pin); version and
+        initialized are persisted and NO private blob is stored on the
+        account (and the transient blob buffer is zeroed)."""
+        account = self._new_account(mode='juicebox', pin='9999')
+        client = Mock()
+        cfg = {'realm_id': 'test-realm',
+               'juicebox_service_url': 'https://j.example'}
+        client.request.side_effect = [
+            {'data': []},                                   # reconcile GET
+            {'data': {'public_key_version': '1712'}},       # registration POST
+            {'data': [{'public_key_version': '1712',
+                       'juicebox_config': cfg}]},           # config GET
+        ]
+        chain = self._setup_chat_patch()
+        with chain['patcher']:
+            chain['fake_gen'].generate_keypairs.return_value = \
+                self._gen_payload()
+            exported = bytearray(b'\x00\x01\x02' * 21)
+            chain['fake_gen'].export_keys.return_value = exported
+            result = XChatDecryptor(
+                self.env, account, client=client).register_public_keys()
+        posts = [c for c in client.request.call_args_list
+                 if c.args[0] == 'POST']
+        self.assertEqual(len(posts), 1)
+        self.assertIn('/2/users/%s/public_keys' % OWNER_ID, posts[0].args[1])
+        body = posts[0].kwargs['body']
+        self.assertEqual(body['version'], '1711')
+        self.assertEqual(body['generate_version'], True)
+        self.assertEqual(body['public_key']['public_key'], 'identity-pub-1711')
+        self.assertEqual(body['public_key']['signing_public_key'],
+                         'signing-pub-1711')
+        self.assertEqual(body['public_key']['identity_public_key_signature'],
+                         'id-sig-1711')
+        self.assertEqual(
+            body['public_key']['registration_method'],
+            'identity_and_signing_key')
+        self.assertEqual(client.request.call_count, 3)
+        # Backup chat is built from the returned juicebox_config and the blob
+        # (the original bytes, not the zeroed buffer).
+        chain['fake_backup'].import_keys.assert_called_once_with(
+            b'\x00\x01\x02' * 21)
+        chain['fake_backup'].setup.assert_called_once_with('9999')
+        # The transient blob buffer is zeroed after use.
+        self.assertEqual(bytes(exported), b'\x00' * (3 * 21))
+        self.assertTrue(result['registered'])
+        self.assertTrue(account.x_chat_initialized)
+        self.assertEqual(account.x_chat_signing_key_version, '1712')
+        self.assertFalse(account.x_chat_key_blob)
+
+    def test_register_public_keys_rate_limited_raises_clear_error(self):
+        """A 429 on the registration POST surfaces a clear error and persists
+        nothing (the account is NOT marked initialized)."""
+        account = self._new_account()
+        client = Mock()
+        client.request.side_effect = [
+            {'data': []},
+            twitter_errors.TwitterRateLimitError('rate limited: budget'),
+        ]
+        with patch('chat_xdk.Chat') as chat_cls:
+            chat_cls.return_value.generate_keypairs.return_value = \
+                self._gen_payload()
+            chat_cls.return_value.export_keys.return_value = \
+                bytearray(b'\x01' * 32)
+            with self.assertRaises(ValueError) as ctx:
+                XChatDecryptor(self.env, account,
+                               client=client).register_public_keys()
+        self.assertIn('rate limited', str(ctx.exception))
+        self.assertFalse(account.x_chat_initialized)
+        self.assertFalse(account.x_chat_key_blob)
+
+    def test_register_public_keys_adopts_existing_key_skips_post(self):
+        """If the generated public key is already registered on the account,
+        the POST is skipped and the existing version is adopted (rate budget
+        preserved)."""
+        account = self._new_account()
+        client = Mock()
+        cfg = {'realm_id': 'test-realm',
+               'juicebox_service_url': 'https://j.example'}
+        client.request.side_effect = [
+            {'data': [{'public_key': 'identity-pub-1711',
+                       'public_key_version': 'already'}]},
+            {'data': [{'public_key': 'identity-pub-1711',
+                       'public_key_version': 'already',
+                       'juicebox_config': cfg}]},
+        ]
+        chain = self._setup_chat_patch()
+        with chain['patcher']:
+            chain['fake_gen'].generate_keypairs.return_value = \
+                self._gen_payload()
+            chain['fake_gen'].export_keys.return_value = \
+                bytearray(b'\x01' * 32)
+            XChatDecryptor(self.env, account,
+                           client=client).register_public_keys()
+        self.assertEqual(client.request.call_count, 2)
+        self.assertFalse(any(c.args[0] == 'POST'
+                             for c in client.request.call_args_list))
+        self.assertEqual(account.x_chat_signing_key_version, 'already')
+        self.assertTrue(account.x_chat_initialized)
+
+    def test_register_public_keys_already_backed_up_raises(self):
+        """If a juicebox_config already exists, refuse to mint a fresh
+        identity instead of burning the rate-limited registration budget."""
+        account = self._new_account()
+        client = Mock()
+        client.request.return_value = {'data': [{
+            'public_key_version': '1',
+            'juicebox_config': {'realm_id': 'existing'}}]}
+        with patch('chat_xdk.Chat') as chat_cls:
+            with self.assertRaises(ValueError) as ctx:
+                XChatDecryptor(self.env, account,
+                               client=client).register_public_keys()
+        self.assertIn('already has', str(ctx.exception))
+        self.assertEqual(client.request.call_count, 1)
+        chat_cls.assert_not_called()
+
+    def test_register_public_keys_requires_pin_in_juicebox_mode(self):
+        """juicebox mode without a PIN must fail before any network call."""
+        account = self._new_account(mode='juicebox', pin=False)
+        client = Mock()
+        with patch('chat_xdk.Chat'):
+            with self.assertRaises(ValueError) as ctx:
+                XChatDecryptor(self.env, account,
+                               client=client).register_public_keys()
+        self.assertIn('PIN', str(ctx.exception))
+        client.request.assert_not_called()
+
+    def test_register_public_keys_requires_user_id(self):
+        account = self._new_account(mode='juicebox', pin='9999',
+                                    user_id=False)
+        client = Mock()
+        with patch('chat_xdk.Chat'):
+            with self.assertRaises(ValueError) as ctx:
+                XChatDecryptor(self.env, account,
+                               client=client).register_public_keys()
+        self.assertIn('user id', str(ctx.exception))
+        client.request.assert_not_called()
+
+    def test_register_public_keys_key_blob_mode_stores_blob(self):
+        """key_blob mode registers the public key AND stores the exported
+        private blob on the account (its configured key source)."""
+        account = self._new_account(mode='key_blob', pin=False)
+        client = Mock()
+        client.request.side_effect = [
+            {'data': []},
+            {'data': {'public_key_version': '7'}},
+        ]
+        raw = bytes(range(64))
+        chain = self._setup_chat_patch()
+        with chain['patcher']:
+            chain['fake_gen'].generate_keypairs.return_value = \
+                self._gen_payload(version='6')
+            chain['fake_gen'].export_keys.return_value = bytearray(raw)
+            XChatDecryptor(self.env, account,
+                           client=client).register_public_keys()
+        self.assertEqual(account.x_chat_key_blob, b64encode(raw).decode())
+        self.assertEqual(account.x_chat_signing_key_version, '7')
+        self.assertTrue(account.x_chat_initialized)
+        # No backup chat was built in key_blob mode.
+        self.assertEqual(len(chain['ctor_calls']), 1)
+
+    def test_register_public_keys_backup_failure_keeps_registration(self):
+        """If the Juicebox backup fails AFTER the public key was registered,
+        raise a clear error, leave the registration in place, persist no
+        private blob and do not mark the account initialized."""
+        account = self._new_account()
+        client = Mock()
+        cfg = {'realm_id': 'test-realm'}
+        client.request.side_effect = [
+            {'data': []},
+            {'data': {'public_key_version': '1712'}},
+            {'data': [{'public_key_version': '1712',
+                       'juicebox_config': cfg}]},
+        ]
+        chain = self._setup_chat_patch()
+        with chain['patcher']:
+            chain['fake_gen'].generate_keypairs.return_value = \
+                self._gen_payload()
+            chain['fake_gen'].export_keys.return_value = \
+                bytearray(b'\x01' * 32)
+            chain['fake_backup'].setup.side_effect = Exception('juicebox boom')
+            with self.assertRaises(ValueError) as ctx:
+                XChatDecryptor(self.env, account,
+                               client=client).register_public_keys()
+        self.assertIn('Juicebox backup failed', str(ctx.exception))
+        posts = [c for c in client.request.call_args_list
+                 if c.args[0] == 'POST']
+        self.assertEqual(len(posts), 1)
+        self.assertFalse(account.x_chat_initialized)
+        self.assertFalse(account.x_chat_key_blob)
+
+    def test_provider_register_delegates_to_decryptor(self):
+        account = self._new_account()
+        provider = TwitterProvider(self.env, account)
+        with patch.object(
+                XChatDecryptor, 'register_public_keys',
+                return_value={'registered': True,
+                              'signing_key_version': '1'}) as reg:
+            result = provider.register_x_chat_public_keys()
+        reg.assert_called_once_with()
+        self.assertTrue(result['registered'])
+        self.assertIsNotNone(provider._xchat)
+
+    def test_account_action_register_x_chat_public_keys_dispatches(self):
+        """The account action dispatches to the provider's register method and
+        marks the account initialized on success."""
+        account = self._new_account()
+        fake_provider = Mock()
+        fake_provider.register_x_chat_public_keys = Mock(
+            return_value={'registered': True})
+        with patch.object(type(account), 'get_event_provider',
+                          return_value=fake_provider):
+            result = account.action_register_x_chat_public_keys()
+        fake_provider.register_x_chat_public_keys.assert_called_once_with(
+            account)
+        self.assertTrue(account.x_chat_initialized)
+        self.assertEqual(result['type'], 'ir.actions.client')
+        self.assertEqual(result['params']['type'], 'success')
+
+
+@tagged('post_install', '-at_install', 'x_account_twitter')
 class TestTwitterBackslashGuard(XAccountTwitterTestBase):
 
     @classmethod

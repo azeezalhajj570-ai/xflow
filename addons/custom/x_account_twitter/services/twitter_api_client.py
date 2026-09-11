@@ -50,6 +50,11 @@ _LEGACY_PATHS = (
 
 
 def _endpoint_for_path(path):
+    # X Chat public-key endpoints (GET/POST /2/users/{id}/public_keys) are
+    # served by the chat host (api.x.com), not the legacy api.twitter.com host
+    # that serves the other /2/users/* routes.
+    if path.startswith('/2/users/') and path.rstrip('/').endswith('/public_keys'):
+        return X_API_ENDPOINT
     if any(path.startswith(prefix) for prefix in _LEGACY_PATHS):
         return LEGACY_TWITTER_ENDPOINT
     return X_API_ENDPOINT
