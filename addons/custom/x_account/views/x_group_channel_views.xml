@@ -20,8 +20,15 @@
         <field name="arch" type="xml">
             <form string="Chat" create="false">
                 <header>
+                    <button name="action_bulk_follow" type="object"
+                        string="Follow Members" class="btn-secondary"
+                        invisible="channel_type != 'x_group'"
+                        groups="social.group_social_user"/>
+                    <button name="action_send_message" type="object"
+                        string="Send Message" class="btn-primary"
+                        groups="social.group_social_user"/>
                     <button name="action_fetch_group_info" type="object"
-                        string="Fetch Info" class="btn-primary"
+                        string="Fetch Info" class="btn-secondary"
                         groups="social.group_social_user"
                         confirm="Fetch this conversation's info from X and update its name?"/>
                 </header>

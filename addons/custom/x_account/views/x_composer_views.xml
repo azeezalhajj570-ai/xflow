@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="x_message_composer_view_form" model="ir.ui.view">
+        <field name="name">x.message.composer.view.form</field>
+        <field name="model">x.message.composer</field>
+        <field name="arch" type="xml">
+            <form string="Send Message">
+                <group>
+                    <field name="channel_id" readonly="1"/>
+                    <field name="account_id" readonly="1"/>
+                    <field name="conversation_id" readonly="1"/>
+                    <field name="channel_type" readonly="1" string="Type"/>
+                </group>
+                <field name="body" required="1" placeholder="Write your message..."/>
+                <footer>
+                    <button name="action_send" string="Send Message" type="object"
+                        class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_x_message_composer" model="ir.actions.act_window">
+        <field name="name">Send Message</field>
+        <field name="res_model">x.message.composer</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="view_id" ref="x_message_composer_view_form"/>
+    </record>
+</odoo>

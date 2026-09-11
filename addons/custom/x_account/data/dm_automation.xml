@@ -35,8 +35,8 @@ for record in records:
             </field>
         </record>
 
-        <!-- Draft rule: auto-reply a DM to the 1:1 user conversation when a
-             new inbound message arrives. Filtering (channel type, encrypted,
+        <!-- Auto-reply rule: send a DM to the 1:1 user conversation when a new
+             inbound message arrives. Filtering (channel type, encrypted,
              content) can be adjusted in the Automation Rules UI. -->
         <record id="base_automation_x_dm_auto_reply_user" model="base.automation">
             <field name="name">X: Auto-reply DM to User</field>
@@ -44,7 +44,7 @@ for record in records:
             <field name="trigger">on_time_created</field>
             <field name="trg_date_range">1</field>
             <field name="trg_date_range_type">minutes</field>
-            <field name="active" eval="False"/>
+            <field name="active" eval="True"/>
             <field name="filter_domain">[('direction', '=', 'inbound'), ('encrypted', '=', False), ('body_plain', '!=', False), ('channel_id.channel_type', '=', 'x')]</field>
         </record>
         <record id="ir_actions_server_x_dm_auto_reply_user" model="ir.actions.server">
@@ -58,7 +58,7 @@ for record in records:
             <field name="base_automation_id" ref="base_automation_x_dm_auto_reply_user"/>
         </record>
 
-        <!-- Draft rule: post a message into the group conversation when a new
+        <!-- Auto-reply rule: post a message into the group conversation when a new
              inbound group message arrives. -->
         <record id="base_automation_x_dm_auto_reply_group" model="base.automation">
             <field name="name">X: Auto-reply DM to Group</field>
@@ -66,7 +66,7 @@ for record in records:
             <field name="trigger">on_time_created</field>
             <field name="trg_date_range">1</field>
             <field name="trg_date_range_type">minutes</field>
-            <field name="active" eval="False"/>
+            <field name="active" eval="True"/>
             <field name="filter_domain">[('direction', '=', 'inbound'), ('encrypted', '=', False), ('body_plain', '!=', False), ('channel_id.channel_type', '=', 'x_group')]</field>
         </record>
         <record id="ir_actions_server_x_dm_auto_reply_group" model="ir.actions.server">
