@@ -69,6 +69,17 @@ class TestTwitterApiClient(XAccountTwitterTestBase):
         self.assertEqual(ctx.exception.code, 'rate_limit')
         self.assertTrue(ctx.exception.retryable)
 
+    def test_request_429_captures_reset_epoch_header(self):
+        """The 24h reset window from ``x-user-limit-24hour-reset`` must be
+        carried on the rate-limit error so callers can tell the user when to
+        retry."""
+        resp = self._mock_response(429)
+        resp.headers = {'x-user-limit-24hour-reset': '1789162704'}
+        with patch('requests.request', return_value=resp):
+            with self.assertRaises(twitter_errors.TwitterRateLimitError) as ctx:
+                self.client.request('GET', '/2/users/12345/public_keys')
+        self.assertEqual(ctx.exception.reset_epoch, 1789162704)
+
     def test_request_401_raises_authentication(self):
         with patch('requests.request', return_value=self._mock_response(
                 401, {'detail': 'Unauthorized', 'title': 'Unauthorized'})):
