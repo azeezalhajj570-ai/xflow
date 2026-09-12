@@ -487,6 +487,102 @@ class TestTwitterGroups(XAccountTwitterTestBase):
         with self.assertRaises(ValueError):
             channel.action_fetch_group_members()
 
+    def _members_payload(self, member_ids=None, users=None):
+        member_ids = member_ids or ['111', '222']
+        users = users or [
+            {'id': '111', 'name': 'Alice', 'username': 'alice'},
+            {'id': '222', 'name': 'Bob', 'username': 'bob'},
+            {'id': OWNER_ID, 'name': 'Owner', 'username': 'grpowner'}]
+        return {
+            'data': {'id': CHAT_GROUP_ID, 'type': 'group',
+                     'member_ids': member_ids,
+                     'participant_ids': member_ids,
+                     'admin_ids': member_ids[:1]},
+            'includes': {'users': users},
+        }
+
+    def _make_member_channel(self, name, conversation_id=None):
+        account = self._make_account()
+        return self.env['discuss.channel'].sudo().create({
+            'name': name,
+            'channel_type': 'x_group',
+            'x_account_id': account.id,
+            'x_conversation_id': conversation_id or CHAT_GROUP_ID,
+        })
+
+    def test_action_fetch_group_members_bulk_aggregates(self):
+        c1 = self._make_member_channel('Bulk Chat 1')
+        c2 = self._make_member_channel('Bulk Chat 2')
+        with patch.object(TwitterApiClient, 'request',
+                          return_value=self._members_payload()) as mocked:
+            result = (c1 | c2).action_fetch_group_members_bulk()
+        self.assertEqual(result['params']['type'], 'success')
+        self.assertIn('2 chat(s)', result['params']['message'])
+        self.assertIn('6 member(s)', result['params']['message'])
+        self.assertIn('3 new', result['params']['message'])
+        for channel in (c1 | c2):
+            self.assertEqual(
+                len(channel.channel_member_ids.filtered(
+                    lambda m: m.partner_id.x_user_id)), 3)
+
+    def test_action_fetch_group_members_bulk_reports_failures(self):
+        ok_channel = self._make_member_channel('Bulk Ok')
+        broken = self.env['discuss.channel'].sudo().create({
+            'name': 'Bulk Broken',
+            'channel_type': 'x_group',
+            'x_account_id': self._make_account().id,
+            'x_conversation_id': CHAT_GROUP_ID,
+        })
+        internal = self.env['discuss.channel'].sudo().create({
+            'name': 'Bulk Internal',
+            'channel_type': 'channel',
+            'x_account_id': self._make_account().id,
+        })
+        with patch.object(TwitterApiClient, 'request', side_effect=[
+                self._members_payload(), {}]):
+            result = (ok_channel | broken | internal).action_fetch_group_members_bulk()
+        self.assertEqual(result['params']['type'], 'warning')
+        self.assertIn('1 chat(s)', result['params']['message'])
+        self.assertIn('1 skipped', result['params']['message'])
+        self.assertIn('1 failed', result['params']['message'])
+        self.assertIn('Bulk Broken', result['params']['message'])
+        self.assertIn('not found', result['params']['message'])
+
+    def test_action_fetch_group_members_bulk_no_actionable_chats(self):
+        config = self.env['discuss.channel'].sudo().create({
+            'name': 'Plain Group',
+            'channel_type': 'channel',
+        })
+        result = config.action_fetch_group_members_bulk()
+        self.assertEqual(result['params']['type'], 'info')
+        self.assertIn('No X conversations selected', result['params']['message'])
+
+    def test_action_fetch_group_members_server_action_binding(self):
+        action = self.env.ref('x_account.action_server_fetch_group_members')
+        self.assertEqual(action.state, 'code')
+        self.assertEqual(action.model_id.model, 'discuss.channel')
+        self.assertTrue(action.binding_model_id)
+        self.assertEqual(action.binding_model_id.model, 'discuss.channel')
+        self.assertEqual(action.binding_type, 'action')
+        self.assertIn('action_fetch_group_members_bulk()', action.code)
+
+    def test_action_fetch_group_members_server_action_runs_multiple(self):
+        action = self.env.ref('x_account.action_server_fetch_group_members')
+        c1 = self._make_member_channel('Action Chat 1')
+        c2 = self._make_member_channel('Action Chat 2')
+        with patch.object(TwitterApiClient, 'request',
+                          return_value=self._members_payload()):
+            result = action.with_context(
+                active_model='discuss.channel',
+                active_ids=(c1 | c2).ids).run()
+        self.assertTrue(result)
+        self.assertEqual(result['params']['type'], 'success')
+        self.assertIn('2 chat(s)', result['params']['message'])
+        for channel in (c1 | c2):
+            self.assertEqual(
+                len(channel.channel_member_ids.filtered(
+                    lambda m: m.partner_id.x_user_id)), 3)
+
     def test_safe_group_name_rejects_short_base64_ciphertext(self):
         """A base64 blob short enough to slip old length checks must NOT become
         a channel name (it is ciphertext, not a readable name)."""
