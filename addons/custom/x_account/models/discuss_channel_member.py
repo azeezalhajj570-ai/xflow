@@ -1,4 +1,4 @@
-from odoo import fields, models
+from odoo import api, fields, models
 
 
 class DiscussChannelMember(models.Model):
@@ -24,3 +24,15 @@ class DiscussChannelMember(models.Model):
         related='partner_id.x_is_blue_verified',
         readonly=True,
     )
+    x_partner_is_following = fields.Boolean(
+        string='Following',
+        compute='_compute_x_partner_is_following',
+        readonly=True,
+        help='Whether the channel X account already follows this member.',
+    )
+
+    @api.depends('partner_id', 'channel_id.x_account_id.x_following_ids')
+    def _compute_x_partner_is_following(self):
+        for member in self:
+            following = member.channel_id.x_account_id.x_following_ids
+            member.x_partner_is_following = member.partner_id in following

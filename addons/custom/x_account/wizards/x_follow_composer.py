@@ -49,10 +49,41 @@ class XFollowComposer(models.TransientModel):
         help='Time to wait between each follow request.',
     )
 
+    def _followable_members(self, channel=None):
+        """Channel group members that can be bulk-followed.
+
+        Excludes members without an ``x_username``, the account's own X
+        profile, and members the account already follows (``x_following_ids``).
+        """
+        channel = channel or self.channel_id
+        if not channel:
+            return self.env['res.partner']
+        members = channel.x_group_member_ids
+        account = channel.x_account_id
+        if not account:
+            return members.filtered('x_username')
+        own_user_id = str(account.twitter_user_id or '').strip()
+        own_handle = (account.social_account_handle or '').lower().lstrip('@')
+        followed_ids = account.sudo().x_following_ids.ids
+        result = self.env['res.partner']
+        for member in members:
+            if not member.x_username:
+                continue
+            if member.id in followed_ids:
+                continue
+            username = member.x_username.lower().lstrip('@')
+            if own_handle and username == own_handle:
+                continue
+            if own_user_id and member.x_user_id \
+                    and str(member.x_user_id).strip() == own_user_id:
+                continue
+            result |= member
+        return result
+
     @api.depends('channel_id')
     def _compute_member_pool_ids(self):
         for composer in self:
-            composer.member_pool_ids = composer.channel_id.x_group_member_ids
+            composer.member_pool_ids = composer._followable_members()
 
     @api.model
     def default_get(self, fields_list):
@@ -64,7 +95,7 @@ class XFollowComposer(models.TransientModel):
             if 'member_ids' in fields_list:
                 channel = self.env['discuss.channel'].browse(active_id)
                 result['member_ids'] = [
-                    (6, 0, channel.x_group_member_ids.filtered('x_username').ids)
+                    (6, 0, self._followable_members(channel).ids)
                 ]
         return result
 
@@ -80,7 +111,7 @@ class XFollowComposer(models.TransientModel):
             return self._follow_result(
                 _('No valid X account for conversation %s.') % channel.name,
                 kind='danger')
-        members = self.member_ids.filtered('x_username')
+        members = self.member_ids & self._followable_members()
         if not members:
             return self._follow_result(
                 _('Select at least one member with an X username.'),
