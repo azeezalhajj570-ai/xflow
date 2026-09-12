@@ -40,6 +40,28 @@
         </field>
     </record>
 
+    <record id="x_account_group_view_search" model="ir.ui.view">
+        <field name="name">x.account.group.view.search</field>
+        <field name="model">x.account.group</field>
+        <field name="arch" type="xml">
+            <search string="X Account Groups">
+                <field name="name"/>
+                <field name="description"/>
+                <field name="account_ids"/>
+                <filter string="Auto Execute" name="auto_execute" domain="[('auto_execute', '=', True)]"/>
+                <filter string="Paused" name="paused" domain="[('paused', '=', True)]"/>
+                <filter string="Running" name="running" domain="[('auto_execute', '=', True), ('paused', '=', False)]"/>
+                <filter string="Has Accounts" name="has_accounts" domain="[('account_ids', '!=', False)]"/>
+                <group>
+                    <filter string="Automation Action" name="groupby_actions" domain="[]" context="{'group_by': 'actions'}"/>
+                    <filter string="Auto Execute" name="groupby_auto_execute" domain="[]" context="{'group_by': 'auto_execute'}"/>
+                    <filter string="Paused" name="groupby_paused" domain="[]" context="{'group_by': 'paused'}"/>
+                    <filter string="Creation Date" name="groupby_create_date" domain="[]" context="{'group_by': 'create_date:month'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
     <record id="action_x_account_group" model="ir.actions.act_window">
         <field name="name">X Account Groups</field>
         <field name="res_model">x.account.group</field>

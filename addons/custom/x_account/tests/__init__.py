@@ -10,6 +10,7 @@ from . import test_portability
 from . import test_official_publish
 from . import test_fetch_groups
 from . import test_discuss_channel
+from . import test_search_views
 from . import test_orphan_backfill
 from . import test_dual_provider
 from . import test_dm_automation

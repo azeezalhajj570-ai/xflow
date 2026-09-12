@@ -45,6 +45,39 @@
         </field>
     </record>
 
+    <record id="x_message_view_search" model="ir.ui.view">
+        <field name="name">x.message.view.search</field>
+        <field name="model">x.message</field>
+        <field name="arch" type="xml">
+            <search string="X Messages">
+                <field name="body_plain" string="Body"/>
+                <field name="external_id"/>
+                <field name="author_x_username"/>
+                <field name="author_partner_id"/>
+                <field name="channel_id"/>
+                <field name="account_id"/>
+                <filter string="Incoming" name="direction_inbound" domain="[('direction', '=', 'inbound')]"/>
+                <filter string="Outgoing" name="direction_outbound" domain="[('direction', '=', 'outbound')]"/>
+                <separator/>
+                <filter string="Acknowledged" name="acked" domain="[('acked', '=', True)]"/>
+                <filter string="Delivered" name="delivered" domain="[('delivered', '=', True)]"/>
+                <filter string="Participant Joined" name="participant_joined" domain="[('participant_joined', '=', True)]"/>
+                <filter string="Participant Left" name="participant_left" domain="[('participant_left', '=', True)]"/>
+                <separator/>
+                <filter string="Received" name="filter_external_created_at" date="external_created_at"/>
+                <separator/>
+                <group>
+                    <filter string="Direction" name="groupby_direction" domain="[]" context="{'group_by': 'direction'}"/>
+                    <filter string="X Account" name="groupby_account" domain="[]" context="{'group_by': 'account_id'}"/>
+                    <filter string="Chat" name="groupby_channel" domain="[]" context="{'group_by': 'channel_id'}"/>
+                    <filter string="Author" name="groupby_author" domain="[]" context="{'group_by': 'author_partner_id'}"/>
+                    <filter string="Company" name="groupby_company" domain="[]" context="{'group_by': 'company_id'}"/>
+                    <filter string="Creation Date" name="groupby_create_date" domain="[]" context="{'group_by': 'create_date:month'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
     <record id="action_x_account_messages" model="ir.actions.act_window">
         <field name="name">X Messages</field>
         <field name="res_model">x.message</field>

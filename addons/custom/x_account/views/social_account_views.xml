@@ -108,6 +108,37 @@
         </field>
     </record>
 
+    <record id="view_social_account_search_inherit_x_account" model="ir.ui.view">
+        <field name="name">social.account.search.inherit.x_account</field>
+        <field name="model">social.account</field>
+        <field name="inherit_id" ref="social.social_account_view_search"/>
+        <field name="arch" type="xml">
+            <xpath expr="//search" position="inside">
+                <separator/>
+                <filter string="X: Active" name="x_connection_active"
+                    domain="[('x_connection_status', '=', 'active')]"/>
+                <filter string="X: Needs Reauthentication" name="x_connection_reauth"
+                    domain="[('x_connection_status', '=', 'reauth_required')]"/>
+                <filter string="X: Disconnected / Invalid" name="x_connection_broken"
+                    domain="[('x_connection_status', 'in', ['disconnected', 'invalid', 'error'])]"/>
+                <filter string="X: Disabled" name="x_connection_disabled"
+                    domain="[('x_connection_status', '=', 'disabled')]"/>
+                <filter string="X: Chat Not Initialized" name="x_chat_not_initialized"
+                    domain="[('x_chat_initialized', '=', False)]"/>
+                <filter string="X: PIN Rejected" name="x_chat_pin_locked"
+                    domain="[('x_chat_pin_locked', '=', True)]"/>
+                <group>
+                    <filter string="X Connection Status" name="x_groupby_connection_status" domain="[]"
+                        context="{'group_by': 'x_connection_status'}"/>
+                    <filter string="X Chat Key Source" name="x_groupby_chat_key_mode" domain="[]"
+                        context="{'group_by': 'x_chat_key_mode'}"/>
+                    <filter string="X Chat Initialized" name="x_groupby_chat_initialized" domain="[]"
+                        context="{'group_by': 'x_chat_initialized'}"/>
+                </group>
+            </xpath>
+        </field>
+    </record>
+
     <record id="action_x_account_social_accounts" model="ir.actions.act_window">
         <field name="name">X Accounts</field>
         <field name="res_model">social.account</field>

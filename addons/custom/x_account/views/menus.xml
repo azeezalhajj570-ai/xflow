@@ -67,6 +67,13 @@
         sequence="25"/>
 
     <menuitem
+        id="menu_x_account_groups"
+        name="Groups"
+        parent="menu_x_account_root"
+        action="action_x_account_group"
+        sequence="30"/>
+
+    <menuitem
         id="menu_x_account_tasks"
         name="Tasks"
         parent="menu_x_account_root"
