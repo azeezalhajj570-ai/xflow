@@ -91,11 +91,7 @@ class TestXBulkFollow(XAccountTestBase):
             active_model='discuss.channel', active_id=channel.id
         ).create({})
         self.assertEqual(wizard.channel_id.id, channel.id)
-        self.assertEqual(wizard.line_ids.partner_id, m1 | m2)
-        self.assertTrue(
-            wizard.line_ids.filtered(lambda line: line.partner_id == m1).do_follow)
-        self.assertFalse(
-            wizard.line_ids.filtered(lambda line: line.partner_id == m2).do_follow)
+        self.assertEqual(wizard.member_ids, m1)
         self.assertEqual(wizard.cooldown_sec, 10)
 
     def test_action_follow_enqueues_one_task_per_member_staggered(self):
@@ -145,7 +141,7 @@ class TestXBulkFollow(XAccountTestBase):
         self.assertEqual(
             len(set(tasks.mapped('next_retry_at'))), 1)
 
-    def test_action_follow_skips_unchecked_members(self):
+    def test_action_follow_only_follows_selected_members(self):
         account = self._make_account('follow_skipped')
         m1 = self._make_member('u1', username='user_one')
         m2 = self._make_member('u2', username='user_two')
@@ -153,11 +149,7 @@ class TestXBulkFollow(XAccountTestBase):
         wizard = self.env['x.follow.composer'].with_context(
             active_model='discuss.channel', active_id=channel.id
         ).create({})
-        wizard.write({
-            'line_ids': [(1, line.id, {'do_follow': False})
-                         for line in wizard.line_ids
-                         if line.partner_id == m2]
-        })
+        wizard.write({'member_ids': [(6, 0, [m1.id])]})
 
         result = wizard.action_follow()
 
@@ -177,7 +169,7 @@ class TestXBulkFollow(XAccountTestBase):
         channel = self._make_group_channel(account, m1 | m2)
         wizard = self.env['x.follow.composer'].with_context(
             active_model='discuss.channel', active_id=channel.id
-        ).create({})
+        ).create({'member_ids': [(6, 0, [m1.id, m2.id])]})
 
         result = wizard.action_follow()
 
