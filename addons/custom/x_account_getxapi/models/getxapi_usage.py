@@ -56,7 +56,7 @@ class GetXAPIUsage(models.Model):
     )
     estimated_cost = fields.Float(
         string='Estimated Cost (USD)',
-        digits=(10, 4),
+        digits=(16, 8),
         help='Estimated USD cost for this API call based on the pricing table.',
     )
     request_duration = fields.Integer(

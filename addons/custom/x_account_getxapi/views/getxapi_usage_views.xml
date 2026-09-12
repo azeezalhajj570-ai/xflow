@@ -23,7 +23,7 @@
                     <field name="method" widget="badge"/>
                     <field name="status_code"/>
                     <field name="success" widget="boolean"/>
-                    <field name="estimated_cost" widget="monetary"/>
+                    <field name="estimated_cost"/>
                     <field name="request_duration" string="Duration (ms)"/>
                     <field name="error_type" optional="hide"/>
                 </list>
