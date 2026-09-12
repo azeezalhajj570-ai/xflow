@@ -31,6 +31,10 @@
                         string="Fetch Info" class="btn-secondary"
                         groups="social.group_social_user"
                         confirm="Fetch this conversation's info from X and update its name?"/>
+                    <button name="action_fetch_group_members" type="object"
+                        string="Fetch Members" class="btn-secondary"
+                        groups="social.group_social_user"
+                        confirm="Fetch this conversation's members and their usernames from X and update the member list?"/>
                 </header>
                 <sheet>
                     <div class="oe_title">

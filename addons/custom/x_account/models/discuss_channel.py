@@ -381,6 +381,125 @@ class DiscussChannel(models.Model):
             },
         }
 
+    def action_fetch_group_members(self):
+        """Fetch this conversation's members and their usernames from X.
+
+        Uses the same provider lookup and endpoint as
+        :meth:`action_fetch_group_info` (the official X Chat API is the only
+        one that returns group member ids and usernames); falls back to the
+        action provider when the event provider does not implement the lookup.
+
+        Upserts the members as ``res.partner`` records (``x_user_id`` +
+        ``x_username``) and ensures each one is a member of the channel.
+        """
+        self.ensure_one()
+        if self.channel_type not in ('x', 'x_group'):
+            raise ValueError(
+                'Fetch group members is only available on X conversations.')
+        account = self.x_account_id
+        if not account:
+            raise ValueError('This conversation has no linked X account.')
+        if not self.x_conversation_id:
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': 'Fetch Group Members',
+                    'message': 'This conversation has no conversation id to look up.',
+                    'type': 'warning',
+                    'sticky': True,
+                },
+            }
+        provider = account.get_event_provider()
+        fetch = getattr(provider, 'get_group_info', None)
+        if not fetch:
+            provider = account.get_action_provider()
+            fetch = getattr(provider, 'get_group_info', None)
+        if not fetch:
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': 'Fetch Group Members',
+                    'message': 'Provider %s does not support fetching '
+                               'conversation members.' % account.x_provider,
+                    'type': 'warning',
+                    'sticky': True,
+                },
+            }
+        try:
+            result = fetch(account, self.x_conversation_id)
+        except Exception as exc:
+            _logger.exception('action_fetch_group_members failed: %s', exc)
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': 'Fetch Group Members',
+                    'message': 'Failed to fetch conversation members: %s' % exc,
+                    'type': 'danger',
+                    'sticky': True,
+                },
+            }
+        if not result or not result.get('conversation_id'):
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': 'Fetch Group Members',
+                    'message': 'Conversation %s not found or no longer '
+                               'accessible.' % (self.x_conversation_id or ''),
+                    'type': 'warning',
+                    'sticky': True,
+                },
+            }
+        member_ids = result.get('member_ids') or []
+        member_names = result.get('member_names') or []
+        by_uid = dict(zip([str(uid) for uid in member_ids], member_names))
+        partner_model = self.env['res.partner'].sudo()
+        member_model = self.env['discuss.channel.member'].sudo()
+        created = updated = 0
+        partners = partner_model.browse()
+        for x_uid in member_ids:
+            partner = partner_model.search(
+                [('x_user_id', '=', str(x_uid))], limit=1)
+            username = by_uid.get(str(x_uid)) or ''
+            name = username or str(x_uid)
+            if not partner:
+                partner = partner_model.create({
+                    'name': name,
+                    'x_user_id': str(x_uid),
+                    'x_username': username,
+                })
+                created += 1
+            elif partner.x_username != username:
+                partner.write({'x_username': username})
+                updated += 1
+            partners |= partner
+        existing = member_model.search([
+            ('channel_id', '=', self.id),
+            ('partner_id', 'in', partners.ids),
+        ]).mapped('partner_id')
+        member_model.create([
+            {'channel_id': self.id, 'partner_id': pid}
+            for pid in (partners - existing).ids
+        ])
+        usernames = [by_uid.get(str(uid)) or str(uid) for uid in member_ids]
+        preview = ', '.join('@%s' % u for u in usernames[:10])
+        if len(usernames) > 10:
+            preview += ' and %s more' % (len(usernames) - 10)
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': 'Fetch Group Members',
+                'message': 'Fetched %s member(s) (%s new, %s updated): %s'
+                           % (len(usernames), created, updated, preview),
+                'type': 'success',
+                'sticky': False,
+            },
+        }
+
     @api.model
     def _handle_x_inbound_event(self, event):
         """Route a generic inbound X event into an x.message + discuss channel."""
