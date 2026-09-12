@@ -32,7 +32,7 @@ so manual edits are never overwritten.
 import logging
 import re
 
-from .twitter_errors import TwitterError
+from .twitter_errors import TwitterError, describe
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -71,14 +71,19 @@ class TwitterGroupSync:
         ``meta.conversation_key_events``, and stops as soon as a recovered key
         decrypts the ciphertext (capped to bound cost / rate usage).
 
-        Returns the plaintext group name, or '' when it cannot be decrypted.
+        Returns ``(name, reason, detail)``: the plaintext group name (or '')
+        plus why it could not be recovered, so the caller can report the exact
+        cause — ``'no_key'`` (no chat decryption key/PIN), ``'rate_limited'``
+        (X throttled the scan) or ``'not_found'`` (scan found no key event).
         """
         try:
             decryptor = self._xchat_decryptor()
-        except Exception:
-            return ''
+        except Exception as exc:
+            return '', 'error', '%s: %s' % (type(exc).__name__, exc)
         if not decryptor.available:
-            return ''
+            return '', 'no_key', (
+                'no chat decryption key available (key mode %s)'
+                % (self.client.account.x_chat_key_mode or 'key_blob'))
         account = self.client.account
         cached = {}
         try:
@@ -88,9 +93,10 @@ class TwitterGroupSync:
             cached = {}
         plain = decryptor.decrypt_metadata(ciphertext, cached_keys=cached)
         if plain:
-            return self._safe_group_name(plain)
+            return self._safe_group_name(plain), None, None
         token = None
         consecutive_throttle = 0
+        last_error = None
         for _ in range(60):
             params = {'chat_event.fields': 'id', 'max_results': 100}
             if token:
@@ -102,13 +108,14 @@ class TwitterGroupSync:
                 consecutive_throttle = 0
             except TwitterError as exc:
                 if not getattr(exc, 'retryable', False):
-                    raise
+                    return '', 'error', describe(exc)
+                last_error = exc
                 consecutive_throttle += 1
                 if consecutive_throttle > 4:
                     _LOGGER.warning(
                         'Chat events scan for %s stayed throttled; giving up '
-                        'name decrypt', conv_id)
-                    return ''
+                        'name decrypt (%s)', conv_id, describe(exc))
+                    return '', 'rate_limited', describe(last_error)
                 _LOGGER.warning(
                     'Chat events scan throttled for %s on decrypt (%s); '
                     'backing off', conv_id, exc.message)
@@ -127,11 +134,15 @@ class TwitterGroupSync:
                 plain = decryptor.decrypt_metadata(
                     ciphertext, cached_keys=cached)
                 if plain:
-                    return self._safe_group_name(plain)
+                    return self._safe_group_name(plain), None, None
             token = meta.get('next_token')
             if not token:
                 break
-        return ''
+        if last_error is not None:
+            return '', 'rate_limited', describe(last_error)
+        return '', 'not_found', (
+            'scanned the conversation events feed without finding the '
+            'conversation key')
 
     def get_conversation_info(self, conversation_id):
         """Fetch one X conversation via ``GET /2/chat/conversations/{id}``.
@@ -187,11 +198,13 @@ class TwitterGroupSync:
             member_names.append(user.get('username') or user.get('name') or x_uid)
 
         group_name = self._safe_group_name(conv.get('group_name'))
+        decrypt_reason = decrypt_detail = None
         undecrypted = bool(conv.get('group_name')) and not group_name \
             and channel_type == 'x_group'
         if undecrypted:
-            group_name = self._decrypt_conversation_group_name(
-                conv_id, conv.get('group_name'))
+            group_name, decrypt_reason, decrypt_detail = (
+                self._decrypt_conversation_group_name(
+                    conv_id, conv.get('group_name')))
             undecrypted = not group_name
         if channel_type == 'x':
             other_names = [n for uid, n in zip(
@@ -217,6 +230,8 @@ class TwitterGroupSync:
         }
         if undecrypted:
             result['undecrypted'] = True
+            result['undecrypted_reason'] = decrypt_reason or 'unknown'
+            result['undecrypted_detail'] = decrypt_detail or ''
         return result
 
     def fetch_groups(self, account, limit=100):

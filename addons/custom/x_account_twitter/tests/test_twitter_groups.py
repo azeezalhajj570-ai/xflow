@@ -5,7 +5,8 @@ from odoo.tests import tagged
 from odoo.addons.x_account_twitter.services.twitter_api_client import TwitterApiClient
 from odoo.addons.x_account_twitter.services.twitter_errors import (
     TwitterAuthenticationError, TwitterPermissionError, TwitterNotFoundError,
-    TwitterTemporaryError)
+    TwitterRateLimitError, TwitterTemporaryError)
+from odoo.addons.x_account_twitter.services.twitter_group_sync import TwitterGroupSync
 from odoo.addons.x_account_twitter.services.twitter_provider import TwitterProvider
 
 from .common import XAccountTwitterTestBase
@@ -396,6 +397,75 @@ class TestTwitterGroups(XAccountTwitterTestBase):
         self.assertEqual(channel.name, 'Real Name (kept)')
         self.assertEqual(result['params']['type'], 'warning')
         self.assertIn('Could not decrypt', result['params']['message'])
+
+    def _ciphertext_conv_page(self):
+        return {
+            'data': {'id': CHAT_GROUP_ID, 'type': 'group',
+                     'group_name': 'A' * 88, 'member_ids': ['111'],
+                     'participant_ids': ['111'], 'admin_ids': ['111']},
+            'includes': {'users': [
+                {'id': '111', 'name': 'Alice', 'username': 'alice'}]},
+        }
+
+    def test_action_fetch_group_info_reports_rate_limit_exactly(self):
+        """A throttled key scan must report X's 429 with the real limit
+        numbers, not the misleading 'set the encryption code' hint."""
+        account = self._make_account()
+        account.write({'x_chat_key_blob': 'fake-blob',
+                       'x_chat_signing_key_version': '1',
+                       'x_chat_key_mode': 'key_blob'})
+        channel = self.env['discuss.channel'].sudo().create({
+            'name': 'Rate Limited (kept)',
+            'channel_type': 'x_group',
+            'x_account_id': account.id,
+            'x_conversation_id': CHAT_GROUP_ID,
+        })
+        conv_page = self._ciphertext_conv_page()
+        fake_chat = MagicMock()
+        fake_chat.decrypt.side_effect = TypeError('conversation key required')
+        throttle = TwitterRateLimitError('Too Many Requests')
+        throttle.rate_limit_limit = 30
+        throttle.rate_limit_remaining = 0
+        throttle.rate_limit_reset_epoch = 1789250641
+
+        def _request(method, url, **kwargs):
+            if url.endswith('/events'):
+                raise throttle
+            return conv_page
+
+        with patch.object(TwitterApiClient, 'request', side_effect=_request), \
+             patch.object(TwitterApiClient, '_sleep'), \
+             patch('chat_xdk.Chat', return_value=fake_chat):
+            result = channel.action_fetch_group_info()
+        message = result['params']['message']
+        self.assertEqual(result['params']['type'], 'warning')
+        self.assertIn('rate_limit', message)
+        self.assertIn('Too Many Requests', message)
+        self.assertIn('limit=30, remaining=0', message)
+        self.assertIn('2026-09-12 22:04 UTC', message)
+        self.assertNotIn('encryption code', message)
+        self.assertEqual(channel.name, 'Rate Limited (kept)')
+
+    def test_action_fetch_group_info_reports_missing_key_hint(self):
+        """With no chat key material at all, the encryption-code hint is the
+        right thing to show."""
+        account = self._make_account()
+        channel = self.env['discuss.channel'].sudo().create({
+            'name': 'No Key (kept)',
+            'channel_type': 'x_group',
+            'x_account_id': account.id,
+            'x_conversation_id': CHAT_GROUP_ID,
+        })
+        conv_page = self._ciphertext_conv_page()
+        fake_decryptor = MagicMock()
+        fake_decryptor.available = False
+
+        with patch.object(TwitterApiClient, 'request', return_value=conv_page), \
+             patch.object(TwitterGroupSync, '_xchat_decryptor',
+                          return_value=fake_decryptor):
+            result = channel.action_fetch_group_info()
+        self.assertEqual(result['params']['type'], 'warning')
+        self.assertIn('encryption code', result['params']['message'])
 
     # ------------------------------------------------- fetch group members
     def test_action_fetch_group_members_upserts_partners_and_membership(self):

@@ -114,6 +114,7 @@ class TwitterApiClient:
         if response.status_code == 429 \
                 and isinstance(exc, twitter_errors.TwitterRateLimitError):
             exc.reset_epoch = self._reset_epoch(response)
+            self._attach_rate_limit_headers(exc, response)
         raise exc
 
     # --------------------------------------------------------------- internals
@@ -168,6 +169,25 @@ class TwitterApiClient:
             return int(response.headers.get('x-user-limit-24hour-reset'))
         except (AttributeError, TypeError, ValueError):
             return None
+
+    @staticmethod
+    def _attach_rate_limit_headers(exc, response):
+        """Copy the endpoint-window 429 headers onto ``exc``.
+
+        ``x-rate-limit-*`` describe the per-endpoint window that actually
+        throttled the request (usually minutes), unlike ``x-user-limit-24hour-*``
+        which describe the daily user cap. Keeping both lets callers report the
+        real cause instead of a generic hint.
+        """
+        def _int_like(header):
+            try:
+                return int(response.headers.get(header))
+            except (AttributeError, TypeError, ValueError):
+                return None
+
+        exc.rate_limit_limit = _int_like('x-rate-limit-limit')
+        exc.rate_limit_remaining = _int_like('x-rate-limit-remaining')
+        exc.rate_limit_reset_epoch = _int_like('x-rate-limit-reset')
 
     @staticmethod
     def _retry_delay(attempt, retry_after):

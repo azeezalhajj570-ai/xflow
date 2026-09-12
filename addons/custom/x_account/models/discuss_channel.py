@@ -380,12 +380,31 @@ class DiscussChannel(models.Model):
                            'accessible.' % (self.x_conversation_id or ''),
             }
         if result.get('undecrypted'):
+            reason = result.get('undecrypted_reason')
+            detail = result.get('undecrypted_detail') or ''
+            if reason == 'no_key':
+                return {
+                    'ok': False,
+                    'type': 'warning',
+                    'message': 'Could not decrypt this group\'s name. Make sure '
+                               'the X Chat encryption code is set on the '
+                               'account and try again.',
+                }
+            if reason == 'rate_limited':
+                # Surface X's own numbers: the scan for the group-name key is
+                # throttled, which has nothing to do with the encryption code.
+                return {
+                    'ok': False,
+                    'type': 'warning',
+                    'message': 'X rate limit reached while looking up this '
+                               'group\'s name key: %s. Wait for the limit to '
+                               'reset and try again.' % (detail or 'HTTP 429'),
+                }
             return {
                 'ok': False,
                 'type': 'warning',
-                'message': 'Could not decrypt this group\'s name. Make sure '
-                           'the X Chat encryption code is set on the '
-                           'account and try again.',
+                'message': 'Could not decrypt this group\'s name: %s'
+                           % (detail or 'no conversation key found'),
             }
         name = result.get('name')
         updated = bool(name) and self.name != name
