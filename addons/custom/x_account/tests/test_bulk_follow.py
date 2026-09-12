@@ -94,6 +94,48 @@ class TestXBulkFollow(XAccountTestBase):
         self.assertEqual(wizard.member_ids, m1)
         self.assertEqual(wizard.cooldown_sec, 10)
 
+    def test_member_pool_excludes_self_no_username_and_followed(self):
+        account = self._make_account('poolowner')
+        account.write({'twitter_user_id': 'z99'})
+        self_member = self._make_member('z99', username='poolowner')
+        no_username = self._make_member('x2', username=None)
+        already = self._make_member('x3', username='already_followed')
+        target = self._make_member('x4', username='pool_target')
+        channel = self._make_group_channel(
+            account, self_member | no_username | already | target)
+        account.write({'x_following_ids': [(6, 0, [already.id])]})
+        wizard = self.env['x.follow.composer'].with_context(
+            active_model='discuss.channel', active_id=channel.id
+        ).create({})
+        self.assertEqual(wizard.member_pool_ids, target)
+        self.assertEqual(wizard.member_ids, target)
+
+    def test_action_follow_skips_self_and_already_followed(self):
+        account = self._make_account('skipself')
+        account.write({'twitter_user_id': 's1'})
+        self_member = self._make_member('s1', username='skipself')
+        already = self._make_member('x5', username='already_followed')
+        target = self._make_member('x6', username='real_target')
+        channel = self._make_group_channel(
+            account, self_member | already | target)
+        account.write({'x_following_ids': [(6, 0, [already.id])]})
+        wizard = self.env['x.follow.composer'].with_context(
+            active_model='discuss.channel', active_id=channel.id
+        ).create({
+            'member_ids': [(6, 0, [self_member.id, already.id, target.id])],
+        })
+
+        result = wizard.action_follow()
+
+        self.assertEqual(result['params']['type'], 'success')
+        tasks = self.env['x.account.task'].search([
+            ('account_id', '=', account.id),
+            ('operation', '=', 'follow'),
+        ])
+        self.assertEqual(len(tasks), 1)
+        self.assertEqual(
+            json.loads(tasks.task_context)['screen_name'], 'real_target')
+
     def test_action_follow_enqueues_one_task_per_member_staggered(self):
         account = self._make_account('follow_enqueue')
         m1 = self._make_member('u1', username='user_one')
@@ -226,3 +268,29 @@ class TestXBulkFollow(XAccountTestBase):
             self.env['x.account.task']._process_queue()
         task.invalidate_recordset()
         self.assertEqual(task.status, 'success')
+
+    def test_executed_follow_marks_account_following(self):
+        account = self._make_account('follow_marks')
+        m1 = self._make_member('u1', username='user_one')
+        m2 = self._make_member('u2', username='user_two')
+        channel = self._make_group_channel(account, m1 | m2)
+        wizard = self.env['x.follow.composer'].with_context(
+            active_model='discuss.channel', active_id=channel.id
+        ).create({'cooldown_sec': 0})
+        wizard.action_follow()
+        tasks = self.env['x.account.task'].search([
+            ('account_id', '=', account.id),
+            ('operation', '=', 'follow'),
+        ])
+        self.assertEqual(len(tasks), 2)
+        with patch.object(
+            SessionWebProvider, 'follow',
+            autospec=True,
+            side_effect=lambda self_, screen_name=None, **kw: {
+                'screen_name': screen_name, 'followed': True},
+        ):
+            self.env['x.account.task']._process_queue()
+        for task in tasks:
+            task.invalidate_recordset()
+            self.assertEqual(task.status, 'success')
+        self.assertEqual(account.x_following_ids, m1 | m2)

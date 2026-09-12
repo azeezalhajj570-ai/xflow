@@ -253,10 +253,12 @@ class GetXAPIClient:
                 'error_type': error_type or '',
                 'account_id': self._account_id,
             }
-            self._env['getxapi.api.usage'].sudo().create(vals)
-        except Exception:
-            self._env.cr.rollback()
-            _LOGGER.debug('GetXAPI: failed to log usage for %s', path, exc_info=True)
+            created = self._env['getxapi.api.usage'].sudo().create(vals)
+            _LOGGER.info('GetXAPI usage logged: acc=%s status=%s endpoint=%s id=%s',
+                         self._account_id, status_code, path, created.id)
+        except Exception as exc:
+            _LOGGER.warning('GetXAPI usage LOG FAILED: %r', exc, exc_info=True)
+            raise
 
     @staticmethod
     def _retry_delay(attempt, retry_after):

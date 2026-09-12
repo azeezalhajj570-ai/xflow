@@ -102,6 +102,7 @@ class TestXSaveXMessage(XAccountTestBase):
         self.assertIn('editable="bottom"', arch)
         self.assertIn('x_partner_username', arch)
         self.assertIn('x_partner_blue_verified', arch)
+        self.assertIn('x_partner_is_following', arch)
 
     def test_group_members_editable_formset_adds_member(self):
         channel = self._channel('g-test-3')
@@ -147,3 +148,20 @@ class TestXSaveXMessage(XAccountTestBase):
             active_id=channel.id).run()
         self.assertTrue(result)
         self.assertEqual(result['params']['type'], 'warning')
+
+    def test_member_following_flag_reflects_account_following(self):
+        channel = self._channel('g-test-5')
+        followed = self.env['res.partner'].create({'name': 'Followed Member'})
+        other = self.env['res.partner'].create({'name': 'Other Member'})
+        self.env['discuss.channel.member'].sudo().create([
+            {'channel_id': channel.id, 'partner_id': followed.id},
+            {'channel_id': channel.id, 'partner_id': other.id},
+        ])
+        self.account.write({'x_following_ids': [(6, 0, [followed.id])]})
+
+        flags = {
+            member.partner_id: member.x_partner_is_following
+            for member in channel.channel_member_ids
+        }
+        self.assertTrue(flags[followed])
+        self.assertFalse(flags[other])

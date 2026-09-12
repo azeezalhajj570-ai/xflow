@@ -185,6 +185,14 @@ class SocialAccount(models.Model):
         compute='_compute_x_group_count',
         help='Number of X group-DM channels for this account.',
     )
+    x_following_ids = fields.Many2many(
+        'res.partner',
+        relation='x_account_following_rel',
+        column1='account_id',
+        column2='partner_id',
+        string='X Following',
+        help='Partners (X users) that this account already follows.',
+    )
 
     @api.depends('x_session_store_id')
     def _compute_x_group_count(self):

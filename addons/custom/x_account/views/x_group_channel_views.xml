@@ -53,6 +53,7 @@
                                     <field name="x_partner_username" string="Username" readonly="1"/>
                                     <field name="x_partner_verified" string="Verified" readonly="1"/>
                                     <field name="x_partner_blue_verified" string="Blue Verified" readonly="1"/>
+                                    <field name="x_partner_is_following" string="Following" readonly="1"/>
                                 </list>
                             </field>
                         </page>

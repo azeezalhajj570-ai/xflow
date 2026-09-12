@@ -94,24 +94,27 @@ class TestGetXAPIUserService(XAccountGetXAPITestBase):
         with patch.object(GetXAPIClient, 'post', return_value={
             'data': {'result': {'following': True, 'user_id': '100'}},
         }) as mocked:
-            result = self.service.follow('alice')
+            result = self.service.follow('alice', auth_token='tok')
         self.assertTrue(result['success'])
         body = mocked.call_args.kwargs['json']
-        self.assertEqual(body['userName'], 'alice')
+        self.assertEqual(body['username'], 'alice')
+        self.assertEqual(body['auth_token'], 'tok')
 
     def test_follow_strips_at(self):
         with patch.object(GetXAPIClient, 'post', return_value={
             'data': {'result': {'following': True}},
         }) as mocked:
-            self.service.follow('@alice')
+            self.service.follow('@alice', auth_token='tok')
         body = mocked.call_args.kwargs['json']
-        self.assertEqual(body['userName'], 'alice')
+        self.assertEqual(body['username'], 'alice')
+        self.assertEqual(body['auth_token'], 'tok')
 
     def test_unfollow(self):
         with patch.object(GetXAPIClient, 'post', return_value={
             'data': {'result': {'following': False, 'user_id': '100'}},
         }) as mocked:
-            result = self.service.unfollow('alice')
+            result = self.service.unfollow('alice', auth_token='tok')
         self.assertTrue(result['success'])
         body = mocked.call_args.kwargs['json']
-        self.assertEqual(body['userName'], 'alice')
+        self.assertEqual(body['username'], 'alice')
+        self.assertEqual(body['auth_token'], 'tok')

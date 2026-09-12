@@ -240,6 +240,8 @@ class XAccountTask(models.Model):
             ctx.update(extra_ctx)
             result = fn(**{k: v for k, v in ctx.items() if k != 'self'})
             self.write({'status': 'success', 'result': result})
+            if op == 'follow' and self._follow_succeeded(result):
+                self._record_follow(account)
             return result
         except Exception as exc:
             self._schedule_retry(str(exc))
@@ -257,6 +259,66 @@ class XAccountTask(models.Model):
             })
         else:
             self.write({'status': 'failed'})
+
+    def _task_context(self):
+        try:
+            return json.loads(self.task_context or '{}')
+        except ValueError:
+            return {}
+
+    @staticmethod
+    def _follow_succeeded(result):
+        """Whether a follow operation result signals success.
+
+        Providers either return a plain truthy DTO or a dict with a success
+        flag ('ok', 'success', 'followed', ...). An empty result counts as
+        failure so the account is not marked as following the target.
+        """
+        if not result:
+            return False
+        if isinstance(result, dict):
+            for key in ('ok', 'success', 'successful', 'followed'):
+                if key in result:
+                    return bool(result[key])
+            if not result:
+                return False
+        return True
+
+    def _find_followed_partner(self, account, screen_name):
+        """Resolve the followed X member partner for a follow task.
+
+        Prefers the task's conversation members, then falls back to a global
+        ``x_username`` match, so the partner only has X identity data.
+        """
+        if not screen_name:
+            return None
+        ctx = self._task_context()
+        members = self.env['res.partner']
+        channel_id = ctx.get('channel_id')
+        if channel_id:
+            channel = self.env['discuss.channel'].browse(channel_id)
+            if channel and channel.exists():
+                members = channel.x_group_member_ids
+        needle = str(screen_name).lstrip('@')
+        partner = members.filtered(
+            lambda p: p.x_username and p.x_username.lstrip('@') == needle)
+        if not partner:
+            partner = self.env['res.partner'].sudo().search([
+                ('x_user_id', '!=', False),
+                '|',
+                ('x_username', '=', needle),
+                ('x_username', '=', '@' + needle),
+            ], limit=1)
+        return partner
+
+    def _record_follow(self, account):
+        """Mark the followed target partner on the account (``x_following_ids``)."""
+        self.ensure_one()
+        ctx = self._task_context()
+        partner = self._find_followed_partner(account, ctx.get('screen_name'))
+        if not partner:
+            return
+        account.sudo().write({'x_following_ids': [(4, partner.id)]})
 
     def action_ignore_stale(self, age_minutes=None):
         """Mark pending tasks older than the freshness window as failed.
