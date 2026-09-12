@@ -108,6 +108,14 @@ class TestXSearchViews(XAccountTestBase):
             'x_account.menu_x_account_groups', raise_if_not_found=False))
         self.assertTrue(self.env.ref('x_account.action_x_account_group'))
 
+    def test_automation_lists_include_channel_rules(self):
+        """The X Automation / Server Actions lists must cover discuss.channel:
+        the 'fetch group info after creation' rule lives on that model."""
+        for xmlid in ('x_account.action_x_account_automation_rules',
+                      'x_account.action_x_account_server_actions'):
+            domain = self.env.ref(xmlid).domain or ''
+            self.assertIn("'discuss.channel'", domain, xmlid)
+
     def test_chat_action_pins_the_base_search_view(self):
         """The Chat list must resolve deterministically to the search view our
         X filters are attached to (several primaries exist for discuss.channel)."""
