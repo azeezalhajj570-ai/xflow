@@ -20,18 +20,18 @@
         <field name="arch" type="xml">
             <form string="Chat" create="false">
                 <header>
-                    <button name="action_bulk_follow" type="object"
+                    <button name="%(x_account.action_server_bulk_follow)d" type="action"
                         string="Follow Members" class="btn-secondary"
                         invisible="channel_type != 'x_group'"
                         groups="social.group_social_user"/>
-                    <button name="action_send_message" type="object"
+                    <button name="%(x_account.action_server_send_message)d" type="action"
                         string="Send Message" class="btn-primary"
                         groups="social.group_social_user"/>
-                    <button name="action_fetch_group_info" type="object"
+                    <button name="%(x_account.action_server_fetch_group_info)d" type="action"
                         string="Fetch Info" class="btn-secondary"
                         groups="social.group_social_user"
                         confirm="Fetch this conversation's info from X and update its name?"/>
-                    <button name="action_fetch_group_members" type="object"
+                    <button name="%(x_account.action_server_fetch_group_members_form)d" type="action"
                         string="Fetch Members" class="btn-secondary"
                         groups="social.group_social_user"
                         confirm="Fetch this conversation's members and their usernames from X and update the member list?"/>
@@ -40,23 +40,31 @@
                     <div class="oe_title">
                         <h1><field name="name" placeholder="Chat name (editable)"/></h1>
                     </div>
-                    <group>
-                        <field name="channel_type" string="Type" readonly="1"/>
-                        <field name="x_conversation_id" string="Conversation ID" readonly="1"/>
-                        <field name="x_account_id" string="X Account" readonly="1"/>
-                        <field name="x_group_member_count" string="Members" readonly="1"
-                            invisible="channel_type != 'x_group'"/>
-                    </group>
-                    <group string="Members" invisible="channel_type != 'x_group'">
-                        <field name="x_group_member_ids" readonly="1" nolabel="1">
-                            <list>
-                                <field name="name" string="Member Name"/>
-                                <field name="x_username" string="Username"/>
-                                <field name="x_is_verified" string="Verified"/>
-                                <field name="x_is_blue_verified" string="Blue Verified"/>
-                            </list>
-                        </field>
-                    </group>
+                    <notebook>
+                        <page string="Information" name="information">
+                            <group>
+                                <field name="channel_type" string="Type" readonly="1"/>
+                                <field name="x_conversation_id" string="Conversation ID" readonly="1"/>
+                                <field name="x_account_id" string="X Account" readonly="1"/>
+                                <field name="x_group_member_count" string="Members" readonly="1"
+                                    invisible="channel_type != 'x_group'"/>
+                            </group>
+                        </page>
+                        <page string="Members" name="members"
+                            invisible="channel_type not in ('x', 'x_group')">
+                            <field name="channel_member_ids" mode="list"
+                                context="{'active_test': False}"
+                                readonly="channel_type != 'x_group'">
+                                <list string="Members" editable="bottom">
+                                    <field name="partner_id" string="Partner" required="1"/>
+                                    <field name="x_partner_name" string="Member Name" readonly="1"/>
+                                    <field name="x_partner_username" string="Username" readonly="1"/>
+                                    <field name="x_partner_verified" string="Verified" readonly="1"/>
+                                    <field name="x_partner_blue_verified" string="Blue Verified" readonly="1"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
                 </sheet>
             </form>
         </field>

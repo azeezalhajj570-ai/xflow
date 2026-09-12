@@ -90,3 +90,57 @@ class TestXSaveXMessage(XAccountTestBase):
             self.env['x.message'].sudo().search_count([
                 ('channel_id', '=', channel.id),
             ]), 1)
+
+    def test_chat_form_uses_notebook_members_formset(self):
+        view = self.env.ref('x_account.x_group_channel_view_form')
+        arch = view.arch
+        self.assertIn('<notebook>', arch)
+        self.assertIn('string="Information"', arch)
+        self.assertIn('string="Members"', arch)
+        self.assertIn('name="channel_member_ids"', arch)
+        self.assertIn('mode="list"', arch)
+        self.assertIn('editable="bottom"', arch)
+        self.assertIn('x_partner_username', arch)
+        self.assertIn('x_partner_blue_verified', arch)
+
+    def test_group_members_editable_formset_adds_member(self):
+        channel = self._channel('g-test-3')
+        partner = self.env['res.partner'].create({'name': 'Formset Member'})
+        member = self.env['discuss.channel.member'].sudo().create({
+            'channel_id': channel.id,
+            'partner_id': partner.id,
+        })
+        self.assertIn(member, channel.channel_member_ids)
+        self.assertIn(partner, channel.channel_member_ids.partner_id)
+
+    def test_chat_form_header_buttons_use_server_actions(self):
+        view = self.env.ref('x_account.x_group_channel_view_form')
+        arch = view.arch_db
+        self.assertIn('type="action"', arch)
+        for xmlid in (
+            'x_account.action_server_bulk_follow',
+            'x_account.action_server_send_message',
+            'x_account.action_server_fetch_group_info',
+            'x_account.action_server_fetch_group_members_form',
+        ):
+            self.assertIn('name="%d"' % self.env.ref(xmlid).id, arch)
+
+    def test_chat_header_server_actions_bound_to_discuss_channel(self):
+        for xmlid in (
+            'x_account.action_server_bulk_follow',
+            'x_account.action_server_send_message',
+            'x_account.action_server_fetch_group_info',
+            'x_account.action_server_fetch_group_members_form',
+        ):
+            action = self.env.ref(xmlid)
+            self.assertEqual(action.state, 'code')
+            self.assertEqual(action.model_id.model, 'discuss.channel')
+
+    def test_fetch_members_form_server_action_runs_on_active_id(self):
+        action = self.env.ref('x_account.action_server_fetch_group_members_form')
+        channel = self._channel('g-test-4')
+        result = action.with_context(
+            active_model='discuss.channel',
+            active_id=channel.id).run()
+        self.assertTrue(result)
+        self.assertEqual(result['params']['type'], 'warning')
