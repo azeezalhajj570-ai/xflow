@@ -690,13 +690,55 @@ class DiscussChannel(models.Model):
             author_x_username=event.get('author_x_username'),
         )
 
+    def _x_is_group_conversation(self):
+        """Whether this X channel is a real group conversation.
+
+        A 1:1 conversation can be stored as ``x_group`` when it was created
+        from a GetXAPI conversation id shaped ``<user_id>:<user_id>``. Real
+        groups use a ``g``-prefixed (or numeric) conversation id, so the
+        presence of a ``:`` identifies a 1:1 mis-typed as a group.
+        """
+        self.ensure_one()
+        if self.channel_type != 'x_group':
+            return False
+        return ':' not in (self.x_conversation_id or '')
+
+    def _x_dm_recipient_user_id(self):
+        """Recipient X user id for a 1:1 conversation, or '' when unknown.
+
+        Prefers the linked partner, then falls back to a ``<id>:<id>`` /
+        ``<id>-<id>`` conversation id: the half that is not the account's own
+        user id. When the account id is unknown, only a conversation id with a
+        single distinct participant (a self conversation) is accepted.
+        """
+        self.ensure_one()
+        if self.x_partner_id and self.x_partner_id.x_user_id:
+            return self.x_partner_id.x_user_id
+        conversation_id = self.x_conversation_id or ''
+        own_id = str(self.x_account_id.twitter_user_id or '')
+        for separator in (':', '-'):
+            if separator not in conversation_id:
+                continue
+            parts = [p for p in conversation_id.split(separator) if p]
+            if own_id:
+                others = [p for p in parts if p != own_id]
+                if len(others) == 1:
+                    return others[0]
+            unique = list(dict.fromkeys(parts))
+            if len(unique) == 1:
+                return unique[0]
+            return ''
+        return ''
+
     def _enqueue_send_dm(self, text=None):
         """Enqueue an X direct-message task for this conversation (user or group).
 
-        Routes by channel_type: 1:1 ``x`` conversations send via the action
-        provider (``send_dm``), ``x_group`` conversations via the event
-        provider (``send_group_dm``, the official X API is the only one that
-        can write into an existing group conversation). Only enqueues an
+        Routes by conversation shape: real group conversations send via the
+        event provider (``send_group_dm``, the official X API is the only one
+        that can write into an existing group conversation); everything else is
+        a 1:1 conversation and sends via the action provider (``send_dm``,
+        GetXAPI), even when it was stored as ``x_group`` from a
+        ``<user_id>:<user_id>`` GetXAPI conversation id. Only enqueues an
         ``x.account.task`` — the task auto-execution rule or the queue worker
         performs the X HTTP call.
         """
@@ -718,8 +760,14 @@ class DiscussChannel(models.Model):
         if not conversation_id:
             raise ValueError(
                 'This X conversation has no conversation id to send to.')
-        if self.channel_type == 'x':
-            recipient_id = self.x_partner_id.x_user_id
+        if self._x_is_group_conversation():
+            task_ctx = {
+                'conversation_id': conversation_id,
+                'text': text,
+            }
+            operation = 'send_group_dm'
+        else:
+            recipient_id = self._x_dm_recipient_user_id()
             if not recipient_id:
                 raise ValueError(
                     'Cannot resolve the recipient X user id for channel id=%s'
@@ -729,12 +777,6 @@ class DiscussChannel(models.Model):
                 'text': text,
             }
             operation = 'send_dm'
-        else:
-            task_ctx = {
-                'conversation_id': conversation_id,
-                'text': text,
-            }
-            operation = 'send_group_dm'
         task = self.env['x.account.task'].sudo().create({
             'account_id': account.id,
             'operation': operation,
