@@ -63,6 +63,38 @@
         </field>
     </record>
 
+    <record id="x_account_task_view_search" model="ir.ui.view">
+        <field name="name">x.account.task.view.search</field>
+        <field name="model">x.account.task</field>
+        <field name="arch" type="xml">
+            <search string="X Account Tasks">
+                <field name="operation"/>
+                <field name="account_id"/>
+                <field name="group_id"/>
+                <field name="task_context"/>
+                <filter string="Pending" name="status_pending" domain="[('status', '=', 'pending')]"/>
+                <filter string="Running" name="status_running" domain="[('status', '=', 'running')]"/>
+                <filter string="Failed" name="status_failed" domain="[('status', '=', 'failed')]"/>
+                <filter string="Success" name="status_success" domain="[('status', '=', 'success')]"/>
+                <filter string="Cancelled" name="status_cancelled" domain="[('status', '=', 'cancelled')]"/>
+                <separator/>
+                <filter string="Overdue" name="overdue" domain="[('status', '=', 'pending'), ('next_retry_at', '&lt;', context_today().strftime('%Y-%m-%d %H:%M:%S'))]"/>
+                <filter string="Retried" name="retried" domain="[('retry_count', '&gt;', 0)]"/>
+                <separator/>
+                <filter string="Scheduled" name="filter_next_retry_at" date="next_retry_at"/>
+                <separator/>
+                <group>
+                    <filter string="Status" name="groupby_status" domain="[]" context="{'group_by': 'status'}"/>
+                    <filter string="Operation" name="groupby_operation" domain="[]" context="{'group_by': 'operation'}"/>
+                    <filter string="X Account" name="groupby_account" domain="[]" context="{'group_by': 'account_id'}"/>
+                    <filter string="X Account Group" name="groupby_group" domain="[]" context="{'group_by': 'group_id'}"/>
+                    <filter string="Company" name="groupby_company" domain="[]" context="{'group_by': 'company_id'}"/>
+                    <filter string="Creation Date" name="groupby_create_date" domain="[]" context="{'group_by': 'create_date:month'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
     <record id="action_x_account_task" model="ir.actions.act_window">
         <field name="name">X Account Tasks</field>
         <field name="res_model">x.account.task</field>

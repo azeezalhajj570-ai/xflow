@@ -63,11 +63,48 @@
         </field>
     </record>
 
+    <record id="view_discuss_channel_search_inherit_x_account" model="ir.ui.view">
+        <field name="name">discuss.channel.search.inherit.x_account</field>
+        <field name="model">discuss.channel</field>
+        <field name="inherit_id" ref="mail.discuss_channel_view_search"/>
+        <field name="arch" type="xml">
+            <xpath expr="//search" position="inside">
+                <field name="x_conversation_id" string="X Conversation ID"/>
+                <field name="x_account_id" string="X Account"/>
+                <separator/>
+                <filter string="X: 1:1" name="x_type_direct"
+                    domain="[('channel_type', '=', 'x')]"/>
+                <filter string="X: Groups" name="x_type_group"
+                    domain="[('channel_type', '=', 'x_group')]"/>
+                <separator/>
+                <filter string="X: Synchronized" name="x_sync_ok"
+                    domain="[('x_sync_status', '=', 'ok')]"/>
+                <filter string="X: Encrypted" name="x_sync_encrypted"
+                    domain="[('x_sync_status', '=', 'encrypted')]"/>
+                <filter string="X: Partially Synchronized" name="x_sync_partial"
+                    domain="[('x_sync_status', '=', 'partial')]"/>
+                <filter string="X: Sync Failed" name="x_sync_failed"
+                    domain="[('x_sync_status', '=', 'failed')]"/>
+                <filter string="X: Missing Account" name="x_no_account"
+                    domain="[('x_account_id', '=', False)]"/>
+                <group>
+                    <filter string="X Type" name="x_groupby_type" domain="[]"
+                        context="{'group_by': 'channel_type'}"/>
+                    <filter string="X Account" name="x_groupby_account" domain="[]"
+                        context="{'group_by': 'x_account_id'}"/>
+                    <filter string="X Sync Status" name="x_groupby_sync_status" domain="[]"
+                        context="{'group_by': 'x_sync_status'}"/>
+                </group>
+            </xpath>
+        </field>
+    </record>
+
     <record id="action_x_account_group_channels" model="ir.actions.act_window">
         <field name="name">Chat</field>
         <field name="res_model">discuss.channel</field>
         <field name="view_mode">list,form</field>
         <field name="domain">[('channel_type', 'in', ['x', 'x_group'])]</field>
+        <field name="search_view_id" ref="mail.discuss_channel_view_search"/>
         <field name="view_ids" eval="[(5, 0, 0),
             (0, 0, {'view_mode': 'list', 'view_id': ref('x_group_channel_view_tree')}),
             (0, 0, {'view_mode': 'form', 'view_id': ref('x_group_channel_view_form')})]"/>
