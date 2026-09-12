@@ -49,9 +49,11 @@ class XMessage(models.Model):
     author_x_username = fields.Char(string='Author X Username')
     encrypted = fields.Boolean(
         string='Encrypted',
-        help='True when the external event body is end-to-end encrypted '
-             '(encoded_event) and no plaintext is available. The record exists '
-             'so the sync state is explicit instead of silently missing.',
+        help='Legacy marker for an event whose body is end-to-end encrypted '
+             '(encoded_event) with no plaintext available. No longer set: '
+             'body-less events are skipped before creation, because these rows '
+             'were never rendered, matched by automations, or shown in the UI. '
+             'The sync state lives on the channel (X Sync Status) instead.',
     )
     acked = fields.Boolean(string='Acknowledged')
     delivered = fields.Boolean(string='Delivered')

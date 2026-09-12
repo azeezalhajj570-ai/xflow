@@ -142,11 +142,13 @@ class DiscussChannel(models.Model):
     def _save_x_message(self, direction, external_id, body, external_created_at,
                         author_partner=None, **kw):
         self.ensure_one()
-        # An empty body is dropped for regular messages (legacy DM payloads are
-        # often nothing but escaping artifacts), but encrypted XChat events must
-        # still be recorded with the ``encrypted`` marker so undecryptable
-        # messages remain visible instead of silently disappearing.
-        if not body and not kw.get('encrypted'):
+        # A body-less event carries nothing to store: the ``encrypted`` marker
+        # rows were never rendered (every caller passes ``no_mail``), never
+        # matched by the DM automations (they filter on ``body_plain != False``)
+        # and had no UI field, so they were pure noise. The event/task layer
+        # filters these out before they reach here; this guard keeps every
+        # provider honest.
+        if not (body or '').strip():
             return self.env['x.message']
         # OmniX delivers timestamps in several shapes: ISO-8601 strings
         # ("2026-08-31T12:00:00Z") or Unix epoch milliseconds (ints). Odoo
@@ -261,15 +263,15 @@ class DiscussChannel(models.Model):
             if sender_id:
                 author_partner = self.env['res.partner'].sudo().search(
                     [('x_user_id', '=', str(sender_id))], limit=1)
-            self._save_x_message(
+            if self._save_x_message(
                 direction='outbound' if msg.get('from_me') else 'inbound',
                 external_id=msg['id'],
                 body=msg.get('text', ''),
                 external_created_at=msg.get('created_at'),
                 author_partner=author_partner,
                 author_x_id=sender_id,
-            )
-            count += 1
+            ):
+                count += 1
         if self.env.context.get('dialog'):
             return {
                 'type': 'ir.actions.client',

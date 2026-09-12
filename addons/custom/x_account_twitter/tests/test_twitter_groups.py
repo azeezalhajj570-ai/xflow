@@ -732,7 +732,7 @@ class TestTwitterGroups(XAccountTwitterTestBase):
             result = account.action_fetch_group_messages()
         self.assertEqual(mocked.call_args.args[:2],
                          ('GET', '/2/chat/conversations/%s/events' % CHAT_GROUP_ID))
-        # 1 plaintext message stored; 1 encrypted event explicitly tracked.
+        # 1 plaintext message stored; the encrypted event has nothing to store.
         self.assertEqual(result['messages'], 1)
         self.assertEqual(result['encrypted_skipped'], 1)
         self.assertEqual(result['failures'], 0)
@@ -741,9 +741,9 @@ class TestTwitterGroups(XAccountTwitterTestBase):
                 ('x_conversation_id', '=', CHAT_GROUP_ID)], limit=1).id),
         ])
         by_id = {m.external_id: m for m in xmsgs}
+        self.assertEqual(sorted(by_id), ['cm1'])
         self.assertFalse(by_id['cm1'].encrypted)
         self.assertEqual(by_id['cm1'].body_plain, 'hello chat')
-        self.assertTrue(by_id['cm2'].encrypted)
 
     def test_fetch_group_messages_is_idempotent(self):
         account = self._make_account()
@@ -868,8 +868,9 @@ class TestXChatDecryption(XAccountTwitterTestBase):
             vals['x_chat_signing_key_version'] = '1'
         return self.env['social.account'].create(vals)
 
-    def test_without_key_blob_keeps_encrypted_marker(self):
-        """No key blob -> encrypted events stay encrypted markers."""
+    def test_without_key_blob_stores_nothing_and_marks_encrypted(self):
+        """No key blob -> the encrypted event is not stored as a message; the
+        channel's sync status carries the encrypted state instead."""
         account = self._make_account(with_blob=False)
         channel = self.env['discuss.channel'].sudo()._get_x_channel(
             account, conversation_id=CHAT_GROUP_ID, channel_type='x_group',
@@ -885,9 +886,9 @@ class TestXChatDecryption(XAccountTwitterTestBase):
             result = account.action_fetch_group_messages()
         self.assertEqual(result['messages'], 0)
         self.assertEqual(result['encrypted_skipped'], 1)
-        xmsg = self.env['x.message'].sudo().search([
-            ('channel_id', '=', channel.id), ('external_id', '=', 'cm1')], limit=1)
-        self.assertTrue(xmsg.encrypted)
+        self.assertEqual(channel.x_sync_status, 'encrypted')
+        self.assertFalse(self.env['x.message'].sudo().search([
+            ('channel_id', '=', channel.id), ('external_id', '=', 'cm1')], limit=1))
 
     def test_with_key_blob_decrypts_to_message(self):
         """Key blob present + XDK decrypt ok -> plaintext x.message."""
@@ -922,8 +923,8 @@ class TestXChatDecryption(XAccountTwitterTestBase):
         self.assertFalse(xmsg.encrypted)
         self.assertEqual(xmsg.body_plain, 'hello decrypted')
 
-    def test_decrypt_failure_keeps_encrypted_marker(self):
-        """XDK decrypt raises -> event stays encrypted, no crash."""
+    def test_decrypt_failure_stores_nothing(self):
+        """XDK decrypt raises -> nothing stored, encrypted state on the channel."""
         account = self._make_account(with_blob=True)
         channel = self.env['discuss.channel'].sudo()._get_x_channel(
             account, conversation_id=CHAT_GROUP_ID, channel_type='x_group',
@@ -943,6 +944,10 @@ class TestXChatDecryption(XAccountTwitterTestBase):
         self.assertEqual(result['messages'], 0)
         self.assertEqual(result['encrypted_skipped'], 1)
         self.assertEqual(result['failures'], 0)
+        self.assertEqual(channel.x_sync_status, 'encrypted')
+        self.assertFalse(self.env['x.message'].sudo().search_count([
+            ('channel_id', '=', channel.id),
+        ]))
 
     def test_encrypted_group_name_decrypted(self):
         """Encrypted group_name is decrypted via the XDK when a blob exists."""

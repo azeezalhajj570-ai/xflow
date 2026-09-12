@@ -108,6 +108,32 @@ class TwitterActivity:
                     'event_type': event_type}
 
         payload = data.get('payload') or {}
+        if not self._envelope_has_message_content(event_type, payload):
+            # Read receipts, typing indicators, membership/key-change-only
+            # deliveries: nothing to store, so don't burn a queue task on them.
+            # The event row is still recorded (state ``skipped``) for audit and
+            # delivery de-duplication.
+            try:
+                with self.env.cr.savepoint():
+                    self.env['x.twitter.event'].sudo().create({
+                        'event_uuid': event_uuid,
+                        'account_id': account.id,
+                        'event_type': event_type,
+                        'state': 'skipped',
+                        'payload': json.dumps({
+                            'event_uuid': event_uuid,
+                            'event_type': event_type,
+                            'user_id': str(user_id),
+                            'payload': payload,
+                        }),
+                    })
+            except psycopg2.IntegrityError:
+                pass
+            _logger.info(
+                'x_account_twitter: %s event %s carries no message body; '
+                'recorded as skipped without a task', event_type, event_uuid)
+            return {'status': 'skipped', 'reason': 'no_message_content',
+                    'event_type': event_type, 'event_uuid': event_uuid}
         try:
             with self.env.cr.savepoint():
                 event = self.env['x.twitter.event'].sudo().create({
@@ -254,25 +280,14 @@ class TwitterActivity:
         channel_model = self.env['discuss.channel'].sudo()
         partner_model = self.env['res.partner'].sudo()
         for ev in events:
-            if not isinstance(ev, dict) or ev.get('type') != 'message_create':
+            text = self._usable_dm_text(ev)
+            if text is None:
                 continue
             mc = ev.get('message_create') or {}
             sender_id = mc.get('sender_id')
             recipient_id = (mc.get('target') or {}).get('recipient_id')
             message_id = ev.get('id')
-            text = (mc.get('message_data') or {}).get('text', '')
             if not sender_id or not message_id:
-                continue
-            # Guard: a DM event whose text is nothing but a run of backslashes
-            # (or whitespace) is almost always a payload/escaping artifact (e.g.
-            # an encrypted event miscategorized as a legacy DM, or a double-
-            # decoded envelope), not a real message. Never surface it as body.
-            stripped = (text or '').replace('\\', '')
-            if (text or '').strip() and not stripped.strip():
-                _logger.warning(
-                    'x_account_twitter: skipping DM %s whose body is a pure '
-                    'backslash/escaping artifact (%d chars); treating as '
-                    'payload noise', message_id, len((text or '').strip()))
                 continue
             # 1:1 DMs use the canonical "{smaller}-{larger}" conversation id.
             conv_id = self._conversation_key(sender_id, recipient_id)
@@ -282,7 +297,7 @@ class TwitterActivity:
                 create_if_not_found=True)
             author_partner = self._ensure_partner(
                 partner_model, sender_id, sender_name_map.get(sender_id, ''))
-            channel._save_x_message(
+            if channel._save_x_message(
                 direction='outbound' if outbound else 'inbound',
                 external_id=str(message_id),
                 body=text or '',
@@ -290,8 +305,8 @@ class TwitterActivity:
                 author_partner=author_partner,
                 author_x_id=sender_id,
                 author_x_username=author_partner.x_username if author_partner else False,
-            )
-            count += 1
+            ):
+                count += 1
         return {'messages': count}
 
     def _handle_chat(self, account, payload, outbound=False):
@@ -299,10 +314,12 @@ class TwitterActivity:
 
         XChat message bodies are end-to-end encrypted and delivered as
         ``encoded_event`` blobs. When the account has a Chat key blob the event
-        is decrypted (plaintext stored); otherwise it is recorded with the
-        existing ``encrypted`` marker and an empty body — we never fabricate a
-        body. The ``chat.conversation_join`` event is used to ensure the group
-        channel exists so later membership sync can attach members.
+        is decrypted (plaintext stored); otherwise the event carries no storable
+        body, so no ``x.message`` is created — the conversation and its members
+        are still ensured so the chat stays visible, and the undecryptable
+        state is reported back through the ``encrypted`` flag. The
+        ``chat.conversation_join`` event is used to ensure the group channel
+        exists so later membership sync can attach members.
         """
         conversation_id = payload.get('conversation_id')
         sender_id = payload.get('sender_id')
@@ -328,6 +345,22 @@ class TwitterActivity:
             author_partner = self.env['res.partner'].sudo().search(
                 [('x_user_id', '=', str(sender_id))], limit=1)
             body, decrypted = self._decrypt_chat_event(account, payload)
+            if not (body or '').strip():
+                # Some deliveries carry the text in the clear even though the
+                # decryptor only understands ``encoded_event``.
+                plain = (payload.get('text') or '').strip()
+                if plain:
+                    body, decrypted = plain, True
+            if not (body or '').strip():
+                # Nothing readable: storing a body-less row only ever produced
+                # an invisible marker, so skip it. The channel-level sync status
+                # is what reports the encrypted state.
+                _logger.info(
+                    'x_account_twitter: chat event %s has no plaintext '
+                    '(account_id=%s, channel_id=%s); not stored',
+                    message_id, account.id, channel.id)
+                return {'messages': 0, 'encrypted': not decrypted,
+                        'skipped': 'no_plaintext', 'channel': channel.id}
             channel._save_x_message(
                 direction='outbound' if outbound else 'inbound',
                 external_id=str(message_id),
@@ -335,12 +368,10 @@ class TwitterActivity:
                 external_created_at=created_at_msec,
                 author_partner=author_partner,
                 author_x_id=sender_id,
-                encrypted=not decrypted,
                 no_mail=True,
             )
-            return {'messages': 1, 'encrypted': not decrypted,
-                    'channel': channel.id}
-        return {'messages': 0, 'encrypted': True,
+            return {'messages': 1, 'encrypted': False, 'channel': channel.id}
+        return {'messages': 0, 'skipped': 'missing_ids',
                 'channel': channel.id if channel else 0}
 
     # ------------------------------------------------------------ chat helpers
@@ -547,6 +578,45 @@ class TwitterActivity:
             return bool(self.env.cr.closed)
         except Exception:
             return True
+
+    @staticmethod
+    def _usable_dm_text(event):
+        """Text of a legacy DM event, or ``None`` when it carries no content.
+
+        ``None`` for non-``message_create`` events (typing, read receipts,
+        reactions, membership), for a missing/blank ``text`` (media-only), and
+        for a pure backslash/whitespace escaping artifact — almost always a
+        payload/decoding artifact rather than a real message.
+        """
+        if not isinstance(event, dict) or event.get('type') != 'message_create':
+            return None
+        text = ((event.get('message_create') or {}).get('message_data')
+                or {}).get('text') or ''
+        if not text.strip():
+            return None
+        if not text.replace('\\', '').strip():
+            _logger.warning(
+                'x_account_twitter: skipping DM %s whose body is a pure '
+                'backslash/escaping artifact (%d chars); treating as payload '
+                'noise', event.get('id'), len(text.strip()))
+            return None
+        return text
+
+    @classmethod
+    def _envelope_has_message_content(cls, event_type, payload):
+        """Whether an envelope can yield a message body.
+
+        Conservative: an encrypted ``chat.received`` blob is kept even when it
+        cannot be decrypted yet, so a real message is never dropped here — only
+        envelopes that can never produce a body are.
+        """
+        if event_type == 'dm.received':
+            return any(cls._usable_dm_text(ev)
+                       for ev in (payload.get('direct_message_events') or []))
+        if event_type == 'chat.received':
+            return bool(payload.get('encoded_event')
+                        or (payload.get('text') or '').strip())
+        return True
 
     @staticmethod
     def _envelope_data(envelope):

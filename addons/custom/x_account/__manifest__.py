@@ -3,7 +3,7 @@
     'name': 'X Account & Session Platform',
     'category': 'Marketing/Social Marketing',
     'summary': 'Native X account & session management replacing XAction',
-    'version': '19.0.1.0.0',
+    'version': '19.0.1.1.0',
     'description': """
 X Account & Session Platform for Odoo
 =====================================

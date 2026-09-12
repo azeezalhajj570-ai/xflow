@@ -53,7 +53,7 @@ class TestXSaveXMessage(XAccountTestBase):
                 ('channel_id', '=', channel.id),
             ]), 0)
 
-    def test_saves_encrypted_event_with_empty_body(self):
+    def test_drops_encrypted_event_with_empty_body(self):
         channel = self._channel()
         xm = channel._save_x_message(
             direction='inbound',
@@ -63,25 +63,36 @@ class TestXSaveXMessage(XAccountTestBase):
             external_created_at=False,
             no_mail=True,
         )
-        self.assertTrue(xm)
-        self.assertEqual(xm.body_plain, '')
-        self.assertTrue(xm.encrypted)
+        self.assertFalse(xm)
+        self.assertEqual(
+            self.env['x.message'].sudo().search_count([
+                ('channel_id', '=', channel.id),
+            ]), 0)
 
-    def test_encrypted_event_is_idempotent(self):
+    def test_drops_whitespace_only_body(self):
+        channel = self._channel('g-test-ws')
+        xm = channel._save_x_message(
+            direction='inbound',
+            external_id='55555555-5555-5555-5555-555555555555',
+            body='   \n\t ',
+            external_created_at=False,
+            no_mail=True,
+        )
+        self.assertFalse(xm)
+
+    def test_message_is_idempotent_by_external_id(self):
         channel = self._channel('g-test-2')
         first = channel._save_x_message(
             direction='inbound',
             external_id='44444444-4444-4444-4444-444444444444',
-            body='',
-            encrypted=True,
+            body='once',
             external_created_at=False,
             no_mail=True,
         )
         second = channel._save_x_message(
             direction='inbound',
             external_id='44444444-4444-4444-4444-444444444444',
-            body='',
-            encrypted=True,
+            body='once',
             external_created_at=False,
             no_mail=True,
         )

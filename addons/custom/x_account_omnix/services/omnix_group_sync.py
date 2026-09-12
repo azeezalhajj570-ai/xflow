@@ -154,15 +154,15 @@ class OmniXGroupSync:
                     if sender_id:
                         author_partner = self.env['res.partner'].sudo().search(
                             [('x_user_id', '=', str(sender_id))], limit=1)
-                    channel._save_x_message(
+                    if channel._save_x_message(
                         direction='outbound' if msg.get('from_me') else 'inbound',
                         external_id=msg['id'],
                         body=msg.get('text', ''),
                         external_created_at=msg.get('created_at'),
                         author_partner=author_partner,
                         author_x_id=sender_id,
-                    )
-                    total += 1
+                    ):
+                        total += 1
             except Exception:
                 _LOGGER.exception('Failed to fetch messages for group %s', conv_id)
                 failures += 1
