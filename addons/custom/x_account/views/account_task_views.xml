@@ -99,5 +99,6 @@
         <field name="name">X Account Tasks</field>
         <field name="res_model">x.account.task</field>
         <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_groupby_account': 1, 'search_default_groupby_operation': 2, 'search_default_groupby_status': 3}</field>
     </record>
 </odoo>

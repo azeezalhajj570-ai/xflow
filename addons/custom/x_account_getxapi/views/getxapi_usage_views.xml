@@ -4,7 +4,8 @@
         <record id="getxapi_usage_action" model="ir.actions.act_window">
             <field name="name">GetXAPI Usage</field>
             <field name="res_model">getxapi.api.usage</field>
-            <field name="view_mode">list,form</field>
+            <field name="view_mode">list,form,pivot</field>
+            <field name="context">{'search_default_groupby_account': 1}</field>
             <field name="domain">[('account_id.company_id', 'in', allowed_company_ids)]</field>
             <field name="help" type="html">
                 <p class="o_view_nocontent_smiling_face">No API usage recorded yet.</p>
@@ -60,6 +61,58 @@
                         </group>
                     </sheet>
                 </form>
+            </field>
+        </record>
+
+        <record id="getxapi_usage_view_search" model="ir.ui.view">
+            <field name="name">getxapi.api.usage.search</field>
+            <field name="model">getxapi.api.usage</field>
+            <field name="arch" type="xml">
+                <search string="GetXAPI Usage">
+                    <field name="endpoint"/>
+                    <field name="account_id"/>
+                    <field name="error_type"/>
+                    <field name="error_message"/>
+                    <field name="twitter_error_code"/>
+                    <filter string="Successful" name="filter_success" domain="[('success', '=', True)]"/>
+                    <filter string="Failed" name="filter_failed" domain="[('success', '=', False)]"/>
+                    <separator/>
+                    <filter string="GET" name="filter_get" domain="[('method', '=', 'GET')]"/>
+                    <filter string="POST" name="filter_post" domain="[('method', '=', 'POST')]"/>
+                    <separator/>
+                    <filter string="Client Error (4xx)" name="filter_4xx" domain="[('status_code', '&gt;=', 400), ('status_code', '&lt;', 500)]"/>
+                    <filter string="Server Error (5xx)" name="filter_5xx" domain="[('status_code', '&gt;=', 500)]"/>
+                    <filter string="Rate Limited" name="filter_rate_limit" domain="[('error_type', '=', 'rate_limit')]"/>
+                    <filter string="Daily DM Limit" name="filter_daily_dm_limit" domain="[('twitter_error_code', '=', 502)]"/>
+                    <separator/>
+                    <filter string="Timestamp" name="filter_timestamp" date="timestamp"/>
+                    <separator/>
+                    <group>
+                        <filter string="X Account" name="groupby_account" domain="[]" context="{'group_by': 'account_id'}"/>
+                        <filter string="Endpoint" name="groupby_endpoint" domain="[]" context="{'group_by': 'endpoint'}"/>
+                        <filter string="Method" name="groupby_method" domain="[]" context="{'group_by': 'method'}"/>
+                        <filter string="Success" name="groupby_success" domain="[]" context="{'group_by': 'success'}"/>
+                        <filter string="Status Code" name="groupby_status_code" domain="[]" context="{'group_by': 'status_code'}"/>
+                        <filter string="Error Type" name="groupby_error_type" domain="[]" context="{'group_by': 'error_type'}"/>
+                        <filter string="Company" name="groupby_company" domain="[]" context="{'group_by': 'company_id'}"/>
+                        <filter string="Timestamp" name="groupby_timestamp" domain="[]" context="{'group_by': 'timestamp:day'}"/>
+                        <filter string="Creation Date" name="groupby_create_date" domain="[]" context="{'group_by': 'create_date:month'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
+        <record id="getxapi_usage_view_pivot" model="ir.ui.view">
+            <field name="name">getxapi.api.usage.pivot</field>
+            <field name="model">getxapi.api.usage</field>
+            <field name="arch" type="xml">
+                <pivot string="GetXAPI Usage">
+                    <field name="account_id" type="row"/>
+                    <field name="endpoint" type="row"/>
+                    <field name="method" type="col"/>
+                    <field name="estimated_cost" type="measure"/>
+                    <field name="request_duration" type="measure"/>
+                </pivot>
             </field>
         </record>
 

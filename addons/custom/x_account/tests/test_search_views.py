@@ -53,6 +53,22 @@ class TestXSearchViews(XAccountTestBase):
             'groupby_create_date',
         ))
 
+    def test_account_task_action_groups_by_account_operation_status(self):
+        """Opening Tasks must land on Account > Operation > Status."""
+        action = self.env.ref('x_account.action_x_account_task')
+        context = action.context or ''
+        expected = {
+            'search_default_groupby_account': 1,
+            'search_default_groupby_operation': 2,
+            'search_default_groupby_status': 3,
+        }
+        for key, order in expected.items():
+            self.assertIn("'%s': %s" % (key, order), context)
+        # every default must name a filter that really exists in the search view
+        arch = self._search_arch('x.account.task')
+        for key in expected:
+            self.assertIn('name="%s"' % key[len('search_default_'):], arch)
+
     # -------------------------------------------------------- inherited models
     def test_social_account_search_view_extends_base(self):
         view = self.env.ref(
@@ -79,6 +95,12 @@ class TestXSearchViews(XAccountTestBase):
         ))
 
     # ----------------------------------------------------------------- menus
+    def test_message_action_groups_by_chat(self):
+        """Opening Messages must land grouped by chat."""
+        action = self.env.ref('x_account.action_x_account_messages')
+        self.assertIn("'search_default_groupby_channel': 1", action.context or '')
+        self.assertIn('name="groupby_channel"', self._search_arch('x.message'))
+
     def test_chat_action_pins_the_base_search_view(self):
         """The Chat list must resolve deterministically to the search view our
         X filters are attached to (several primaries exist for discuss.channel)."""
