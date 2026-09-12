@@ -80,6 +80,35 @@ class TestTwitterApiClient(XAccountTwitterTestBase):
                 self.client.request('GET', '/2/users/12345/public_keys')
         self.assertEqual(ctx.exception.reset_epoch, 1789162704)
 
+    def test_request_429_captures_endpoint_window_headers(self):
+        """A 429 must carry the ``x-rate-limit-*`` numbers that actually
+        throttled the request (distinct from the 24h user cap), so callers can
+        report the exact limit instead of a generic hint."""
+        resp = self._mock_response(429, {'title': 'Too Many Requests'})
+        resp.headers = {
+            'x-rate-limit-limit': '30',
+            'x-rate-limit-remaining': '0',
+            'x-rate-limit-reset': '1789250641',
+            'x-user-limit-24hour-limit': '10000',
+            'x-user-limit-24hour-remaining': '9914',
+            'x-user-limit-24hour-reset': '1789336141',
+        }
+        with patch('requests.request', return_value=resp):
+            with self.assertRaises(twitter_errors.TwitterRateLimitError) as ctx:
+                self.client.request(
+                    'GET', '/2/chat/conversations/g1/events')
+        exc = ctx.exception
+        self.assertEqual(exc.rate_limit_limit, 30)
+        self.assertEqual(exc.rate_limit_remaining, 0)
+        self.assertEqual(exc.rate_limit_reset_epoch, 1789250641)
+        # The 24h cap is reported separately and is NOT the endpoint window.
+        self.assertEqual(exc.reset_epoch, 1789336141)
+        described = twitter_errors.describe(exc)
+        self.assertIn('rate_limit', described)
+        self.assertIn('Too Many Requests', described)
+        self.assertIn('limit=30, remaining=0', described)
+        self.assertIn('2026-09-12 22:04 UTC', described)
+
     def test_request_401_raises_authentication(self):
         with patch('requests.request', return_value=self._mock_response(
                 401, {'detail': 'Unauthorized', 'title': 'Unauthorized'})):

@@ -52,6 +52,12 @@ class TwitterRateLimitError(TwitterError):
         # Epoch (seconds, UTC) when the 24h user-limit window resets, from the
         # ``x-user-limit-24hour-reset`` response header when X returns it.
         self.reset_epoch = reset_epoch
+        # The endpoint-window numbers X returned (``x-rate-limit-*``), set by
+        # TwitterApiClient on a 429. These describe the limit that actually
+        # throttled the request, which is usually NOT the 24h user cap.
+        self.rate_limit_limit = None
+        self.rate_limit_remaining = None
+        self.rate_limit_reset_epoch = None
 
 
 class TwitterPermissionError(TwitterError):
@@ -144,6 +150,46 @@ def _build_error(code, response_body):
     if code == 'not_found':
         return TwitterNotFoundError(detail)
     return TwitterError(code, detail)
+
+
+def describe(exc):
+    """One-line, operator-readable description of a classified X error.
+
+    Includes the exact rate-limit numbers X returned, so a 429 reads as
+    ``rate_limit: Too Many Requests (limit=30, remaining=0, resets at
+    2026-09-12 22:04 UTC)`` instead of leaving the caller to guess (or report
+    an unrelated cause such as a missing encryption code).
+    """
+    if not exc:
+        return ''
+    text = str(getattr(exc, 'message', '') or '')
+    details = []
+    limit = getattr(exc, 'rate_limit_limit', None)
+    remaining = getattr(exc, 'rate_limit_remaining', None)
+    if limit is not None or remaining is not None:
+        details.append('limit=%s, remaining=%s' % (limit, remaining))
+    reset = _format_epoch(getattr(exc, 'rate_limit_reset_epoch', None))
+    if reset:
+        details.append('resets at %s UTC' % reset)
+    if details:
+        extra = ', '.join(details)
+        text = '%s (%s)' % (text, extra) if text else extra
+    code = str(getattr(exc, 'code', '') or '')
+    if code and text:
+        return '%s: %s' % (code, text)
+    return text or code
+
+
+def _format_epoch(epoch):
+    """Format an epoch (seconds, UTC) as ``YYYY-MM-DD HH:MM``, or ''."""
+    if not epoch:
+        return ''
+    from datetime import datetime, timezone
+    try:
+        return datetime.fromtimestamp(
+            int(epoch), timezone.utc).strftime('%Y-%m-%d %H:%M')
+    except (TypeError, ValueError, OSError, OverflowError):
+        return ''
 
 
 def _detail(response_body):
