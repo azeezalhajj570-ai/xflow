@@ -153,9 +153,14 @@ DBs by design.
 - **Follow Members composer** (`x.follow.composer`, opened from the X group chat
   form via the "Follow Members" button): members are selected on a
   `Many2many('res.partner')` field (`member_ids`) rendered with
-  `widget="many2many_tags"`, domain-restricted to the conversation's group
-  members (`[('id', 'in', channel_id.x_group_member_ids)]`). Do NOT regress this
-  to a One2many/checkbox line list.
+  `widget="many2many_tags"`. The tag field's domain is restricted to the
+  conversation's group members by referencing a computed `member_pool_ids`
+  field (`[('id', 'in', member_pool_ids)]`). Do NOT regress this to a
+  One2many/checkbox line list.
+- Do NOT use traversal domains like `[('id', 'in', channel_id.x_group_member_ids)]`
+  in form views — the web client cannot resolve `m2o.<related m2m>` and throws
+  `InvalidDomainError: Invalid domain representation`. Resolve the pool on the
+  record itself (computed field) and reference it directly.
 - In general, prefer `Many2many` + `widget="many2many_tags"` over One2many line
   lists for member/tag selection in wizards and forms.
 

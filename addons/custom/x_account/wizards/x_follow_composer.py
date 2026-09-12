@@ -37,11 +37,22 @@ class XFollowComposer(models.TransientModel):
         'res.partner',
         string='Members',
     )
+    member_pool_ids = fields.Many2many(
+        'res.partner',
+        string='Selectable Members',
+        compute='_compute_member_pool_ids',
+        help='Channel group members available for selection.',
+    )
     cooldown_sec = fields.Integer(
         string='Cooldown (seconds)',
         default=10,
         help='Time to wait between each follow request.',
     )
+
+    @api.depends('channel_id')
+    def _compute_member_pool_ids(self):
+        for composer in self:
+            composer.member_pool_ids = composer.channel_id.x_group_member_ids
 
     @api.model
     def default_get(self, fields_list):

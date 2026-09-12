@@ -10,8 +10,9 @@
                     <field name="account_id" readonly="1"/>
                 </group>
                 <group string="Members to Follow">
+                    <field name="member_pool_ids" invisible="1"/>
                     <field name="member_ids" widget="many2many_tags"
-                        domain="[('id', 'in', channel_id.x_group_member_ids)]"
+                        domain="[('id', 'in', member_pool_ids)]"
                         options="{'create': false, 'no_create_edit': true}"/>
                     <label for="cooldown_sec"/>
                     <div>
