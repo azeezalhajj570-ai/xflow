@@ -28,6 +28,34 @@ for rec in records:
             <field name="code">action = records.action_fetch_group_members_bulk()</field>
         </record>
 
+        <record id="action_server_fetch_group_members_form" model="ir.actions.server">
+            <field name="name">Fetch Group Members (current chat)</field>
+            <field name="model_id" ref="mail.model_discuss_channel"/>
+            <field name="state">code</field>
+            <field name="code">action = (records or record)[:1].action_fetch_group_members()</field>
+        </record>
+
+        <record id="action_server_bulk_follow" model="ir.actions.server">
+            <field name="name">Follow Members</field>
+            <field name="model_id" ref="mail.model_discuss_channel"/>
+            <field name="state">code</field>
+            <field name="code">action = (records or record)[:1].action_bulk_follow()</field>
+        </record>
+
+        <record id="action_server_send_message" model="ir.actions.server">
+            <field name="name">Send Message</field>
+            <field name="model_id" ref="mail.model_discuss_channel"/>
+            <field name="state">code</field>
+            <field name="code">action = (records or record)[:1].action_send_message()</field>
+        </record>
+
+        <record id="action_server_fetch_group_info" model="ir.actions.server">
+            <field name="name">Fetch Group Info</field>
+            <field name="model_id" ref="mail.model_discuss_channel"/>
+            <field name="state">code</field>
+            <field name="code">action = (records or record)[:1].action_fetch_group_info()</field>
+        </record>
+
         <record id="action_server_groups_by_account" model="ir.actions.server">
             <field name="name">Groups by Account</field>
             <field name="model_id" ref="social.model_social_account"/>
