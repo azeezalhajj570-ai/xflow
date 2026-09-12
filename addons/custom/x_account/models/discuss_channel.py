@@ -309,65 +309,20 @@ class DiscussChannel(models.Model):
                     'sticky': True,
                 },
             }
-        provider = account.get_event_provider()
-        fetch = getattr(provider, 'get_group_info', None)
-        if not fetch:
-            provider = account.get_action_provider()
-            fetch = getattr(provider, 'get_group_info', None)
-        if not fetch:
+        data = self._fetch_group_info_single()
+        if not data.get('ok'):
             return {
                 'type': 'ir.actions.client',
                 'tag': 'display_notification',
                 'params': {
                     'title': 'Fetch Group Info',
-                    'message': 'Provider %s does not support fetching '
-                               'conversation info.' % account.x_provider,
-                    'type': 'warning',
+                    'message': data['message'],
+                    'type': data['type'],
                     'sticky': True,
                 },
             }
-        try:
-            result = fetch(account, self.x_conversation_id)
-        except Exception as exc:
-            _logger.exception('action_fetch_group_info failed: %s', exc)
-            return {
-                'type': 'ir.actions.client',
-                'tag': 'display_notification',
-                'params': {
-                    'title': 'Fetch Group Info',
-                    'message': 'Failed to fetch conversation info: %s' % exc,
-                    'type': 'danger',
-                    'sticky': True,
-                },
-            }
-        if not result or not result.get('conversation_id'):
-            return {
-                'type': 'ir.actions.client',
-                'tag': 'display_notification',
-                'params': {
-                    'title': 'Fetch Group Info',
-                    'message': 'Conversation %s not found or no longer '
-                               'accessible.' % (self.x_conversation_id or ''),
-                    'type': 'warning',
-                    'sticky': True,
-                },
-            }
-        if result.get('undecrypted'):
-            return {
-                'type': 'ir.actions.client',
-                'tag': 'display_notification',
-                'params': {
-                    'title': 'Fetch Group Info',
-                    'message': 'Could not decrypt this group\'s name. Make sure '
-                               'the X Chat encryption code is set on the '
-                               'account and try again.',
-                    'type': 'warning',
-                    'sticky': True,
-                },
-            }
-        if result.get('name') and self.name != result['name']:
-            self.write({'name': result['name']})
-            message = 'Name updated to "%s".' % result['name']
+        if data['updated']:
+            message = 'Name updated to "%s".' % data['name']
         else:
             message = 'The conversation name is already current.'
         return {
@@ -378,6 +333,121 @@ class DiscussChannel(models.Model):
                 'message': message,
                 'type': 'success',
                 'sticky': False,
+            },
+        }
+
+    def _fetch_group_info_single(self):
+        """Pull one X conversation's raw info and update its name if needed.
+
+        ``self`` must be a single X conversation that already carries a
+        linked account and a conversation id (the caller validates this).
+        Returns a dict:
+
+        - success: ``{'ok': True, 'name': str|None, 'updated': bool}``
+        - failure: ``{'ok': False, 'type': 'warning'|'danger',
+          'message': str}``
+        """
+        self.ensure_one()
+        account = self.x_account_id
+        provider = account.get_event_provider()
+        fetch = getattr(provider, 'get_group_info', None)
+        if not fetch:
+            provider = account.get_action_provider()
+            fetch = getattr(provider, 'get_group_info', None)
+        if not fetch:
+            return {
+                'ok': False,
+                'type': 'warning',
+                'message': 'Provider %s does not support fetching '
+                           'conversation info.' % account.x_provider,
+            }
+        try:
+            result = fetch(account, self.x_conversation_id)
+        except Exception as exc:
+            _logger.exception('action_fetch_group_info failed: %s', exc)
+            return {
+                'ok': False,
+                'type': 'danger',
+                'message': 'Failed to fetch conversation info: %s' % exc,
+            }
+        if not result or not result.get('conversation_id'):
+            return {
+                'ok': False,
+                'type': 'warning',
+                'message': 'Conversation %s not found or no longer '
+                           'accessible.' % (self.x_conversation_id or ''),
+            }
+        if result.get('undecrypted'):
+            return {
+                'ok': False,
+                'type': 'warning',
+                'message': 'Could not decrypt this group\'s name. Make sure '
+                           'the X Chat encryption code is set on the '
+                           'account and try again.',
+            }
+        name = result.get('name')
+        updated = bool(name) and self.name != name
+        if updated:
+            self.write({'name': name})
+        return {'ok': True, 'name': name, 'updated': updated}
+
+    def action_fetch_group_info_bulk(self):
+        """Fetch group info for several X conversations at once.
+
+        Server-action entry point for the Chat list view: iterates the
+        selected records, skips the ones that cannot host a conversation
+        lookup (non-X chats, missing account or conversation id), reuses the
+        single-conversation logic for the rest, and returns one aggregated
+        notification while continuing on any per-conversation failure.
+        """
+        records = self.filtered(
+            lambda ch: ch.channel_type in ('x', 'x_group')
+            and ch.x_account_id and ch.x_conversation_id)
+        skipped = len(self) - len(records)
+        processed = updated = 0
+        failures = []
+        for channel in records:
+            data = channel._fetch_group_info_single()
+            if not data.get('ok'):
+                failures.append((channel.name or str(channel.id),
+                                 data['message']))
+                continue
+            processed += 1
+            if data.get('updated'):
+                updated += 1
+        parts = []
+        if processed:
+            parts.append('%s chat(s)' % processed)
+            parts.append('%s name(s) updated' % updated
+                         if updated else 'no name changes')
+        if skipped:
+            parts.append('%s skipped' % skipped)
+        if failures:
+            parts.append('%s failed' % len(failures))
+        if not processed and not failures:
+            message = 'No X conversations selected.'
+        else:
+            message = ', '.join(parts) if parts else 'No X conversations selected.'
+        if failures:
+            preview = '; '.join('%s: %s' % (name, error)
+                                for name, error in failures[:5])
+            if len(failures) > 5:
+                preview += '; and %s more' % (len(failures) - 5)
+            message += ' | ' + preview
+        if processed == 0:
+            ntype = 'danger' if failures else 'info'
+        elif failures:
+            ntype = 'warning'
+        else:
+            ntype = 'success'
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': 'Fetch Group Info',
+                'message': message,
+                'type': ntype,
+                'sticky': True,
             },
         }
 

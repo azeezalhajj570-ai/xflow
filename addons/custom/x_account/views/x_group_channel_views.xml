@@ -27,14 +27,6 @@
                     <button name="%(x_account.action_server_send_message)d" type="action"
                         string="Send Message" class="btn-primary"
                         groups="social.group_social_user"/>
-                    <button name="%(x_account.action_server_fetch_group_info)d" type="action"
-                        string="Fetch Info" class="btn-secondary"
-                        groups="social.group_social_user"
-                        confirm="Fetch this conversation's info from X and update its name?"/>
-                    <button name="%(x_account.action_server_fetch_group_members_form)d" type="action"
-                        string="Fetch Members" class="btn-secondary"
-                        groups="social.group_social_user"
-                        confirm="Fetch this conversation's members and their usernames from X and update the member list?"/>
                 </header>
                 <sheet>
                     <div class="oe_title">

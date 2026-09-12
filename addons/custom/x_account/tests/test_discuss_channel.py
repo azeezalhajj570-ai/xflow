@@ -120,10 +120,13 @@ class TestXSaveXMessage(XAccountTestBase):
         for xmlid in (
             'x_account.action_server_bulk_follow',
             'x_account.action_server_send_message',
+        ):
+            self.assertIn('name="%d"' % self.env.ref(xmlid).id, arch)
+        for xmlid in (
             'x_account.action_server_fetch_group_info',
             'x_account.action_server_fetch_group_members_form',
         ):
-            self.assertIn('name="%d"' % self.env.ref(xmlid).id, arch)
+            self.assertNotIn('name="%d"' % self.env.ref(xmlid).id, arch)
 
     def test_chat_header_server_actions_bound_to_discuss_channel(self):
         for xmlid in (
