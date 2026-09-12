@@ -259,7 +259,7 @@ class GetXAPIClient:
 
     def _log_usage(self, path, method, status_code, success, duration_ms,
                    error=None):
-        """Log API usage to getxapi.api.usage. Failures here are silently ignored."""
+        """Log API usage to getxapi.api.usage. Failure to log propagates."""
         if not self._account_id:
             return
         try:

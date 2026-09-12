@@ -159,9 +159,15 @@ class TestGetXAPIClient(XAccountGetXAPITestBase):
                 'twitter_error_code': 502,
                 'retry_after': 3600,
             }, ok=False)
-            with self.assertRaises(GetXAPIError):
+            # Plain try/except on purpose: Odoo's assertRaises wraps its block
+            # in a savepoint and rolls it back on the expected exception, which
+            # would also undo the usage row asserted on below.
+            try:
                 client.post('/twitter/dm/send', json={
                     'auth_token': 'tok', 'recipient_id': '9', 'text': 'hi'})
+                self.fail('GetXAPIError was not raised')
+            except GetXAPIError:
+                pass
         record = self.env['getxapi.api.usage'].search([
             ('account_id', '=', account.id),
         ], limit=1)
