@@ -9,14 +9,18 @@ through AI agents, chatbots, or human operators. Built atop `whatsapp_evaluation
 ## Dev Environment
 
 - **Docker containers:**
-  - `odoo19-dev-odoo` — Odoo 19 Enterprise (`kerbi/odoo19e-202604:latest`)
-  - `odoo19-dev-db` — PostgreSQL 17 with pgvector (`pgvector/pgvector:pg17`)
+  - `odooo-odoo` — Odoo 19 Enterprise (compose service `odoo`)
+  - PostgreSQL is **not** part of this compose project; it runs in the external
+    madarbot stack (container `madarbot-postgres-1`)
 - **DB connection:** configured in both `.env` and `config/odoo.conf`
-  - host `db` (compose service name), port `5432`
-  - user `odoo`, password `odoo18@2024!`
+  - host `madarbot-postgres-1`, port `5432`
+  - user `odoo`, password `odoo` (note: NOT `odoo18@2024!`)
+  - **Running dev DB name: `odoo_2026-08-11_22-38-33`** (set via `db_name` in
+    config and `ODOO_DATABASE` in `.env`)
 - **Addons:** code lives on host under `addons/custom/`, mapped to `/mnt/custom-addons/` in container
 - **Config:** `config/odoo.conf` is mounted at `/etc/odoo/odoo.conf`
-  - `dbfilter = .*` so the dev server can see any DB (including test DBs)
+  - `dbfilter = ^odoo_2026-08-11_22-38-33$` — the dev server is pinned to the
+    running DB name above (not `.*`)
   - explicit `db_host/db_port/db_user/db_password` so `docker exec` commands work
     without relying on the entrypoint to inject credentials
 - **Container memory:** defined in `.env` via `ODOO_MEMORY_LIMIT` and `DB_MEMORY_LIMIT`
@@ -56,9 +60,11 @@ sub-commands, so server options must follow `odoo server`.
 ```bash
 TEST_DB=test_ai_whatsapp
 
-# Create a fresh DB in the postgres container
-docker compose exec db psql -U odoo -d postgres -c "DROP DATABASE IF EXISTS ${TEST_DB};"
-docker compose exec db psql -U odoo -d postgres -c "CREATE DATABASE ${TEST_DB} OWNER odoo;"
+# Create a fresh DB on the external postgres host (madarbot-postgres-1)
+docker compose exec -T odoo sh -c \
+  'PGPASSWORD="$POSTGRES_PASSWORD" exec psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d postgres -c "DROP DATABASE IF EXISTS test_ai_whatsapp;"' sh test_ai_whatsapp
+docker compose exec -T odoo sh -c \
+  'PGPASSWORD="$POSTGRES_PASSWORD" exec psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d postgres -c "CREATE DATABASE test_ai_whatsapp OWNER odoo;"' sh test_ai_whatsapp
 
 # Run tests
 docker compose exec -T odoo /entrypoint.sh odoo server \
@@ -73,8 +79,9 @@ docker compose exec -T odoo /entrypoint.sh odoo server \
 
 ### Why the old command was broken
 
-`docker exec odoo19-dev-odoo psql ...` was wrong because PostgreSQL runs in a
-separate container (`odoo19-dev-db`). `--dbfilter` is not a valid option (use
+`docker exec odoo19-dev-odoo psql ...` was wrong because PostgreSQL runs in the
+external madarbot stack (`madarbot-postgres-1`), not in an Odoo compose service.
+`--dbfilter` is not a valid option (use
 `--db-filter` on the command line, or set it in `odoo.conf`). And `odoo -d ...`
 bypassed the `server` subcommand, so the server tried to bind to the default
 HTTP port and crashed.
@@ -106,13 +113,15 @@ helper script, or add `--http-port=18069 --workers=0` to the manual command.
 
 ### `FATAL: database "test_ai_whatsapp" does not exist`
 
-The dev server was started with `dbfilter = ^odoo$`, which hides test DBs. The
-config now uses `dbfilter = .*`; restart the Odoo container if you changed it.
+The `dbfilter` in `config/odoo.conf` is pinned to the running dev DB
+(`^odoo_2026-08-11_22-38-33$`). Tests pass the DB explicitly with `-d`, so
+compose-provided test runs are unaffected, but the GUI database list hides test
+DBs by design.
 
 ### `psql: connection to server on socket ... failed`
 
-`psql` was run inside the Odoo container. PostgreSQL lives in the `db`
-container. Use `docker compose exec db psql ...`.
+`psql` was run inside the Odoo container. PostgreSQL lives on the external host
+`madarbot-postgres-1`. Use `docker compose exec -T odoo sh -c 'PGPASSWORD="$POSTGRES_PASSWORD" psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d postgres ...'` from the repo root, or `docker exec madarbot-postgres-1 psql ...`.
 
 ## Project Files
 
@@ -138,6 +147,17 @@ container. Use `docker compose exec db psql ...`.
 - WhatsApp outbound sends (`WhatsAppMessage._send_message`) should be mocked in
   tests to avoid real network calls and an Odoo 19 test-framework incompatibility
   with `requests` tuple timeouts
+
+## UI Conventions
+
+- **Follow Members composer** (`x.follow.composer`, opened from the X group chat
+  form via the "Follow Members" button): members are selected on a
+  `Many2many('res.partner')` field (`member_ids`) rendered with
+  `widget="many2many_tags"`, domain-restricted to the conversation's group
+  members (`[('id', 'in', channel_id.x_group_member_ids)]`). Do NOT regress this
+  to a One2many/checkbox line list.
+- In general, prefer `Many2many` + `widget="many2many_tags"` over One2many line
+  lists for member/tag selection in wizards and forms.
 
 ## Spec Location
 
