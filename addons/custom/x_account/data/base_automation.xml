@@ -1,6 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <data noupdate="1">
+        <!-- Fetch the info (name, members) of a newly created X group chat one
+             minute after the chat appears, reusing the existing "Fetch Group
+             Info" server action. Scoped to X group channels that have an
+             account and a conversation id, so it never touches other chats. -->
+        <record id="base_automation_x_group_fetch_info" model="base.automation">
+            <field name="name">X: Fetch Group Info After Creation</field>
+            <field name="model_id" ref="mail.model_discuss_channel"/>
+            <field name="trigger">on_time_created</field>
+            <field name="trg_date_range">1</field>
+            <field name="trg_date_range_type">minutes</field>
+            <field name="active" eval="True"/>
+            <field name="filter_domain">[('channel_type', '=', 'x_group'), ('x_account_id', '!=', False), ('x_conversation_id', '!=', False)]</field>
+            <field name="action_server_ids" eval="[(6, 0, [ref('action_server_fetch_group_info')])]"/>
+        </record>
+
         <!-- Enqueue group automation tasks when an auto-execute, non-paused
              x.account.group is created or updated. The action only enqueues
              x.account.task records; it never performs X HTTP directly. -->
