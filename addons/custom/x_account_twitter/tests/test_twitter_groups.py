@@ -557,6 +557,100 @@ class TestTwitterGroups(XAccountTwitterTestBase):
         self.assertEqual(result['params']['type'], 'info')
         self.assertIn('No X conversations selected', result['params']['message'])
 
+    def test_action_fetch_group_info_bulk_aggregates(self):
+        c1 = self._make_member_channel('Bulk Name One')
+        c2 = self._make_member_channel('Bulk Name Two')
+        payload = {
+            'data': {'id': CHAT_GROUP_ID, 'type': 'group',
+                     'group_name': 'Design Team',
+                     'member_ids': ['111', '222'],
+                     'participant_ids': ['111', '222'],
+                     'admin_ids': ['111']},
+            'includes': {'users': [
+                {'id': '111', 'name': 'Alice', 'username': 'alice'},
+                {'id': '222', 'name': 'Bob', 'username': 'bob'}]},
+        }
+        with patch.object(TwitterApiClient, 'request', return_value=payload):
+            result = (c1 | c2).action_fetch_group_info_bulk()
+        self.assertEqual(result['params']['type'], 'success')
+        self.assertIn('2 chat(s)', result['params']['message'])
+        self.assertIn('2 name(s) updated', result['params']['message'])
+        for channel in (c1 | c2):
+            self.assertEqual(channel.name, 'Design Team')
+
+    def test_action_fetch_group_info_bulk_reports_failures(self):
+        ok_channel = self._make_member_channel('Info Bulk Ok')
+        broken = self.env['discuss.channel'].sudo().create({
+            'name': 'Info Bulk Broken',
+            'channel_type': 'x_group',
+            'x_account_id': self._make_account().id,
+            'x_conversation_id': CHAT_GROUP_ID,
+        })
+        internal = self.env['discuss.channel'].sudo().create({
+            'name': 'Info Bulk Internal',
+            'channel_type': 'channel',
+            'x_account_id': self._make_account().id,
+        })
+        payload = {
+            'data': {'id': CHAT_GROUP_ID, 'type': 'group',
+                     'group_name': 'Design Team',
+                     'member_ids': ['111'], 'participant_ids': ['111'],
+                     'admin_ids': ['111']},
+            'includes': {'users': [
+                {'id': '111', 'name': 'Alice', 'username': 'alice'}]},
+        }
+        with patch.object(TwitterApiClient, 'request', side_effect=[payload, {}]):
+            result = (ok_channel | broken | internal).action_fetch_group_info_bulk()
+        self.assertEqual(result['params']['type'], 'warning')
+        self.assertIn('1 chat(s)', result['params']['message'])
+        self.assertIn('1 skipped', result['params']['message'])
+        self.assertIn('1 failed', result['params']['message'])
+        self.assertIn('Info Bulk Broken', result['params']['message'])
+        self.assertIn('not found', result['params']['message'])
+        self.assertEqual(ok_channel.name, 'Design Team')
+
+    def test_action_fetch_group_info_bulk_no_actionable_chats(self):
+        config = self.env['discuss.channel'].sudo().create({
+            'name': 'Plain Info Group',
+            'channel_type': 'channel',
+        })
+        result = config.action_fetch_group_info_bulk()
+        self.assertEqual(result['params']['type'], 'info')
+        self.assertIn('No X conversations selected', result['params']['message'])
+
+    def test_action_fetch_group_info_server_action_binding(self):
+        action = self.env.ref('x_account.action_server_fetch_group_info')
+        self.assertEqual(action.state, 'code')
+        self.assertEqual(action.model_id.model, 'discuss.channel')
+        self.assertTrue(action.binding_model_id)
+        self.assertEqual(action.binding_model_id.model, 'discuss.channel')
+        self.assertEqual(action.binding_type, 'action')
+        self.assertIn('action_fetch_group_info_bulk()', action.code)
+
+    def test_action_fetch_group_info_server_action_runs_multiple(self):
+        action = self.env.ref('x_account.action_server_fetch_group_info')
+        c1 = self._make_member_channel('Info Action One')
+        c2 = self._make_member_channel('Info Action Two')
+        payload = {
+            'data': {'id': CHAT_GROUP_ID, 'type': 'group',
+                     'group_name': 'Design Team',
+                     'member_ids': ['111', '222'],
+                     'participant_ids': ['111', '222'],
+                     'admin_ids': ['111']},
+            'includes': {'users': [
+                {'id': '111', 'name': 'Alice', 'username': 'alice'},
+                {'id': '222', 'name': 'Bob', 'username': 'bob'}]},
+        }
+        with patch.object(TwitterApiClient, 'request', return_value=payload):
+            result = action.with_context(
+                active_model='discuss.channel',
+                active_ids=(c1 | c2).ids).run()
+        self.assertTrue(result)
+        self.assertEqual(result['params']['type'], 'success')
+        self.assertIn('2 chat(s)', result['params']['message'])
+        for channel in (c1 | c2):
+            self.assertEqual(channel.name, 'Design Team')
+
     def test_action_fetch_group_members_server_action_binding(self):
         action = self.env.ref('x_account.action_server_fetch_group_members')
         self.assertEqual(action.state, 'code')
