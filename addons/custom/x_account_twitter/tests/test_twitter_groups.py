@@ -397,6 +397,96 @@ class TestTwitterGroups(XAccountTwitterTestBase):
         self.assertEqual(result['params']['type'], 'warning')
         self.assertIn('Could not decrypt', result['params']['message'])
 
+    # ------------------------------------------------- fetch group members
+    def test_action_fetch_group_members_upserts_partners_and_membership(self):
+        account = self._make_account()
+        channel = self.env['discuss.channel'].sudo().create({
+            'name': 'Members Sync',
+            'channel_type': 'x_group',
+            'x_account_id': account.id,
+            'x_conversation_id': CHAT_GROUP_ID,
+        })
+        payload = {
+            'data': {'id': CHAT_GROUP_ID, 'type': 'group',
+                     'member_ids': ['111', '222'],
+                     'participant_ids': ['111', '222'],
+                     'admin_ids': ['111']},
+            'includes': {'users': [
+                {'id': '111', 'name': 'Alice', 'username': 'alice'},
+                {'id': '222', 'name': 'Bob', 'username': 'bob'},
+                {'id': OWNER_ID, 'name': 'Owner', 'username': 'grpowner'}]},
+        }
+        with patch.object(TwitterApiClient, 'request',
+                          return_value=payload) as mocked:
+            result = channel.action_fetch_group_members()
+        self.assertEqual(mocked.call_args.args[:2],
+                         ('GET', '/2/chat/conversations/%s' % CHAT_GROUP_ID))
+        self.assertEqual(result['params']['type'], 'success')
+        self.assertIn('3 member(s)', result['params']['message'])
+        self.assertIn('@alice', result['params']['message'])
+        alice = self.env['res.partner'].sudo().search(
+            [('x_user_id', '=', '111')], limit=1)
+        bob = self.env['res.partner'].sudo().search(
+            [('x_user_id', '=', '222')], limit=1)
+        self.assertTrue(alice and bob)
+        self.assertEqual(alice.x_username, 'alice')
+        self.assertEqual(bob.x_username, 'bob')
+        member_partners = channel.channel_member_ids.partner_id
+        self.assertIn(alice.id, member_partners.ids)
+        self.assertIn(bob.id, member_partners.ids)
+
+    def test_action_fetch_group_members_updates_stale_username(self):
+        account = self._make_account()
+        alice = self.env['res.partner'].sudo().create({
+            'name': 'Stale Alice',
+            'x_user_id': '111',
+            'x_username': 'old_handle',
+        })
+        channel = self.env['discuss.channel'].sudo().create({
+            'name': 'Members Update',
+            'channel_type': 'x_group',
+            'x_account_id': account.id,
+            'x_conversation_id': CHAT_GROUP_ID,
+        })
+        payload = {
+            'data': {'id': CHAT_GROUP_ID, 'type': 'group',
+                     'member_ids': ['111'],
+                     'participant_ids': ['111'],
+                     'admin_ids': ['111']},
+            'includes': {'users': [
+                {'id': '111', 'name': 'Alice New', 'username': 'alice'}]},
+        }
+        with patch.object(TwitterApiClient, 'request', return_value=payload):
+            result = channel.action_fetch_group_members()
+        alice.invalidate_recordset()
+        self.assertEqual(alice.name, 'Stale Alice')
+        self.assertEqual(alice.x_username, 'alice')
+        self.assertEqual(result['params']['type'], 'success')
+        self.assertIn('1 new', result['params']['message'])
+        self.assertIn('@alice', result['params']['message'])
+
+    def test_action_fetch_group_members_not_found_warns(self):
+        account = self._make_account()
+        channel = self.env['discuss.channel'].sudo().create({
+            'name': 'Members Not Found',
+            'channel_type': 'x_group',
+            'x_account_id': account.id,
+            'x_conversation_id': CHAT_GROUP_ID,
+        })
+        with patch.object(TwitterApiClient, 'request', return_value={}):
+            result = channel.action_fetch_group_members()
+        self.assertEqual(result['params']['type'], 'warning')
+
+    def test_action_fetch_group_members_rejects_non_x(self):
+        account = self._make_account()
+        channel = self.env['discuss.channel'].sudo().create({
+            'name': 'Internal',
+            'channel_type': 'channel',
+            'x_account_id': account.id,
+        })
+        with self.assertRaises(ValueError):
+            channel.action_fetch_group_members()
+
     def test_safe_group_name_rejects_short_base64_ciphertext(self):
         """A base64 blob short enough to slip old length checks must NOT become
         a channel name (it is ciphertext, not a readable name)."""
