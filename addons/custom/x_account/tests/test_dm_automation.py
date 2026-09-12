@@ -87,6 +87,23 @@ class TestXDMEnqueue(XAccountTestBase):
             json.loads(task.task_context),
             {'conversation_id': 'g-conv-7', 'text': 'Group update'})
 
+    def test_mistyped_group_one_to_one_enqueues_send_dm(self):
+        """A 1:1 stored as x_group (GetXAPI ``<id>:<id>`` id) sends via send_dm."""
+        account = self._make_account('sender_mistyped')
+        account.write({'twitter_user_id': '111'})
+        channel = self.env['discuss.channel'].create({
+            'channel_type': 'x_group',
+            'x_account_id': account.id,
+            'x_conversation_id': '111:222',
+            'name': 'GetXAPI 1:1',
+        })
+        task = channel._enqueue_send_dm(text='Hi there')
+        self.assertEqual(task.operation, 'send_dm')
+        self.assertEqual(task.account_id.id, account.id)
+        self.assertEqual(
+            json.loads(task.task_context),
+            {'recipient_id': '222', 'text': 'Hi there'})
+
     def test_default_text_fallback(self):
         account = self._make_account('sender_default')
         channel = self.env['discuss.channel'].create({
@@ -226,6 +243,25 @@ class TestXDMEnqueue(XAccountTestBase):
             result = composer.action_send()
         mock_send.assert_called_once_with(
             conversation_id='g-conv-group-1', text='Group hello')
+        self.assertEqual(result['params']['type'], 'success')
+
+    def test_composer_mistyped_group_one_to_one_uses_send_dm(self):
+        """Composer treats a colon-id x_group as 1:1 and calls send_dm."""
+        account = self._make_account('sender_comp_mistyped')
+        account.write({'twitter_user_id': '111'})
+        channel = self.env['discuss.channel'].create({
+            'channel_type': 'x_group',
+            'x_account_id': account.id,
+            'x_conversation_id': '111:222',
+            'name': 'GetXAPI 1:1',
+        })
+        composer = self.env['x.message.composer'].with_context(
+            active_model='discuss.channel', active_id=channel.id
+        ).create({'body': 'Hello DM'})
+        with patch.object(SessionWebProvider, 'send_dm',
+                          return_value={'success': True}) as mock_send:
+            result = composer.action_send()
+        mock_send.assert_called_once_with(recipient_id='222', text='Hello DM')
         self.assertEqual(result['params']['type'], 'success')
 
     def test_composer_send_failure_surfaces_error(self):

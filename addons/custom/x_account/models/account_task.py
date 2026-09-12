@@ -210,7 +210,7 @@ class XAccountTask(models.Model):
                     task._execute_operation(operation=op, **extra_ctx)
             except Exception as exc:
                 for task in group_tasks:
-                    task._schedule_retry(str(exc))
+                    task._schedule_retry(exc)
 
     def _execute_operation(self, operation=None, **extra_ctx):
         """Execute one task's operation via the account provider.
@@ -244,13 +244,22 @@ class XAccountTask(models.Model):
                 self._record_follow(account)
             return result
         except Exception as exc:
-            self._schedule_retry(str(exc))
+            self._schedule_retry(exc)
             return None
 
-    def _schedule_retry(self, message):
+    def _schedule_retry(self, error):
+        """Retry ``error`` with backoff, or fail it permanently.
+
+        Only errors flagged retryable by the provider (transient rate limits,
+        timeouts, 5xx) are re-queued. Permanent conditions — depleted credits,
+        invalid credentials, a recipient who cannot receive DMs — fail
+        immediately instead of burning every attempt.
+        """
         self.ensure_one()
+        message = str(error)
+        retryable = getattr(error, 'retryable', True)
         self.write({'error': message})
-        if self.retry_count < self.max_attempts - 1:
+        if retryable and self.retry_count < self.max_attempts - 1:
             delay = self.backoff_base * (2 ** self.retry_count)
             self.write({
                 'retry_count': self.retry_count + 1,

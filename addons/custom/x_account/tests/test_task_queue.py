@@ -65,6 +65,22 @@ class TestXTaskQueue(XAccountTestBase):
         self.assertEqual(task.status, 'failed')
         self.assertEqual(task.retry_count, 1)
 
+    def test_non_retryable_error_fails_immediately(self):
+        """A permanent provider error (credits depleted, bad token) must not
+        burn every attempt — it fails on the first try."""
+        task = self._make_task(self.account_a, operation='get_conversations')
+
+        class PermanentError(Exception):
+            retryable = False
+
+        with patch('odoo.addons.x_account.services.providers.session_web.SessionWebProvider.get_conversations',
+                   side_effect=PermanentError('credits depleted')):
+            self.env['x.account.task']._process_queue()
+        task.invalidate_recordset()
+        self.assertEqual(task.status, 'failed')
+        self.assertEqual(task.retry_count, 0)
+        self.assertIn('credits depleted', task.error)
+
     def test_retry_backoff_sets_next_retry(self):
         task = self._make_task(self.account_a, max_attempts=3, backoff_base=60)
         with patch('odoo.addons.x_account.services.providers.session_web.SessionWebProvider.get_conversations',

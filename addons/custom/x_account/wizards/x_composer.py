@@ -68,7 +68,7 @@ class XMessageComposer(models.TransientModel):
                 'Send Message',
                 _('No valid X account for conversation %s.') % channel.name,
                 kind='danger')
-        if channel.channel_type == 'x_group':
+        if channel._x_is_group_conversation():
             operation = 'send_group_dm'
             conv_id = channel.x_conversation_id
             if not conv_id:
@@ -79,7 +79,7 @@ class XMessageComposer(models.TransientModel):
             kwargs = {'conversation_id': conv_id, 'text': body}
         else:
             operation = 'send_dm'
-            recipient_id = channel.x_partner_id.x_user_id
+            recipient_id = channel._x_dm_recipient_user_id()
             if not recipient_id:
                 return self._send_result(
                     'Send Message',
