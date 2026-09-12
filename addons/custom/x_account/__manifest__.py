@@ -34,10 +34,12 @@ Highlights:
         'security/ir.model.access.csv',
         'security/ir_rules.xml',
         'data/cron.xml',
+        # Server actions first: base_automation.xml rules reference
+        # action_server_fetch_group_info, and a ref must resolve at load time.
+        'data/server_actions.xml',
         'data/base_automation.xml',
         'data/channel_automation.xml',
         'data/dm_automation.xml',
-        'data/server_actions.xml',
         'views/res_config_settings_views.xml',
         'views/social_account_views.xml',
         'views/import_session_views.xml',
