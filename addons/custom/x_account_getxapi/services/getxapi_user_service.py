@@ -77,22 +77,26 @@ class GetXAPIUserService:
         data = self._client.get('/twitter/user/following', params=params)
         return getxapi_envelope.GetXAPIEnvelopeParser.followers(data)
 
-    def follow(self, username):
+    def follow(self, username, **kwargs):
         """Follow a user.
 
         :param username: X username to follow.
+        :param kwargs: Extra body fields (auth_token, ct0, twid, proxy).
         :returns: Normalized follow result DTO.
         """
-        username = str(username).lstrip('@')
-        data = self._client.post('/twitter/user/follow', json={'userName': username})
+        body = {'username': str(username).lstrip('@')}
+        body.update(kwargs)
+        data = self._client.post('/twitter/user/follow', json=body)
         return getxapi_envelope.GetXAPIEnvelopeParser.follow_result(data)
 
-    def unfollow(self, username):
+    def unfollow(self, username, **kwargs):
         """Unfollow a user.
 
         :param username: X username to unfollow.
+        :param kwargs: Extra body fields (auth_token, ct0, twid, proxy).
         :returns: Normalized unfollow result DTO.
         """
-        username = str(username).lstrip('@')
-        data = self._client.post('/twitter/user/unfollow', json={'userName': username})
+        body = {'username': str(username).lstrip('@')}
+        body.update(kwargs)
+        data = self._client.post('/twitter/user/unfollow', json=body)
         return getxapi_envelope.GetXAPIEnvelopeParser.unfollow_result(data)

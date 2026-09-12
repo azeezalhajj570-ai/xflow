@@ -124,7 +124,9 @@ class GetXAPIProvider:
             screen_name = user.get('username')
         if not screen_name:
             raise ValueError('target_user_id or screen_name is required')
-        return self._users.follow(screen_name)
+        if self._auth_token:
+            kwargs['auth_token'] = self._auth_token
+        return self._users.follow(screen_name, **kwargs)
 
     def post_tweet(self, text, **kwargs):
         """Create a new tweet via GetXAPI."""

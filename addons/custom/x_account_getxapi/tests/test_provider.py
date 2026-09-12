@@ -29,6 +29,7 @@ class TestGetXAPIProvider(XAccountGetXAPITestBase):
             'twitter_user_id': '12345',
             'x_provider': 'getxapi',
             'x_auth_method': 'session_cookie',
+            'x_getxapi_auth_token': 'test_auth_token',
         })
         cls.provider = GetXAPIProvider(cls.env, cls.account)
 
@@ -84,9 +85,25 @@ class TestGetXAPIProvider(XAccountGetXAPITestBase):
     def test_follow(self):
         with patch.object(GetXAPIClient, 'post', return_value={
             'data': {'result': {'following': True}},
-        }):
+        }) as mocked:
             result = self.provider.follow(screen_name='someuser')
         self.assertTrue(result['success'])
+        body = mocked.call_args.kwargs['json']
+        self.assertEqual(body['username'], 'someuser')
+        self.assertEqual(body['auth_token'], 'test_auth_token')
+
+    def test_follow_requires_target(self):
+        with self.assertRaises(ValueError):
+            self.provider.follow()
+
+    def test_follow_without_auth_token_still_sends_request(self):
+        with patch.object(self.provider, '_auth_token', ''):
+            with patch.object(GetXAPIClient, 'post', return_value={
+                'data': {'result': {'following': True}},
+            }) as mocked:
+                result = self.provider.follow(screen_name='someuser')
+        self.assertTrue(result['success'])
+        self.assertNotIn('auth_token', mocked.call_args.kwargs['json'])
 
     def test_post_tweet(self):
         with patch.object(GetXAPIClient, 'post', return_value={
