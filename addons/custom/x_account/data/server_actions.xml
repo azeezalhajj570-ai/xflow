@@ -19,6 +19,15 @@ for rec in records:
     action = rec.with_context(dialog=True).action_fetch_group_messages()</field>
         </record>
 
+        <record id="action_server_fetch_group_members" model="ir.actions.server">
+            <field name="name">Fetch Group Members</field>
+            <field name="model_id" ref="mail.model_discuss_channel"/>
+            <field name="binding_model_id" ref="mail.model_discuss_channel"/>
+            <field name="binding_type">action</field>
+            <field name="state">code</field>
+            <field name="code">action = records.action_fetch_group_members_bulk()</field>
+        </record>
+
         <record id="action_server_groups_by_account" model="ir.actions.server">
             <field name="name">Groups by Account</field>
             <field name="model_id" ref="social.model_social_account"/>
