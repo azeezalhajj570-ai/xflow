@@ -101,6 +101,13 @@ class TestXSearchViews(XAccountTestBase):
         self.assertIn("'search_default_groupby_channel': 1", action.context or '')
         self.assertIn('name="groupby_channel"', self._search_arch('x.message'))
 
+    def test_groups_menu_is_hidden(self):
+        """The Groups menu was removed on request; its window action stays (it
+        is still reachable from the automation tooling)."""
+        self.assertFalse(self.env.ref(
+            'x_account.menu_x_account_groups', raise_if_not_found=False))
+        self.assertTrue(self.env.ref('x_account.action_x_account_group'))
+
     def test_chat_action_pins_the_base_search_view(self):
         """The Chat list must resolve deterministically to the search view our
         X filters are attached to (several primaries exist for discuss.channel)."""
@@ -108,8 +115,3 @@ class TestXSearchViews(XAccountTestBase):
         self.assertEqual(
             action.search_view_id,
             self.env.ref('mail.discuss_channel_view_search'))
-
-    def test_groups_menu_points_at_the_group_action(self):
-        menu = self.env.ref('x_account.menu_x_account_groups')
-        self.assertEqual(
-            menu.action.id, self.env.ref('x_account.action_x_account_group').id)
