@@ -38,6 +38,45 @@ class TestGetXAPIErrors(XAccountGetXAPITestBase):
         self.assertEqual(error.code, 'rate_limit')
         self.assertTrue(error.retryable)
 
+    def test_429_preserves_twitter_error_code_and_retry_after(self):
+        error = classify(429, '/twitter/dm/send', {
+            'error': 'Too Many Requests',
+            'twitter_error_code': 420,
+            'retry_after': 86400,
+        })
+        self.assertEqual(error.code, 'rate_limit')
+        self.assertTrue(error.retryable)
+        self.assertEqual(error.twitter_error_code, 420)
+        self.assertEqual(error.retry_after, 86400.0)
+        self.assertIn('retry_after=86400s', error.message)
+
+    def test_429_twitter_502_is_daily_dm_limit_not_retryable(self):
+        error = classify(429, '/twitter/dm/send', {
+            'error': 'Too Many Requests',
+            'twitter_error_code': 502,
+        })
+        self.assertEqual(error.code, 'daily_dm_limit')
+        self.assertFalse(error.retryable)
+        self.assertEqual(error.twitter_error_code, 502)
+        result = error.to_result()
+        self.assertEqual(result['error'], 'daily_dm_limit')
+        self.assertEqual(result['twitter_error_code'], 502)
+
+    def test_429_rate_limit_to_result_carries_upstream(self):
+        error = classify(429, '/twitter/dm/send', {
+            'twitter_error_code': 420,
+            'retry_after': 900,
+        })
+        result = error.to_result()
+        self.assertTrue(result['retryable'])
+        self.assertEqual(result['twitter_error_code'], 420)
+        self.assertEqual(result['retry_after'], 900.0)
+
+    def test_402_is_credit_exhausted_not_retryable(self):
+        error = classify(402, '/twitter/tweet/favorite')
+        self.assertEqual(error.code, 'credit_exhausted')
+        self.assertFalse(error.retryable)
+
     def test_500_is_temporary_error(self):
         error = classify(500, '/test')
         self.assertIsInstance(error, GetXAPITemporaryError)

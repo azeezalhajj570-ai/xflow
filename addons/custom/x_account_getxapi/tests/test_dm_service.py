@@ -21,19 +21,24 @@ class TestGetXAPIDMService(XAccountGetXAPITestBase):
         with patch.object(GetXAPIClient, 'post', return_value={
             'data': {'message_id': 'dm-1', 'created_at': '2026-01-01'},
         }) as mocked:
-            result = self.service.send('9', 'hello there')
+            result = self.service.send('9', 'hello there', auth_token='tok')
         self.assertEqual(result['message_id'], 'dm-1')
         body = mocked.call_args.kwargs['json']
+        self.assertEqual(body['auth_token'], 'tok')
         self.assertEqual(body['recipient_id'], '9')
         self.assertEqual(body['text'], 'hello there')
 
     def test_send_requires_recipient(self):
         with self.assertRaises(ValueError):
-            self.service.send('', 'hello')
+            self.service.send('', 'hello', auth_token='tok')
 
     def test_send_requires_text(self):
         with self.assertRaises(ValueError):
-            self.service.send('9', '')
+            self.service.send('9', '', auth_token='tok')
+
+    def test_send_requires_auth_token(self):
+        with self.assertRaises(ValueError):
+            self.service.send('9', 'hello')
 
     def test_list_conversations(self):
         with patch.object(GetXAPIClient, 'post', return_value={

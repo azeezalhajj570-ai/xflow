@@ -102,6 +102,81 @@ class TestGetXAPIClient(XAccountGetXAPITestBase):
                 self.client.post('/twitter/tweet/create', json={'text': 'hello'})
         self.assertEqual(mocked.call_count, 1)
 
+    def test_transient_429_retried_then_succeeds(self):
+        with patch('requests.request') as mocked:
+            mocked.side_effect = [
+                self._mock_response(429, {'error': 'Too Many Requests',
+                                          'retry_after': 5}, ok=False),
+                self._mock_response(200, {'data': {'retweeted': True}}),
+            ]
+            with patch.object(GetXAPIClient, '_sleep') as sleep:
+                result = self.client.post('/twitter/tweet/retweet',
+                                          json={'tweet_id': '1'})
+        self.assertEqual(result, {'data': {'retweeted': True}})
+        self.assertEqual(mocked.call_count, 2)
+        sleep.assert_called_once_with(5.0)
+
+    def test_429_retries_exhausted_raises_rate_limit(self):
+        with patch('requests.request') as mocked:
+            mocked.return_value = self._mock_response(
+                429, {'error': 'Too Many Requests'}, ok=False)
+            with patch.object(GetXAPIClient, '_sleep'):
+                with self.assertRaises(GetXAPIError) as ctx:
+                    self.client.get('/twitter/user/info')
+        self.assertEqual(ctx.exception.code, 'rate_limit')
+        self.assertTrue(ctx.exception.retryable)
+        self.assertEqual(mocked.call_count, 1 + self.client.DEFAULT_RETRIES)
+
+    def test_daily_dm_limit_429_never_retried(self):
+        with patch('requests.request') as mocked:
+            mocked.return_value = self._mock_response(429, {
+                'error': 'Too Many Requests',
+                'twitter_error_code': 502,
+                'retry_after': 86400,
+            }, ok=False)
+            with self.assertRaises(GetXAPIError) as ctx:
+                self.client.post('/twitter/dm/send', json={
+                    'auth_token': 'tok', 'recipient_id': '9', 'text': 'hi'})
+        self.assertEqual(ctx.exception.code, 'daily_dm_limit')
+        self.assertFalse(ctx.exception.retryable)
+        self.assertEqual(ctx.exception.twitter_error_code, 502)
+        self.assertEqual(ctx.exception.retry_after, 86400.0)
+        self.assertEqual(mocked.call_count, 1)
+
+    def test_429_error_logged_with_upstream_fields(self):
+        account = self.env['social.account'].create({
+            'name': 'Usage Account',
+            'media_id': self.twitter_media.id,
+            'social_account_handle': 'usage_user',
+            'twitter_user_id': '999',
+            'x_provider': 'getxapi',
+            'x_getxapi_auth_token': 'tok',
+        })
+        client = GetXAPIClient(self.env, 'test_api_key', account_id=account.id)
+        with patch('requests.request') as mocked:
+            mocked.return_value = self._mock_response(429, {
+                'error': 'Too Many Requests',
+                'twitter_error_code': 502,
+                'retry_after': 3600,
+            }, ok=False)
+            # Plain try/except on purpose: Odoo's assertRaises wraps its block
+            # in a savepoint and rolls it back on the expected exception, which
+            # would also undo the usage row asserted on below.
+            try:
+                client.post('/twitter/dm/send', json={
+                    'auth_token': 'tok', 'recipient_id': '9', 'text': 'hi'})
+                self.fail('GetXAPIError was not raised')
+            except GetXAPIError:
+                pass
+        record = self.env['getxapi.api.usage'].search([
+            ('account_id', '=', account.id),
+        ], limit=1)
+        self.assertEqual(record.status_code, 429)
+        self.assertEqual(record.error_type, 'daily_dm_limit')
+        self.assertEqual(record.twitter_error_code, 502)
+        self.assertEqual(record.retry_after, 3600.0)
+        self.assertIn('daily DM', record.error_message)
+
     def test_pagination_first_page(self):
         with patch('requests.request') as mocked:
             mocked.return_value = self._mock_response(200, {

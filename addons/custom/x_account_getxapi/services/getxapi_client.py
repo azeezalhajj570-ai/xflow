@@ -10,6 +10,11 @@ Retry policy:
 - Reads (GET): retry up to DEFAULT_RETRIES on network error / 5xx / timeout
 - Writes (POST): do NOT retry on timeout (state unknown); retry only on
   explicit 502/503/504 from the server
+- 429 (rate limit): retry up to DEFAULT_RETRIES ONLY when it is a transient
+  GetXAPI/upstream throttle; NEVER retry X's daily DM limit
+  (``twitter_error_code == 502``) — that budget only resets on X's 24h
+  schedule. Retry delay honors ``retry_after`` from the body or the
+  ``Retry-After`` header.
 - Exponential backoff: BACKOFF_BASE * 2^(attempt-1) seconds
 - Honor Retry-After header when present
 
@@ -82,13 +87,13 @@ class GetXAPIClient:
                 envelope = response.json() if response.content else {}
             except ValueError:
                 raise getxapi_errors.GetXAPITemporaryError(path, 'non_json_response')
-            self._log_usage(path, method, response.status_code, True, duration_ms, '')
+            self._log_usage(path, method, response.status_code, True, duration_ms)
             return envelope
 
         body = self._body_json(response)
         error = getxapi_errors.classify(response.status_code, path, body)
         self._log_usage(
-            path, method, response.status_code, False, duration_ms, error.code)
+            path, method, response.status_code, False, duration_ms, error)
         raise error
 
     def paginate(self, path, params=None, method='GET', json=None,
@@ -213,6 +218,21 @@ class GetXAPIClient:
                 attempt += 1
                 continue
 
+            if response.status_code == 429:
+                body = self._body_json(response)
+                if self._no_retry_429(body):
+                    return response
+                if attempt >= retries:
+                    return response
+                delay = self._retry_delay(
+                    attempt + 1, self._retry_after_value(response, body))
+                _LOGGER.warning(
+                    'GetXAPI 429 on %s (attempt %s/%s); retrying in %ss',
+                    url, attempt + 1, retries, delay)
+                self._sleep(delay)
+                attempt += 1
+                continue
+
             if response.status_code < 500:
                 return response
 
@@ -237,12 +257,22 @@ class GetXAPIClient:
             'Accept': 'application/json',
         }
 
-    def _log_usage(self, path, method, status_code, success, duration_ms, error_type):
-        """Log API usage to getxapi.api.usage. Failures here are silently ignored."""
+    def _log_usage(self, path, method, status_code, success, duration_ms,
+                   error=None):
+        """Log API usage to getxapi.api.usage. Failure to log propagates."""
         if not self._account_id:
             return
         try:
             cost = estimate_cost(path)
+            twitter_error_code = None
+            retry_after = None
+            error_message = ''
+            error_type = ''
+            if error is not None:
+                error_type = getattr(error, 'code', '') or ''
+                twitter_error_code = getattr(error, 'twitter_error_code', None)
+                retry_after = getattr(error, 'retry_after', None)
+                error_message = (getattr(error, 'message', '') or '')[:500]
             vals = {
                 'endpoint': path,
                 'method': method.upper(),
@@ -251,6 +281,9 @@ class GetXAPIClient:
                 'estimated_cost': cost,
                 'request_duration': duration_ms,
                 'error_type': error_type or '',
+                'twitter_error_code': twitter_error_code,
+                'retry_after': retry_after,
+                'error_message': error_message,
                 'account_id': self._account_id,
             }
             created = self._env['getxapi.api.usage'].sudo().create(vals)
@@ -280,4 +313,41 @@ class GetXAPIClient:
         try:
             return response.json()
         except ValueError:
+            return None
+
+    @staticmethod
+    def _no_retry_429(body):
+        """True when a 429 must NOT be retried.
+
+        X's daily DM/message-request limit (``twitter_error_code == 502``)
+        only resets on X's 24h schedule — retrying just burns attempts.
+        Credit-related 429s are also never retried (it needs more balance,
+        not more attempts).
+        """
+        if not isinstance(body, dict):
+            return False
+        if body.get('twitter_error_code') in (502, '502'):
+            return True
+        message = ('%s %s %s %s' % (
+            body.get('error') or '',
+            body.get('error_description') or '',
+            body.get('message') or '',
+            body.get('detail') or '',
+        )).lower()
+        return any(
+            token in message
+            for token in ('credit', 'insufficient balance', 'payment', 'daily dm'))
+
+    @staticmethod
+    def _retry_after_value(response, body):
+        """Seconds to wait before a retry: body ``retry_after`` wins, then the
+        ``Retry-After`` header."""
+        if isinstance(body, dict) and body.get('retry_after') is not None:
+            try:
+                return float(body['retry_after'])
+            except (TypeError, ValueError):
+                pass
+        try:
+            return response.headers.get('Retry-After')
+        except AttributeError:
             return None
