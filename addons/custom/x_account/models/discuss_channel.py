@@ -693,15 +693,22 @@ class DiscussChannel(models.Model):
     def _x_is_group_conversation(self):
         """Whether this X channel is a real group conversation.
 
-        A 1:1 conversation can be stored as ``x_group`` when it was created
-        from a GetXAPI conversation id shaped ``<user_id>:<user_id>``. Real
-        groups use a ``g``-prefixed (or numeric) conversation id, so the
-        presence of a ``:`` identifies a 1:1 mis-typed as a group.
+        1:1 conversations pair two user ids — GetXAPI uses ``<id>:<id>`` and
+        the official API ``<id>-<id>`` — and can be stored as ``x_group`` when
+        created from a GetXAPI conversation id. Group ids are ``g``-prefixed or
+        a single numeric id, so a numeric pair identifies a 1:1 conversation.
         """
         self.ensure_one()
         if self.channel_type != 'x_group':
             return False
-        return ':' not in (self.x_conversation_id or '')
+        conversation_id = self.x_conversation_id or ''
+        for separator in (':', '-'):
+            if separator not in conversation_id:
+                continue
+            parts = [p for p in conversation_id.split(separator) if p]
+            if len(parts) == 2 and all(p.isdigit() for p in parts):
+                return False
+        return True
 
     def _x_dm_recipient_user_id(self):
         """Recipient X user id for a 1:1 conversation, or '' when unknown.

@@ -147,19 +147,29 @@ class GetXAPIProvider:
         return self._dms.send(recipient_id, text, auth_token=self._auth_token)
 
     def fetch_groups(self, account, limit=100):
-        """Fetch group-DM conversations and sync them into discuss channels."""
+        """Sync the account's DM conversations into discuss channels.
+
+        GetXAPI's inbox mixes group and 1:1 conversations; both are synced —
+        groups into ``x_group`` channels, 1:1 conversations into ``x``
+        channels carrying the peer on ``x_partner_id`` so DMs can be sent
+        through GetXAPI. An existing 1:1 channel is backfilled with its peer;
+        its stored channel type is left untouched (Odoo forbids changing
+        ``channel_type`` after creation), which is safe because send routing
+        resolves the conversation shape at send time.
+        """
         result = self._dms.list(auth_token=self._auth_token, count=limit)
         conversations = result.get('conversations', [])
-        groups = [c for c in conversations if c.get('group')]
         channel_model = self.env['discuss.channel'].sudo()
         partner_model = self.env['res.partner'].sudo()
-        created = updated = members = 0
-        for conv in groups:
+        my_user_id = str(getattr(account, 'twitter_user_id', '') or '')
+        created = updated = members = groups = 0
+        for conv in conversations:
             conv_id = conv.get('conversation_id')
             if not conv_id:
                 continue
+            is_group = bool(conv.get('group'))
             participant_ids = []
-            member_names = []
+            peer_partner = None
             for p in conv.get('participants') or []:
                 x_uid = p.get('id')
                 if not x_uid:
@@ -173,20 +183,32 @@ class GetXAPIProvider:
                     })
                     members += 1
                 participant_ids.append(partner.id)
-                member_names.append(partner.x_username or partner.name or str(x_uid))
-            group_name = conv.get('name') or ', '.join(member_names[:4]) or conv_id
-            channel = channel_model._get_x_channel(
-                account, conversation_id=conv_id, channel_type='x_group',
-                create_if_not_found=False)
+                if not is_group and str(x_uid) != my_user_id and not peer_partner:
+                    peer_partner = partner
+            channel_type = 'x_group' if is_group else 'x'
+            conv_name, _derived_type = self._chat_name_from_conversation(
+                conv, my_user_id)
+            conv_name = conv_name or conv_id
+            if is_group:
+                groups += 1
+            channel = channel_model.search([
+                ('x_account_id', '=', account.id),
+                ('x_conversation_id', '=', conv_id),
+            ], limit=1)
             if not channel:
                 channel = channel_model._get_x_channel(
-                    account, conversation_id=conv_id, channel_type='x_group',
-                    create_if_not_found=True, member_ids=participant_ids)
-                channel.write({'name': group_name})
+                    account, partner=peer_partner, conversation_id=conv_id,
+                    channel_type=channel_type, create_if_not_found=True,
+                    member_ids=participant_ids)
+                if not channel:
+                    continue
+                channel.write({'name': conv_name})
                 created += 1
             else:
+                if not is_group and peer_partner and channel.x_partner_id != peer_partner:
+                    channel.write({'x_partner_id': peer_partner.id})
                 updated += 1
-        return {'groups': len(groups), 'created': created, 'updated': updated,
+        return {'groups': groups, 'created': created, 'updated': updated,
                 'members': members}
 
     @staticmethod

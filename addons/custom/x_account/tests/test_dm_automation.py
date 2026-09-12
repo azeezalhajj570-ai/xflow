@@ -104,6 +104,22 @@ class TestXDMEnqueue(XAccountTestBase):
             json.loads(task.task_context),
             {'recipient_id': '222', 'text': 'Hi there'})
 
+    def test_mistyped_group_hyphen_one_to_one_enqueues_send_dm(self):
+        """A 1:1 with the official ``<id>-<id>`` shape but x_group type also sends."""
+        account = self._make_account('sender_mistyped_hyphen')
+        account.write({'twitter_user_id': '111'})
+        channel = self.env['discuss.channel'].create({
+            'channel_type': 'x_group',
+            'x_account_id': account.id,
+            'x_conversation_id': '111-222',
+            'name': 'GetXAPI 1:1 hyphen',
+        })
+        task = channel._enqueue_send_dm(text='Hi there')
+        self.assertEqual(task.operation, 'send_dm')
+        self.assertEqual(
+            json.loads(task.task_context),
+            {'recipient_id': '222', 'text': 'Hi there'})
+
     def test_default_text_fallback(self):
         account = self._make_account('sender_default')
         channel = self.env['discuss.channel'].create({

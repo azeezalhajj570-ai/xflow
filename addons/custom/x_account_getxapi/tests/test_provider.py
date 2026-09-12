@@ -209,6 +209,33 @@ class TestSyncChatNames(XAccountGetXAPITestBase):
         self.assertEqual(result['updated'], 1)
         self.assertEqual(channel.name, 'peer_user')
 
+    def test_fetch_groups_syncs_one_to_one_as_direct_channel(self):
+        conv_id = '1196139139269320708-12345'
+        with patch.object(GetXAPIDMService, 'list', return_value={
+                'conversations': [self._conv(conv_id, ctype='one_to_one')],
+                'cursor': ''}):
+            result = self.provider.fetch_groups(self.account)
+        self.assertEqual(result['created'], 1)
+        channel = self.env['discuss.channel'].sudo().search([
+            ('x_account_id', '=', self.account.id),
+            ('x_conversation_id', '=', conv_id)], limit=1)
+        self.assertTrue(channel)
+        self.assertEqual(channel.channel_type, 'x')
+        self.assertEqual(channel.x_partner_id.x_user_id, '999')
+
+    def test_fetch_groups_backfills_partner_on_existing_direct_channel(self):
+        conv_id = '1196139139269320709-12345'
+        channel = self.env['discuss.channel'].sudo()._get_x_channel(
+            self.account, conversation_id=conv_id, channel_type='x_group',
+            create_if_not_found=True)
+        with patch.object(GetXAPIDMService, 'list', return_value={
+                'conversations': [self._conv(conv_id, ctype='one_to_one')],
+                'cursor': ''}):
+            self.provider.fetch_groups(self.account)
+        channel.invalidate_recordset()
+        self.assertEqual(channel.x_partner_id.x_user_id, '999')
+        self.assertFalse(channel._x_is_group_conversation())
+
     def test_sync_counts_unchanged_and_paginates_cursor(self):
         ch = self.env['discuss.channel'].sudo()._get_x_channel(
             self.account, conversation_id='c3', channel_type='x_group',
