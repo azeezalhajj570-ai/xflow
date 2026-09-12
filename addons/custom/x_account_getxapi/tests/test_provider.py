@@ -116,9 +116,16 @@ class TestGetXAPIProvider(XAccountGetXAPITestBase):
     def test_send_dm(self):
         with patch.object(GetXAPIClient, 'post', return_value={
             'data': {'message_id': 'dm-1', 'created_at': '2026-01-01'},
-        }):
+        }) as mocked:
             result = self.provider.send_dm('9', 'hello')
         self.assertEqual(result['message_id'], 'dm-1')
+        body = mocked.call_args.kwargs['json']
+        self.assertEqual(body['auth_token'], 'test_auth_token')
+
+    def test_send_dm_requires_auth_token(self):
+        with patch.object(self.provider, '_auth_token', ''):
+            with self.assertRaises(ValueError):
+                self.provider.send_dm('9', 'hello')
 
     def test_supported_operations(self):
         ops = self.provider.supported_operations()

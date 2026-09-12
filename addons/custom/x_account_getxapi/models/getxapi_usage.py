@@ -65,7 +65,19 @@ class GetXAPIUsage(models.Model):
     )
     error_type = fields.Char(
         string='Error Type',
-        help='Classified error code when the request failed (e.g. rate_limit, authentication_failure).',
+        help='Classified error code when the request failed (e.g. rate_limit, authentication_failure, daily_dm_limit).',
+    )
+    twitter_error_code = fields.Integer(
+        string='Twitter Error Code',
+        help='Upstream X error code embedded in the GetXAPI body (e.g. 502 = X daily DM/message-request limit).',
+    )
+    retry_after = fields.Float(
+        string='Retry After (s)',
+        help='Seconds X/GetXAPI said to wait before retrying, when disclosed.',
+    )
+    error_message = fields.Text(
+        string='Error Message',
+        help='Sanitized error detail returned in the GetXAPI response body.',
     )
 
     @api.model

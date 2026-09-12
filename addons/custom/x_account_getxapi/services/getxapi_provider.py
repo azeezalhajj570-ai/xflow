@@ -144,7 +144,7 @@ class GetXAPIProvider:
 
     def send_dm(self, recipient_id, text):
         """Send a direct message via GetXAPI."""
-        return self._dms.send(recipient_id, text)
+        return self._dms.send(recipient_id, text, auth_token=self._auth_token)
 
     def fetch_groups(self, account, limit=100):
         """Fetch group-DM conversations and sync them into discuss channels."""

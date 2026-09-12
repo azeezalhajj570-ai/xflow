@@ -14,18 +14,25 @@ class GetXAPIDMService:
     def __init__(self, client):
         self._client = client
 
-    def send(self, recipient_id, text):
+    def send(self, recipient_id, text, auth_token=None):
         """Send a direct message.
+
+        GetXAPI requires the sender's ``auth_token`` so it can act as the
+        account that owns the DM thread.
 
         :param recipient_id: X user ID of the recipient.
         :param text: Message text.
+        :param auth_token: The account's GetXAPI auth token (required).
         :returns: {message_id, created_at}
         """
         if not recipient_id:
             raise ValueError('recipient_id is required')
         if not text:
             raise ValueError('text must be non-empty')
+        if not auth_token:
+            raise ValueError('auth_token is required to send DMs')
         data = self._client.post('/twitter/dm/send', json={
+            'auth_token': auth_token,
             'recipient_id': str(recipient_id),
             'text': text,
         })

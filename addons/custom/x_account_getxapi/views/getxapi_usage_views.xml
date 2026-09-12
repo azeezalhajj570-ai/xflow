@@ -26,6 +26,8 @@
                     <field name="estimated_cost"/>
                     <field name="request_duration" string="Duration (ms)"/>
                     <field name="error_type" optional="hide"/>
+                    <field name="twitter_error_code" optional="show"/>
+                    <field name="retry_after" optional="hide"/>
                 </list>
             </field>
         </record>
@@ -50,6 +52,11 @@
                                 <field name="request_duration"/>
                                 <field name="error_type"/>
                             </group>
+                        </group>
+                        <group string="Error Details" invisible="success">
+                            <field name="twitter_error_code"/>
+                            <field name="retry_after"/>
+                            <field name="error_message" colspan="2"/>
                         </group>
                     </sheet>
                 </form>
