@@ -482,9 +482,10 @@ class TwitterGroupSync:
         (``GET /2/chat/conversations/{id}/events``). MessageCreate events are
         stored as x.message records (idempotent by external event id). Events
         whose body is end-to-end encrypted (``encoded_event`` present, no
-        plaintext ``text``) are NOT silently discarded: they are recorded with
-        an explicit ``encrypted`` flag on the channel's message state and
-        counted in ``encrypted_skipped``. Temporary Chat API failures fall back
+        plaintext ``text``) have nothing to store: no x.message is created for
+        them — they are counted in ``encrypted_skipped`` and surfaced on the
+        channel's ``x_sync_status`` (``encrypted`` / ``partial``). Temporary
+        Chat API failures fall back
         to the legacy DM events endpoint (``GET /2/dm_conversations/{id}/dm_events``)
         for that conversation only; permanent failures are counted in
         ``failures`` and logged.
@@ -512,7 +513,7 @@ class TwitterGroupSync:
                     if sender_id:
                         author_partner = self.env['res.partner'].sudo().search(
                             [('x_user_id', '=', str(sender_id))], limit=1)
-                    channel._save_x_message(
+                    if channel._save_x_message(
                         direction='outbound' if msg.get('from_me') else 'inbound',
                         external_id=msg['id'],
                         body=msg.get('text', ''),
@@ -520,20 +521,8 @@ class TwitterGroupSync:
                         author_partner=author_partner,
                         author_x_id=sender_id,
                         encrypted=msg.get('encrypted', False),
-                    )
-                    total += 1
-                for enc in result.get('encrypted', []):
-                    # Persist an explicit marker so automation/UI can see the
-                    # sync state instead of silently missing the message.
-                    channel._save_x_message(
-                        direction='inbound',
-                        external_id=enc['id'],
-                        body='',
-                        external_created_at=enc.get('created_at'),
-                        author_x_id=enc.get('sender_id'),
-                        encrypted=True,
-                        no_mail=True,
-                    )
+                    ):
+                        total += 1
                 if result.get('encrypted') and result.get('messages'):
                     channel.write({'x_sync_status': 'partial'})
                 elif result.get('encrypted'):

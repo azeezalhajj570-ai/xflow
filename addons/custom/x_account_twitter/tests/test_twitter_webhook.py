@@ -202,7 +202,7 @@ class TestTwitterActivityIngest(XAccountTwitterTestBase):
     def test_ingest_dm_creates_event_and_task(self):
         payload = _dm_payload(OWNER_ID, '111', 'dm-1', 'hello', outbound=True)
         result = self._activity().ingest_webhook(
-            _envelope('dm.sent', 'uuid-1', payload=payload))
+            _envelope('dm.received', 'uuid-1', payload=payload))
         self.assertEqual(result['status'], 'accepted')
         event = self.env['x.twitter.event'].sudo().search(
             [('event_uuid', '=', 'uuid-1')])
@@ -215,9 +215,9 @@ class TestTwitterActivityIngest(XAccountTwitterTestBase):
 
     def test_ingest_duplicate_event_skipped(self):
         payload = _dm_payload(OWNER_ID, '111', 'dm-1', 'hi')
-        self._activity().ingest_webhook(_envelope('dm.sent', 'uuid-dup', payload=payload))
+        self._activity().ingest_webhook(_envelope('dm.received', 'uuid-dup', payload=payload))
         result = self._activity().ingest_webhook(
-            _envelope('dm.sent', 'uuid-dup', payload=payload))
+            _envelope('dm.received', 'uuid-dup', payload=payload))
         self.assertEqual(result['status'], 'skipped')
         count = self.env['x.twitter.event'].sudo().search_count(
             [('event_uuid', '=', 'uuid-dup')])
@@ -245,9 +245,9 @@ class TestTwitterActivityIngest(XAccountTwitterTestBase):
         with patch.object(type(self.env['x.twitter.event'].sudo()), 'create',
                           side_effect=flaky_create):
             first = self._activity().ingest_webhook(
-                _envelope('dm.sent', 'uuid-race', payload=payload))
+                _envelope('dm.received', 'uuid-race', payload=payload))
             second = self._activity().ingest_webhook(
-                _envelope('dm.sent', 'uuid-race', payload=payload))
+                _envelope('dm.received', 'uuid-race', payload=payload))
         self.assertEqual(first['status'], 'accepted')
         self.assertEqual(second['status'], 'skipped')
         self.assertEqual(second['reason'], 'duplicate')
@@ -305,6 +305,40 @@ class TestTwitterActivityIngest(XAccountTwitterTestBase):
             'payload': {}}})
         self.assertIn(result2['status'], ('ignored',))
 
+    def test_ingest_contentless_dm_records_skipped_without_task(self):
+        """A dm.received envelope with no message_create (read receipt,
+        typing, membership) must not burn a queue task."""
+        payload = {
+            'direct_message_events': [
+                {'type': 'read', 'id': 'read-1'},
+                {'type': 'typing_indicator', 'id': 'typing-1'},
+            ],
+            'users': {},
+        }
+        result = self._activity().ingest_webhook(
+            _envelope('dm.received', 'uuid-nocontent', payload=payload))
+        self.assertEqual(result['status'], 'skipped')
+        self.assertEqual(result['reason'], 'no_message_content')
+        event = self.env['x.twitter.event'].sudo().search(
+            [('event_uuid', '=', 'uuid-nocontent')], limit=1)
+        self.assertTrue(event)
+        self.assertEqual(event.state, 'skipped')
+        self.assertFalse(event.task_id)
+        self.assertFalse(self.env['x.account.task'].sudo().search([
+            ('account_id', '=', self.account.id),
+            ('operation', '=', 'process_webhook_event'),
+        ]))
+
+    def test_ingest_encrypted_chat_envelope_creates_task(self):
+        """An encoded_event blob may still decrypt later, so it is enqueued."""
+        payload = _chat_payload('g111222333', '111', 'chat-ing-1', group=True)
+        result = self._activity().ingest_webhook(
+            _envelope('chat.received', 'uuid-chat-ing', payload=payload))
+        self.assertEqual(result['status'], 'accepted')
+        event = self.env['x.twitter.event'].sudo().search(
+            [('event_uuid', '=', 'uuid-chat-ing')], limit=1)
+        self.assertTrue(event.task_id)
+
 
 @tagged('post_install', '-at_install', 'x_account_twitter')
 class TestTwitterActivityProcess(XAccountTwitterTestBase):
@@ -360,14 +394,16 @@ class TestTwitterActivityProcess(XAccountTwitterTestBase):
         self.assertTrue(xm)
         self.assertEqual(xm.direction, 'outbound')
 
-    def test_process_chat_event_marks_encrypted(self):
+    def test_process_chat_event_without_plaintext_is_not_stored(self):
+        """An undecryptable chat event has nothing to store, so no x.message
+        (and no body-less marker) is created."""
         payload = _chat_payload('g111222333', '111', 'chat-1', group=True)
         result = self._process('chat.received', 'uuid-chat', payload)
         self.assertTrue(result['processed'])
-        xm = self.env['x.message'].sudo().search(
-            [('external_id', '=', 'chat-1')], limit=1)
-        self.assertTrue(xm)
-        self.assertTrue(xm.encrypted)
+        self.assertEqual(result['messages'], 0)
+        self.assertTrue(result['encrypted'])
+        self.assertFalse(self.env['x.message'].sudo().search(
+            [('external_id', '=', 'chat-1')], limit=1))
 
     def test_process_chat_event_adds_members_to_channel(self):
         """A webhook chat event must add the owner + counterparty as channel
@@ -411,20 +447,20 @@ class TestTwitterActivityProcess(XAccountTwitterTestBase):
             self.account.write({'x_chat_key_blob': False,
                                 'x_chat_signing_key_version': False})
 
-    def test_process_chat_event_decrypt_failure_keeps_encrypted(self):
-        """Decrypt failure (no key blob) keeps the encrypted marker, no crash."""
+    def test_process_chat_event_decrypt_failure_stores_nothing(self):
+        """Decrypt failure (no key blob) stores no message and does not crash."""
         payload = _chat_payload('g111222333', '111', 'chat-nokey-1')
         result = self._process('chat.received', 'uuid-nokey', payload)
         self.assertTrue(result['processed'])
-        xm = self.env['x.message'].sudo().search(
-            [('external_id', '=', 'chat-nokey-1')], limit=1)
-        self.assertTrue(xm)
-        self.assertTrue(xm.encrypted)
+        self.assertEqual(result['messages'], 0)
+        self.assertTrue(result['encrypted'])
+        self.assertFalse(self.env['x.message'].sudo().search(
+            [('external_id', '=', 'chat-nokey-1')], limit=1))
 
     def test_process_chat_event_xdk_crypto_error_keeps_encrypted(self):
         """Corrupted ciphertext / failed signature verification: the XDK
         collects per-event crypto failures in ``errors`` instead of raising;
-        the message must be stored with the encrypted marker and no body."""
+        with no plaintext the event is reported encrypted and stored nowhere."""
         self.account.write({'x_chat_key_blob': b64encode(bytes(range(64))).decode(),
                             'x_chat_signing_key_version': '1'})
         payload = _chat_payload('g111222333', '111', 'chat-badct-1')
@@ -438,11 +474,9 @@ class TestTwitterActivityProcess(XAccountTwitterTestBase):
                 result = self._process('chat.received', 'uuid-badct', payload)
             self.assertTrue(result['processed'])
             self.assertTrue(result['encrypted'])
-            xm = self.env['x.message'].sudo().search(
-                [('external_id', '=', 'chat-badct-1')], limit=1)
-            self.assertTrue(xm)
-            self.assertTrue(xm.encrypted)
-            self.assertFalse(xm.body_plain)
+            self.assertEqual(result['messages'], 0)
+            self.assertFalse(self.env['x.message'].sudo().search(
+                [('external_id', '=', 'chat-badct-1')], limit=1))
         finally:
             self.account.write({'x_chat_key_blob': False,
                                 'x_chat_signing_key_version': False})
@@ -475,10 +509,9 @@ class TestTwitterActivityProcess(XAccountTwitterTestBase):
         self.assertEqual(ctor_account.id, self.account.id)
         self.assertNotEqual(ctor_account.id, other.id)
         self.assertTrue(result['encrypted'])
-        xm = self.env['x.message'].sudo().search(
-            [('external_id', '=', 'chat-iso-1')], limit=1)
-        self.assertTrue(xm)
-        self.assertTrue(xm.encrypted)
+        self.assertEqual(result['messages'], 0)
+        self.assertFalse(self.env['x.message'].sudo().search(
+            [('external_id', '=', 'chat-iso-1')], limit=1))
 
     def test_process_event_does_not_duplicate_on_second_run(self):
         payload = _dm_payload('111', OWNER_ID, 'dm-idem-1', 'once')
