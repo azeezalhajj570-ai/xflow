@@ -7,11 +7,15 @@
             <list string="X Account Tasks" create="false">
                 <field name="account_id"/>
                 <field name="operation"/>
+                <field name="target_post_id" optional="show"/>
+                <field name="target_screen_name" optional="show"/>
                 <field name="status"/>
                 <field name="priority"/>
                 <field name="retry_count"/>
                 <field name="claimed_at"/>
+                <field name="done_at" optional="show"/>
                 <field name="next_retry_at"/>
+                <field name="source" optional="hide"/>
                 <control>
                     <button name="action_process_queue"
                             string="Process Queue"
@@ -51,6 +55,7 @@
                             <field name="retry_count"/>
                             <field name="max_attempts"/>
                             <field name="claimed_at" readonly="1"/>
+                            <field name="done_at" readonly="1"/>
                             <field name="next_retry_at" readonly="1"/>
                         </group>
                     </group>
@@ -72,16 +77,21 @@
                 <field name="account_id"/>
                 <field name="group_id"/>
                 <field name="task_context"/>
+                <field name="target_post_id"/>
+                <field name="target_screen_name"/>
+                <field name="source"/>
                 <filter string="Pending" name="status_pending" domain="[('status', '=', 'pending')]"/>
                 <filter string="Running" name="status_running" domain="[('status', '=', 'running')]"/>
                 <filter string="Failed" name="status_failed" domain="[('status', '=', 'failed')]"/>
                 <filter string="Success" name="status_success" domain="[('status', '=', 'success')]"/>
                 <filter string="Cancelled" name="status_cancelled" domain="[('status', '=', 'cancelled')]"/>
                 <separator/>
+                <filter string="Executed" name="executed" domain="[('done_at', '!=', False)]"/>
                 <filter string="Overdue" name="overdue" domain="[('status', '=', 'pending'), ('next_retry_at', '&lt;', context_today().strftime('%Y-%m-%d %H:%M:%S'))]"/>
                 <filter string="Retried" name="retried" domain="[('retry_count', '&gt;', 0)]"/>
                 <separator/>
                 <filter string="Scheduled" name="filter_next_retry_at" date="next_retry_at"/>
+                <filter string="Done" name="filter_done_at" date="done_at"/>
                 <separator/>
                 <group>
                     <filter string="Status" name="groupby_status" domain="[]" context="{'group_by': 'status'}"/>
@@ -89,16 +99,34 @@
                     <filter string="X Account" name="groupby_account" domain="[]" context="{'group_by': 'account_id'}"/>
                     <filter string="X Account Group" name="groupby_group" domain="[]" context="{'group_by': 'group_id'}"/>
                     <filter string="Company" name="groupby_company" domain="[]" context="{'group_by': 'company_id'}"/>
+                    <filter string="Source" name="groupby_source" domain="[]" context="{'group_by': 'source'}"/>
+                    <filter string="Done Date" name="groupby_done_date" domain="[]" context="{'group_by': 'done_at:day'}"/>
+                    <filter string="Done Month" name="groupby_done_month" domain="[]" context="{'group_by': 'done_at:month'}"/>
                     <filter string="Creation Date" name="groupby_create_date" domain="[]" context="{'group_by': 'create_date:month'}"/>
                 </group>
             </search>
         </field>
     </record>
 
+    <record id="x_account_task_view_pivot" model="ir.ui.view">
+        <field name="name">x.account.task.view.pivot</field>
+        <field name="model">x.account.task</field>
+        <field name="arch" type="xml">
+            <pivot string="X Account Operations">
+                <field name="operation" type="row"/>
+                <field name="account_id" type="row" optional="hide"/>
+                <field name="source" type="row" optional="hide"/>
+                <field name="status" type="col"/>
+                <field name="target_screen_name" type="measure"/>
+                <field name="retry_count" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
     <record id="action_x_account_task" model="ir.actions.act_window">
         <field name="name">X Account Tasks</field>
         <field name="res_model">x.account.task</field>
-        <field name="view_mode">list,form</field>
+        <field name="view_mode">list,form,pivot</field>
         <field name="context">{'search_default_groupby_account': 1, 'search_default_groupby_operation': 2, 'search_default_groupby_status': 3}</field>
     </record>
 </odoo>
