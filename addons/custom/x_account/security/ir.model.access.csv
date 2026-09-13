@@ -5,6 +5,8 @@ access_x_account_group_user,x.account.group.user,model_x_account_group,social.gr
 access_x_account_group_manager,x.account.group.manager,model_x_account_group,social.group_social_manager,1,1,1,1
 access_x_account_task_user,x.account.task.user,model_x_account_task,social.group_social_user,1,1,1,0
 access_x_account_task_manager,x.account.task.manager,model_x_account_task,social.group_social_manager,1,1,1,1
+access_x_account_operation_report_user,x.account.operation.report.user,model_x_account_operation_report,social.group_social_user,1,0,0,0
+access_x_account_operation_report_manager,x.account.operation.report.manager,model_x_account_operation_report,social.group_social_manager,1,0,0,0
 access_x_message_user,x.message.user,model_x_message,social.group_social_user,1,1,1,1
 access_x_message_manager,x.message.manager,model_x_message,social.group_social_manager,1,1,1,1
 access_x_import_session_user,x.import.session.user,model_x_import_session,base.group_user,1,1,1,0

@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="x_account_operation_report_view_list" model="ir.ui.view">
+        <field name="name">x.account.operation.report.view.list</field>
+        <field name="model">x.account.operation.report</field>
+        <field name="arch" type="xml">
+            <list string="X Operations" create="false" edit="false" delete="false">
+                <field name="create_date"/>
+                <field name="group_id" optional="show"/>
+                <field name="account_id"/>
+                <field name="operation" widget="badge"/>
+                <field name="tweet_url" widget="url" string="Tweet"/>
+                <field name="tweet_screen_name" optional="show"/>
+                <field name="tweet_id" optional="hide"/>
+                <field name="status" optional="show"/>
+                <field name="done_at" optional="show"/>
+                <field name="source" optional="hide"/>
+                <field name="channel_id" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="x_account_operation_report_view_pivot" model="ir.ui.view">
+        <field name="name">x.account.operation.report.view.pivot</field>
+        <field name="model">x.account.operation.report</field>
+        <field name="arch" type="xml">
+            <pivot string="X Operations">
+                <field name="group_id" type="row"/>
+                <field name="account_id" type="row" optional="hide"/>
+                <field name="tweet_id" type="row" optional="hide"/>
+                <field name="operation" type="col"/>
+                <field name="status" type="col" optional="hide"/>
+                <field name="operation_count" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="x_account_operation_report_view_graph" model="ir.ui.view">
+        <field name="name">x.account.operation.report.view.graph</field>
+        <field name="model">x.account.operation.report</field>
+        <field name="arch" type="xml">
+            <graph string="X Operations" type="bar">
+                <field name="group_id"/>
+                <field name="account_id" optional="hide"/>
+                <field name="operation"/>
+                <field name="operation_count" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <record id="x_account_operation_report_view_search" model="ir.ui.view">
+        <field name="name">x.account.operation.report.view.search</field>
+        <field name="model">x.account.operation.report</field>
+        <field name="arch" type="xml">
+            <search string="X Operations">
+                <field name="group_id"/>
+                <field name="account_id"/>
+                <field name="tweet_id"/>
+                <field name="tweet_screen_name"/>
+                <field name="channel_id"/>
+                <filter string="Like" name="op_like" domain="[('operation', '=', 'like')]"/>
+                <filter string="Repost" name="op_repost" domain="[('operation', '=', 'repost')]"/>
+                <filter string="Bookmark" name="op_bookmark" domain="[('operation', '=', 'bookmark')]"/>
+                <filter string="Comment" name="op_comment" domain="[('operation', '=', 'comment')]"/>
+                <separator/>
+                <filter string="Success" name="status_success" domain="[('status', '=', 'success')]"/>
+                <filter string="Failed" name="status_failed" domain="[('status', '=', 'failed')]"/>
+                <filter string="Pending" name="status_pending" domain="[('status', '=', 'pending')]"/>
+                <separator/>
+                <filter string="Created On" name="filter_create_date" date="create_date"/>
+                <filter string="Done On" name="filter_done_at" date="done_at"/>
+                <separator/>
+                <group>
+                    <filter string="Account Group" name="groupby_group" domain="[]" context="{'group_by': 'group_id'}"/>
+                    <filter string="X Account" name="groupby_account" domain="[]" context="{'group_by': 'account_id'}"/>
+                    <filter string="Tweet" name="groupby_tweet" domain="[]" context="{'group_by': 'tweet_id'}"/>
+                    <filter string="Operation" name="groupby_operation" domain="[]" context="{'group_by': 'operation'}"/>
+                    <filter string="Status" name="groupby_status" domain="[]" context="{'group_by': 'status'}"/>
+                    <filter string="Channel" name="groupby_channel" domain="[]" context="{'group_by': 'channel_id'}"/>
+                    <filter string="Source" name="groupby_source" domain="[]" context="{'group_by': 'source'}"/>
+                    <filter string="Company" name="groupby_company" domain="[]" context="{'group_by': 'company_id'}"/>
+                    <filter string="Created Date" name="groupby_create_date" domain="[]" context="{'group_by': 'create_date:day'}"/>
+                    <filter string="Created Month" name="groupby_create_month" domain="[]" context="{'group_by': 'create_date:month'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_x_account_operation_report" model="ir.actions.act_window">
+        <field name="name">Operations Report</field>
+        <field name="res_model">x.account.operation.report</field>
+        <field name="view_mode">list,pivot,graph</field>
+        <field name="context">{'search_default_groupby_group': 1, 'search_default_groupby_operation': 2}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No X operations recorded yet.</p>
+            <p>
+                Likes, reposts, bookmarks and comments performed by X accounts are
+                listed here, grouped by account group, account and tweet.
+            </p>
+        </field>
+    </record>
+</odoo>
