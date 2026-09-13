@@ -7,3 +7,4 @@ from . import test_twitter_groups
 from . import test_twitter_webhook
 from . import test_xchat_decryptor
 from . import test_twitter_dm
+from . import test_x_subscriptions
