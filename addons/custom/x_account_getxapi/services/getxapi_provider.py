@@ -17,6 +17,9 @@ SOLID layering:
 """
 
 import logging
+import uuid
+
+from odoo.addons.x_account.services.x_provider import x_conversation_is_group
 
 from .getxapi_client import GetXAPIClient
 from .getxapi_dm_service import GetXAPIDMService
@@ -26,6 +29,22 @@ from .getxapi_user_service import GetXAPIUserService
 from . import getxapi_envelope
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _existing_columns(cr, table, columns):
+    """Return the subset of ``columns`` physically present on ``table``.
+
+    Tests run against a lean install (only the module's dependencies), so
+    optional columns contributed by heavy modules (e.g. accountant's
+    ``res_partner.autopost_bills`` or purchase's ``group_rfq``) may not
+    exist; bulk SQL must only reference columns the database actually has.
+    """
+    cr.execute(
+        'SELECT column_name FROM information_schema.columns '
+        'WHERE table_schema = current_schema() AND table_name = %s '
+        'AND column_name IN %s', (table, tuple(columns)))
+    present = {row[0] for row in cr.fetchall()}
+    return [col for col in columns if col in present]
 
 
 class GetXAPIProvider:
@@ -146,7 +165,7 @@ class GetXAPIProvider:
         """Send a direct message via GetXAPI."""
         return self._dms.send(recipient_id, text, auth_token=self._auth_token)
 
-    def fetch_groups(self, account, limit=100):
+    def fetch_groups(self, account, limit=100, create_missing=True):
         """Sync the account's DM conversations into discuss channels.
 
         GetXAPI's inbox mixes group and 1:1 conversations; both are synced —
@@ -156,60 +175,366 @@ class GetXAPIProvider:
         its stored channel type is left untouched (Odoo forbids changing
         ``channel_type`` after creation), which is safe because send routing
         resolves the conversation shape at send time.
+
+        The whole inbox is paginated (cursor + ``has_more``) so conversations
+        beyond the first page are seen, and records are upserted with raw SQL
+        bulk statements for speed.
         """
-        result = self._dms.list(auth_token=self._auth_token, count=limit)
-        conversations = result.get('conversations', [])
-        channel_model = self.env['discuss.channel'].sudo()
-        partner_model = self.env['res.partner'].sudo()
+        return self._sync_inbox(account, limit=limit, create_missing=create_missing)
+
+    def sync_chat_names(self, account, limit=200, create_missing=True):
+        """Refresh chat channel names (and create missing channels) from GetXAPI.
+
+        Lists DM/group conversations — walking every inbox page via
+        ``cursor`` / ``has_more`` — updates the name of every channel that
+        already exists, and creates channels for conversations that were never
+        seen before (``create_missing``). Payloads are persisted with raw SQL
+        bulk statements so one run stays fast even with a large inbox; the
+        returned dict carries both the legacy name-sync counts
+        (``conversations``/``updated``/``unchanged``/``missing``) and the
+        create-side counts (``groups``/``created``/``members``).
+        """
+        if not self._auth_token:
+            raise ValueError(
+                'Set the GetXAPI Auth Token on this account first — the '
+                'inbox list requires it.')
+        return self._sync_inbox(account, limit=limit, create_missing=create_missing)
+
+    def _iter_inbox_conversations(self, auth_token, limit=50, tab='all'):
+        """Yield every conversation in the account's DM inbox.
+
+        GetXAPI paginates the inbox (~50 per page); walking every page via
+        ``cursor`` / ``has_more`` guarantees the whole inbox is seen, not just
+        the most recent page. A safety cap and a repeated-cursor guard stop
+        runaway loops on a misbehaving upstream.
+        """
+        cursor = None
+        seen_cursors = set()
+        pages = 0
+        max_pages = 200  # ~50/page -> up to ~10k conversations
+        while pages < max_pages:
+            result = self._dms.list(
+                auth_token=auth_token, count=limit, cursor=cursor, tab=tab)
+            conversations = result.get('conversations', [])
+            if conversations:
+                yield conversations
+            pages += 1
+            next_cursor = result.get('cursor')
+            has_more = bool(result.get('has_more', bool(next_cursor)))
+            if not has_more or not next_cursor:
+                return
+            if next_cursor in seen_cursors:
+                _LOGGER.warning(
+                    'GetXAPI inbox pagination stuck on cursor %r (page %s) '
+                    'for account %s; stopping.',
+                    next_cursor, pages, self.account.id)
+                return
+            seen_cursors.add(next_cursor)
+            cursor = next_cursor
+        _LOGGER.warning(
+            'GetXAPI inbox pagination hit the %s-page cap for account %s; '
+            'stopping.', max_pages, self.account.id)
+
+    def _sync_inbox(self, account, limit=50, create_missing=True, tab='all'):
+        """Full-inbox sync shared by ``fetch_groups`` and ``sync_chat_names``.
+
+        Lists every page of the account's DM inbox and persists the
+        conversations with raw SQL: one batch partner upsert, one batch
+        channel upsert, one batch member upsert, and batched name/peer
+        updates. Works on reduced/field-limited recordsets and bypasses the
+        ORM per-record round trips so a run with thousands of conversations
+        stays fast.
+
+        Returns:
+            {'conversations', 'groups', 'created', 'updated', 'unchanged',
+             'missing', 'members'}
+        """
+        env = self.env
+        cr = env.cr
+        env.flush_all()
         my_user_id = str(getattr(account, 'twitter_user_id', '') or '')
-        created = updated = members = groups = 0
-        for conv in conversations:
-            conv_id = conv.get('conversation_id')
-            if not conv_id:
-                continue
-            is_group = bool(conv.get('group'))
-            participant_ids = []
-            peer_partner = None
+        owner_partner_ids = []
+        if self.env.user.partner_id:
+            owner_partner_ids.append(self.env.user.partner_id.id)
+        if account.create_uid and account.create_uid.partner_id:
+            owner_partner_ids.append(account.create_uid.partner_id.id)
+        owner_partner_ids = [
+            pid for pid in dict.fromkeys(owner_partner_ids) if pid]
+
+        # 1. Walk the whole inbox, deduplicating by conversation id.
+        conversations = {}
+        groups = 0
+        for page in self._iter_inbox_conversations(
+                self._auth_token, limit=limit, tab=tab):
+            for conv in page:
+                conv_id = str(conv.get('conversation_id') or '')
+                if not conv_id:
+                    continue
+                if conv_id not in conversations:
+                    conversations[conv_id] = conv
+                    if x_conversation_is_group(
+                            conv_id, group=conv.get('group'),
+                            conv_type=conv.get('type', '')):
+                        groups += 1
+
+        # 2. Upsert participants as res.partner, keyed by x_user_id.
+        uid_info = {}
+        for conv in conversations.values():
             for p in conv.get('participants') or []:
-                x_uid = p.get('id')
+                x_uid = str(p.get('id') or '').strip()
                 if not x_uid:
                     continue
-                partner = partner_model.search([('x_user_id', '=', str(x_uid))], limit=1)
-                if not partner:
-                    partner = partner_model.create({
-                        'name': p.get('name') or p.get('userName') or str(x_uid),
-                        'x_user_id': str(x_uid),
-                        'x_username': p.get('userName'),
-                    })
-                    members += 1
-                participant_ids.append(partner.id)
-                if not is_group and str(x_uid) != my_user_id and not peer_partner:
-                    peer_partner = partner
-            channel_type = 'x_group' if is_group else 'x'
-            conv_name, _derived_type = self._chat_name_from_conversation(
-                conv, my_user_id)
-            conv_name = conv_name or conv_id
-            if is_group:
-                groups += 1
-            channel = channel_model.search([
-                ('x_account_id', '=', account.id),
-                ('x_conversation_id', '=', conv_id),
-            ], limit=1)
-            if not channel:
-                channel = channel_model._get_x_channel(
-                    account, partner=peer_partner, conversation_id=conv_id,
-                    channel_type=channel_type, create_if_not_found=True,
-                    member_ids=participant_ids)
-                if not channel:
+                info = uid_info.setdefault(
+                    x_uid, {'name': '', 'username': ''})
+                if not info['name']:
+                    info['name'] = str(
+                        p.get('name') or p.get('userName') or '')
+                if not info['username']:
+                    info['username'] = str(p.get('userName') or '')
+
+        partner_by_uid = {}
+        if uid_info:
+            cr.execute(
+                'SELECT id, x_user_id FROM res_partner '
+                'WHERE x_user_id IN %s', (tuple(uid_info),))
+            for pid, x_uid in cr.fetchall():
+                partner_by_uid.setdefault(x_uid, pid)
+        missing_uids = [x_uid for x_uid in uid_info
+                        if x_uid not in partner_by_uid]
+        members = 0
+        if missing_uids:
+            partner_insert_cols = _existing_columns(cr, 'res_partner', (
+                'name', 'complete_name', 'type', 'active', 'is_company',
+                'partner_share', 'autopost_bills', 'group_rfq', 'group_on',
+                'is_created_by_ocr', 'x_user_id', 'x_username', 'create_uid',
+                'write_uid', 'create_date', 'write_date',
+                'commercial_partner_id'))
+            insert_cols = [
+                col for col in partner_insert_cols
+                if col != 'commercial_partner_id']
+            rows = []
+            params = []
+            for x_uid in missing_uids:
+                info = uid_info[x_uid]
+                name = info['name'] or info['username'] or x_uid
+                vals = {
+                    'name': name,
+                    'complete_name': name,
+                    'type': 'contact',
+                    'active': True,
+                    'is_company': False,
+                    'partner_share': True,
+                    'autopost_bills': 'ask',
+                    'group_rfq': 'default',
+                    'group_on': 'default',
+                    'is_created_by_ocr': False,
+                    'x_user_id': x_uid,
+                    'x_username': info['username'],
+                    'create_uid': 1,
+                    'write_uid': 1,
+                    'create_date': 'now()',
+                    'write_date': 'now()',
+                }
+                placeholder = [
+                    'now()' if col in ('create_date', 'write_date')
+                    else '%s'
+                    for col in insert_cols]
+                rows.append('(%s)' % ', '.join(placeholder))
+                params += [vals[col] for col in insert_cols
+                           if col not in ('create_date', 'write_date')]
+            cr.execute(
+                'INSERT INTO res_partner (%s) VALUES %s '
+                'RETURNING id, x_user_id'
+                % (', '.join(insert_cols), ', '.join(rows)), params)
+            for pid, x_uid in cr.fetchall():
+                partner_by_uid.setdefault(x_uid, pid)
+            members = len(missing_uids)
+            if 'commercial_partner_id' in partner_insert_cols:
+                cr.execute(
+                    'UPDATE res_partner SET commercial_partner_id = id '
+                    'WHERE id IN %s AND commercial_partner_id IS NULL',
+                    (tuple(partner_by_uid[x_uid] for x_uid in missing_uids),))
+
+        # 3. Resolve name / type / members per conversation.
+        tasks = []
+        for conv_id, conv in conversations.items():
+            is_group = x_conversation_is_group(
+                conv_id, group=conv.get('group'),
+                conv_type=conv.get('type', ''))
+            name, _ctype = self._chat_name_from_conversation(conv, my_user_id)
+            name = name or conv_id
+            peer_partner_id = None
+            participant_ids = []
+            for p in conv.get('participants') or []:
+                x_uid = str(p.get('id') or '').strip()
+                pid = partner_by_uid.get(x_uid) if x_uid else None
+                if not pid:
                     continue
-                channel.write({'name': conv_name})
-                created += 1
-            else:
-                if not is_group and peer_partner and channel.x_partner_id != peer_partner:
-                    channel.write({'x_partner_id': peer_partner.id})
+                participant_ids.append(pid)
+                if (not is_group and x_uid != my_user_id
+                        and peer_partner_id is None):
+                    peer_partner_id = pid
+            tasks.append({
+                'conv_id': conv_id,
+                'is_group': is_group,
+                'name': name,
+                'peer_partner_id': peer_partner_id,
+                'participant_ids': participant_ids,
+            })
+
+        # 4. Load existing channels for this account in one bulk query.
+        conv_ids = [task['conv_id'] for task in tasks]
+        existing_ids = {}
+        channel_names = {}
+        channel_peers = {}
+        if conv_ids:
+            cr.execute(
+                'SELECT id, x_conversation_id, name, x_partner_id FROM '
+                'discuss_channel WHERE x_account_id = %s '
+                'AND x_conversation_id IN %s',
+                (account.id, tuple(conv_ids)))
+            for cid, cconv_id, cname, cpeer in cr.fetchall():
+                existing_ids.setdefault(cconv_id, cid)
+                channel_names[cid] = cname
+                channel_peers[cid] = cpeer
+
+        # 5. Split into create / update buckets.
+        created = unchanged = updated = missing = 0
+        to_create = []
+        name_updates = []
+        x_partner_updates = []
+        for task in tasks:
+            cid = existing_ids.get(task['conv_id'])
+            if not cid:
+                if create_missing:
+                    to_create.append(task)
+                else:
+                    missing += 1
+                continue
+            if task['name'] and channel_names.get(cid) != task['name']:
+                name_updates.append((cid, task['name']))
                 updated += 1
-        return {'groups': groups, 'created': created, 'updated': updated,
-                'members': members}
+            else:
+                unchanged += 1
+            if (not task['is_group'] and task['peer_partner_id']
+                    and channel_peers.get(cid) != task['peer_partner_id']):
+                x_partner_updates.append((cid, task['peer_partner_id']))
+
+        # 6. Bulk-insert missing channels.
+        new_channel_ids = {}
+        if to_create:
+            channel_insert_cols = _existing_columns(cr, 'discuss_channel', (
+                'name', 'channel_type', 'x_account_id', 'x_partner_id',
+                'x_conversation_id', 'uuid', 'x_company_id', 'create_uid',
+                'write_uid', 'active', 'create_date', 'write_date'))
+            rows = []
+            params = []
+            company_id = account.company_id.id or None
+            for task in to_create:
+                vals = {
+                    'name': task['name'],
+                    'channel_type': 'x_group' if task['is_group'] else 'x',
+                    'x_account_id': account.id,
+                    'x_partner_id': task['peer_partner_id'],
+                    'x_conversation_id': task['conv_id'],
+                    'uuid': str(uuid.uuid4()),
+                    'x_company_id': company_id,
+                    'create_uid': 1,
+                    'write_uid': 1,
+                    'active': True,
+                    'create_date': 'now()',
+                    'write_date': 'now()',
+                }
+                placeholder = [
+                    'now()' if col in ('create_date', 'write_date')
+                    else '%s'
+                    for col in channel_insert_cols]
+                rows.append('(%s)' % ', '.join(placeholder))
+                params += [vals[col] for col in channel_insert_cols
+                           if col not in ('create_date', 'write_date')]
+            cr.execute(
+                'INSERT INTO discuss_channel (%s) VALUES %s '
+                'RETURNING id, x_conversation_id'
+                % (', '.join(channel_insert_cols), ', '.join(rows)), params)
+            for cid, cconv_id in cr.fetchall():
+                new_channel_ids[cconv_id] = cid
+                created += 1
+
+        # 7. Bulk-apply name and peer backfills with a single UPDATE each.
+        if name_updates:
+            vrows = ', '.join(['(%s, %s)'] * len(name_updates))
+            params = []
+            for cid, ch_name in name_updates:
+                params += [cid, ch_name]
+            cr.execute(
+                'UPDATE discuss_channel c SET name = v.channel_name, '
+                'write_uid = 1, write_date = now() '
+                'FROM (VALUES %s) AS v(id, channel_name) '
+                'WHERE c.id = v.id' % vrows, params)
+        if x_partner_updates:
+            vrows = ', '.join(['(%s, %s)'] * len(x_partner_updates))
+            params = []
+            for cid, pid in x_partner_updates:
+                params += [cid, pid]
+            cr.execute(
+                'UPDATE discuss_channel c SET x_partner_id = v.partner_id, '
+                'write_uid = 1, write_date = now() '
+                'FROM (VALUES %s) AS v(id, partner_id) '
+                'WHERE c.id = v.id' % vrows, params)
+
+        # 8. Reconcile channel members (cumulative, never removes).
+        channel_members = {}
+        for task in tasks:
+            cid = (new_channel_ids.get(task['conv_id'])
+                   or existing_ids.get(task['conv_id']))
+            if not cid:
+                continue
+            if task['conv_id'] in new_channel_ids:
+                pool = task['participant_ids'] + owner_partner_ids
+            else:
+                pool = task['participant_ids']
+            if pool:
+                channel_members.setdefault(cid, set()).update(pool)
+        if channel_members:
+            existing_members = set()
+            cids = list(channel_members)
+            for start in range(0, len(cids), 1000):
+                chunk = cids[start:start + 1000]
+                cr.execute(
+                    'SELECT channel_id, partner_id FROM '
+                    'discuss_channel_member WHERE channel_id IN %s '
+                    'AND partner_id IS NOT NULL', (tuple(chunk),))
+                existing_members.update(cr.fetchall())
+            to_insert = [
+                (cid, pid) for cid, pool in channel_members.items()
+                for pid in pool if (cid, pid) not in existing_members]
+            if to_insert:
+                rows = ', '.join(['(%s, %s, 0)'] * len(to_insert))
+                params = []
+                for cid, pid in to_insert:
+                    params += [cid, pid]
+                cr.execute(
+                    'INSERT INTO discuss_channel_member (channel_id, '
+                    'partner_id, new_message_separator) VALUES %s' % rows,
+                    params)
+
+        env.invalidate_all()
+
+        _LOGGER.info(
+            'GetXAPI inbox sync for account %s: %s conversation(s), '
+            '%s group(s), %s channel(s) created, %s updated, %s unchanged, '
+            '%s missing, %s new partner(s)',
+            account.id, len(conversations), groups, created, updated,
+            unchanged, missing, members)
+        return {
+            'conversations': len(conversations),
+            'groups': groups,
+            'created': created,
+            'updated': updated,
+            'unchanged': unchanged,
+            'missing': missing,
+            'members': members,
+        }
 
     @staticmethod
     def _chat_name_from_conversation(conv, my_user_id=''):
@@ -220,7 +545,9 @@ class GetXAPIProvider:
             return str(p.get('userName') or p.get('username')
                        or p.get('name') or '')
 
-        is_group = bool(conv.get('group')) or conv.get('type') == 'group'
+        is_group = x_conversation_is_group(
+            conv.get('conversation_id') or conv.get('id'),
+            group=conv.get('group'), conv_type=conv.get('type', ''))
         if is_group:
             name = conv.get('name') or ''
             if name:
@@ -232,50 +559,6 @@ class GetXAPIProvider:
             if str(p.get('id')) != str(my_user_id) and _label(p):
                 return _label(p), 'x'
         return '', 'x'
-
-    def sync_chat_names(self, account, limit=200):
-        """Refresh the names of existing X chat channels from GetXAPI.
-
-        Lists DM/group conversations (cursor-paginated, max 5 pages) and only
-        updates discuss channels that already exist for this account; missing
-        channels are counted, never created. Returns conversation counts.
-        """
-        channel_model = self.env['discuss.channel'].sudo()
-        if not self._auth_token:
-            raise ValueError(
-                'Set the GetXAPI Auth Token on this account first — the '
-                'inbox list requires it.')
-        my_user_id = str(getattr(account, 'twitter_user_id', '') or '')
-        updated = unchanged = missing = seen = 0
-        cursor = None
-        for _page in range(10):  # ~50 conversations per page, max 10 pages
-            result = self._dms.list(
-                auth_token=self._auth_token, count=limit, cursor=cursor)
-            conversations = result.get('conversations', [])
-            seen += len(conversations)
-            for conv in conversations:
-                conv_id = conv.get('conversation_id')
-                if not conv_id:
-                    continue
-                name, _ctype = self._chat_name_from_conversation(conv, my_user_id)
-                channel = channel_model.search([
-                    ('x_account_id', '=', account.id),
-                    ('x_conversation_id', '=', str(conv_id)),
-                    ('channel_type', 'in', ('x', 'x_group')),
-                ], limit=1)
-                if not channel:
-                    missing += 1
-                    continue
-                if name and channel.name != name:
-                    channel.write({'name': name})
-                    updated += 1
-                else:
-                    unchanged += 1
-            cursor = result.get('cursor')
-            if not cursor or not result.get('has_more', bool(cursor)):
-                break
-        return {'conversations': seen, 'updated': updated,
-                'unchanged': unchanged, 'missing': missing}
 
     def fetch_group_messages(self, account, limit=100):
         """Fetch messages from X group-DM conversations and store them."""

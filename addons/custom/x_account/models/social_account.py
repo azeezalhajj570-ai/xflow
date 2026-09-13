@@ -389,12 +389,12 @@ class SocialAccount(models.Model):
         return result
 
     def action_sync_chat_names(self):
-        """Refresh names of existing X chat channels via the account's provider.
+        """Synchronize X chat channels (names + missing channel creation).
 
-        Uses the action provider (e.g. GetXAPI) to list the account's DM and
-        group conversations and update the ``name`` of the discuss channels
-        that already exist for them. Channels for unseen conversations are
-        not created here — use Fetch Groups for that.
+        Uses the action provider (e.g. GetXAPI) to list the FULL account DM
+        inbox (pages walked via cursor) and update the ``name`` of the
+        discuss channels that already exist; conversations that were never
+        seen before get their channels created in the same run.
         """
         self.ensure_one()
         if not self._filter_x_accounts():
@@ -413,14 +413,17 @@ class SocialAccount(models.Model):
                 'action_sync_chat_names failed for account %s', self.id)
             return self._display_notification(
                 'Sync Chat Names', 'Sync failed: %s' % exc, kind='danger')
-        kind = 'success' if (result.get('updated') or result.get('unchanged')) \
-            else 'warning'
+        kind = 'success' if (result.get('created') or result.get('updated')
+                             or result.get('unchanged')) else 'warning'
+        message = 'Conversations: %s%s, updated: %s, unchanged: %s, no channel: %s' % (
+            result.get('conversations', 0),
+            ', created: %s' % result.get('created', 0)
+            if result.get('created') else '',
+            result.get('updated', 0),
+            result.get('unchanged', 0),
+            result.get('missing', 0))
         return self._display_notification(
-            'Sync Chat Names',
-            'Conversations: %s, updated: %s, unchanged: %s, no channel: %s' % (
-                result.get('conversations', 0), result.get('updated', 0),
-                result.get('unchanged', 0), result.get('missing', 0)),
-            kind=kind)
+            'Sync Chat Names', message, kind=kind)
 
     def action_initialize_x_chat_encryption(self):
         """Initialize the account's XChat encryption via its provider.

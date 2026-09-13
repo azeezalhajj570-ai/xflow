@@ -5,6 +5,8 @@ import logging
 
 from odoo import api, fields, models
 
+from ..services.x_provider import x_conversation_is_group
+
 _logger = logging.getLogger(__name__)
 
 
@@ -687,7 +689,8 @@ class DiscussChannel(models.Model):
         channel = self._get_x_channel(
             account,
             conversation_id=conversation_id,
-            channel_type='x_group' if event.get('group') else 'x',
+            channel_type='x_group' if x_conversation_is_group(
+                conversation_id, group=event.get('group')) else 'x',
             create_if_not_found=True,
         )
         author_x_id = event.get('author_x_id')

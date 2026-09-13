@@ -10,6 +10,8 @@ itself only forwards these calls.
 
 import logging
 
+from odoo.addons.x_account.services.x_provider import x_conversation_is_group
+
 from . import omnix_envelope
 
 _LOGGER = logging.getLogger(__name__)
@@ -57,7 +59,13 @@ class OmniXGroupSync:
                 break
             if len(conversations) >= int(limit):
                 break
-        groups = [c for c in conversations if c.get('type') == 'group']
+        # A conversation is a group when OmniX flags it as such (``type``
+        # ``'group'``) OR when its id follows the XChat ``g``-prefix convention
+        # -- OmniX sometimes omits the type for XChat groups, which would
+        # otherwise silently drop them from the sync.
+        groups = [c for c in conversations if x_conversation_is_group(
+            c.get('conversation_id') or c.get('id'),
+            conv_type=c.get('type', ''))]
 
         channel_model = self.env['discuss.channel'].sudo()
         partner_model = self.env['res.partner'].sudo()

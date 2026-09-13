@@ -8,6 +8,8 @@ GetXAPI wraps every payload in ``{"success": ..., "data": ..., "error": ...}``
 deals with bytes.
 """
 
+from odoo.addons.x_account.services.x_provider import x_conversation_is_group
+
 
 class GetXAPIEnvelopeParser:
     """Stateless parser: every method takes a raw envelope and returns a DTO."""
@@ -157,11 +159,7 @@ class GetXAPIEnvelopeParser:
         return {
             'conversations': [
                 {
-                    'conversation_id': (
-                        conv.get('conversation_id')
-                        or conv.get('id')
-                        or conv.get('conversationId')
-                    ),
+                    'conversation_id': conv.get('conversation_id') or conv.get('id') or '',
                     'type': conv.get('type', 'ONE_TO_ONE'),
                     'participants': [
                         dict(p, userName=p.get('userName') or p.get('screen_name')
@@ -171,8 +169,10 @@ class GetXAPIEnvelopeParser:
                     'participant_count': conv.get('participant_count', 0),
                     'name': conv.get('name') or conv.get('title') or '',
                     'last_message': conv.get('last_message'),
-                    'group': str(conv.get('type', '')).upper() not in (
-                        '', 'ONE_TO_ONE', 'ONE_TO_ONE_DM'),
+                    'group': x_conversation_is_group(
+                        conv.get('conversation_id') or conv.get('id') or '',
+                        conv_type=conv.get('type', ''),
+                    ),
                 }
                 for conv in conversations[:limit]
             ],
