@@ -114,6 +114,9 @@ class TestOmniXProvider(XAccountOmniXTestBase):
                     {'conversation_id': 'conv-2', 'type': 'group',
                      'participants': [{'id': '1'}, {'id': '2'}],
                      'participant_count': 2, 'last_message': None},
+                    {'conversation_id': 'g2032517123456',
+                     'participants': [{'id': '1'}, {'id': '2'}],
+                     'participant_count': 2},
                 ],
                 'next_cursor': {'cursor_id': 'abc'},
             },
@@ -121,11 +124,12 @@ class TestOmniXProvider(XAccountOmniXTestBase):
         }
         with patch.object(OmniXHttpClient, 'request', return_value=data) as req:
             result = self.provider.get_conversations(limit=10)
-        self.assertEqual(len(result['conversations']), 2)
+        self.assertEqual(len(result['conversations']), 3)
         self.assertEqual(result['conversations'][0]['conversation_id'], 'conv-1')
         self.assertFalse(result['conversations'][0]['group'])
         self.assertTrue(result['conversations'][1]['group'])
-        self.assertEqual(result['conversations'][1]['participant_count'], 2)
+        # XChat g-prefixed id without a type field must be classified as group.
+        self.assertTrue(result['conversations'][2]['group'])
         self.assertEqual(result['cursor'], 'abc')
         self.assertEqual(req.call_args.args[1], '/dm/list')
 
@@ -183,6 +187,34 @@ class TestOmniXProvider(XAccountOmniXTestBase):
         self.assertTrue(alice)
         self.assertTrue(bob)
         self.assertEqual(alice.x_username, 'alice')
+
+    def test_fetch_groups_syncs_g_prefixed_chat_without_type(self):
+        """XChat 'g...' conversations are synced as groups even when OmniX
+        omits the ``type`` field in /dm/list."""
+        data = {
+            'status': True,
+            'data': {
+                'conversations': [
+                    {'conversation_id': 'g2032517123456',
+                     'participants': [
+                         {'id': '100', 'userName': 'alice', 'name': 'Alice'},
+                         {'id': '200', 'userName': 'bob', 'name': 'Bob'},
+                     ]},
+                ],
+            },
+            'error': None,
+        }
+        with patch.object(OmniXHttpClient, 'request', return_value=data):
+            result = self.provider.fetch_groups(self.account)
+        self.assertEqual(result['groups'], 1)
+        self.assertEqual(result['created'], 1)
+        self.assertEqual(result['members'], 2)
+        channel = self.env['discuss.channel'].sudo().search([
+            ('x_conversation_id', '=', 'g2032517123456'),
+            ('x_account_id', '=', self.account.id),
+        ], limit=1)
+        self.assertTrue(channel)
+        self.assertEqual(channel.channel_type, 'x_group')
 
     def test_send_dm(self):
         data = {'status': True, 'data': {'id': 'dm-1', 'created_at': '2026-01-01'}, 'error': None}

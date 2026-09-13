@@ -9,6 +9,8 @@ and uses many aliases for the same field (``id``/``rest_id``, ``conversation_id`
 deals with bytes.
 """
 
+from odoo.addons.x_account.services.x_provider import x_conversation_is_group
+
 
 class OmniXEnvelopeParser:
     """Stateless parser: every method takes a raw envelope and returns a DTO."""
@@ -49,7 +51,9 @@ class OmniXEnvelopeParser:
                     'participants': conv.get('participants') or [],
                     'participant_count': conv.get('participant_count', 0),
                     'last_message': conv.get('last_message'),
-                    'group': conv.get('type') == 'group',
+                    'group': x_conversation_is_group(
+                        conv.get('conversation_id') or conv.get('id'),
+                        conv_type=conv.get('type', '')),
                 }
                 for conv in conversations[:limit]
             ],

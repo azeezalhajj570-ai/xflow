@@ -18,8 +18,32 @@ x_account_omnix module); the system must never depend on it.
 """
 
 import logging
+import re
 
 _logger = logging.getLogger(__name__)
+
+# XChat (X Groups product) conversation ids are ``g``-prefixed. Providers
+# (OmniX, GetXAPI, ...) sometimes deliver these conversations without a
+# ``group`` flag or a meaningful ``type`` field, so the id shape is the
+# reliable, provider-agnostic group signal.
+_CHAT_GROUP_ID_RE = re.compile(r'^g[0-9]+$')
+
+
+def x_conversation_is_group(conversation_id, group=False, conv_type=''):
+    """Whether an X conversation is a group conversation.
+
+    Returns True when the provider payload already says so (a ``group`` flag
+    or a group ``type`` value) or when the conversation id follows X's XChat
+    ``g``-prefix convention — which providers sometimes omit from their
+    payload (e.g. ``g2032517...`` coming through without a type). Centralizing
+    the rule keeps every provider's group sync consistent.
+    """
+    if group:
+        return True
+    conv_type = str(conv_type or '').strip().lower()
+    if conv_type in ('group', 'group_dm', 'group_dm_thread', 'chat'):
+        return True
+    return bool(_CHAT_GROUP_ID_RE.match(str(conversation_id or '')))
 
 
 class XProvider:

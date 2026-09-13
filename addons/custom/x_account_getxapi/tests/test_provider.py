@@ -188,15 +188,56 @@ class TestSyncChatNames(XAccountGetXAPITestBase):
         self.assertEqual(result['missing'], 0)
         self.assertEqual(channel.name, 'Team Chat')
 
-    def test_sync_skips_channels_that_do_not_exist(self):
+    def test_sync_counts_channels_that_do_not_exist_when_not_creating(self):
         with patch.object(GetXAPIDMService, 'list', return_value={
                 'conversations': [self._conv('ghost', name='Ghost Chat')],
                 'cursor': ''}):
-            result = self.provider.sync_chat_names(self.account)
+            result = self.provider.sync_chat_names(
+                self.account, create_missing=False)
         self.assertEqual(result['missing'], 1)
         self.assertEqual(result['updated'], 0)
         self.assertFalse(self.env['discuss.channel'].sudo().search_count([
             ('x_conversation_id', '=', 'ghost')]))
+
+    def test_sync_creates_missing_channels(self):
+        with patch.object(GetXAPIDMService, 'list', return_value={
+                'conversations': [self._conv('brand-new', name='Fresh Chat')],
+                'cursor': ''}):
+            result = self.provider.sync_chat_names(self.account)
+        self.assertEqual(result['missing'], 0)
+        self.assertEqual(result['created'], 1)
+        channel = self.env['discuss.channel'].sudo().search([
+            ('x_account_id', '=', self.account.id),
+            ('x_conversation_id', '=', 'brand-new')], limit=1)
+        self.assertTrue(channel)
+        self.assertEqual(channel.channel_type, 'x_group')
+        self.assertEqual(channel.name, 'Fresh Chat')
+        self.assertTrue(channel.x_group_member_count)
+
+    def test_fetch_groups_syncs_g_prefixed_chat_as_group_without_type(self):
+        """XChat 'g...' conversations sync as groups even when GetXAPI omits
+        the group flag and type in the inbox payload."""
+        conv_id = 'g2032517123456'
+        conv = {
+            'conversation_id': conv_id,
+            'type': '',
+            'group': False,
+            'participants': [
+                {'id': '12345', 'userName': 'getxapi_names'},
+                {'id': '999', 'userName': 'peer_user'},
+            ],
+        }
+        with patch.object(GetXAPIDMService, 'list', return_value={
+                'conversations': [conv], 'cursor': ''}):
+            result = self.provider.fetch_groups(self.account)
+        self.assertEqual(result['created'], 1)
+        self.assertEqual(result['groups'], 1)
+        channel = self.env['discuss.channel'].sudo().search([
+            ('x_account_id', '=', self.account.id),
+            ('x_conversation_id', '=', conv_id)], limit=1)
+        self.assertTrue(channel)
+        self.assertEqual(channel.channel_type, 'x_group')
+        self.assertTrue(channel._x_is_group_conversation())
 
     def test_sync_one_to_one_uses_peer_handle(self):
         channel = self.env['discuss.channel'].sudo()._get_x_channel(

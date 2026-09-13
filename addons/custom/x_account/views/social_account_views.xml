@@ -61,6 +61,12 @@
                         groups="social.group_social_user"
                         confirm="Sync chat names from GetXAPI into existing channels?"
                         invisible="(not x_action_provider and not x_provider) or not twitter_user_id"/>
+                    <button name="action_fetch_groups" type="object"
+                        string="Fetch Groups"
+                        class="btn-secondary"
+                        groups="social.group_social_user"
+                        confirm="Fetch X groups for this account?"
+                        invisible="(not x_action_provider and not x_provider) or not twitter_user_id"/>
                 </header>
                 <sheet>
                     <div class="oe_title">

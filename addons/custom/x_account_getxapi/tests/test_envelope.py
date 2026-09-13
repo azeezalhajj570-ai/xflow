@@ -105,6 +105,21 @@ class TestGetXAPIEnvelope(XAccountGetXAPITestBase):
         self.assertFalse(result['conversations'][0]['group'])
         self.assertTrue(result['conversations'][1]['group'])
 
+    def test_parse_dm_conversations_classifies_g_prefixed_chat_as_group(self):
+        """XChat 'g...' conversations parse as groups even without a type."""
+        envelope = {
+            'data': {
+                'conversations': [
+                    {'conversation_id': 'g2032517123456',
+                     'participants': [{'id': '1'}, {'id': '2'}],
+                     'participant_count': 2},
+                ],
+            }
+        }
+        result = GetXAPIEnvelopeParser.dm_conversations(envelope)
+        self.assertEqual(len(result['conversations']), 1)
+        self.assertTrue(result['conversations'][0]['group'])
+
     def test_parse_dm_messages(self):
         envelope = {
             'data': {
