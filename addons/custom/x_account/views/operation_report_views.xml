@@ -7,6 +7,7 @@
             <list string="X Operations" create="false" edit="false" delete="false" default_order="received_at desc">
                 <field name="create_date" optional="hide"/>
                 <field name="received_at" widget="relative"/>
+                <field name="received_at_exact" optional="show"/>
                 <field name="channel_link" string="Chat" widget="html"/>
                 <field name="channel_id" optional="hide"/>
                 <field name="account_id"/>
@@ -18,7 +19,8 @@
                 <field name="tweet_id" optional="hide"/>
                 <field name="status" optional="show"/>
                 <field name="done_at" widget="relative" optional="show"/>
-                <field name="processing_time" widget="float_time" optional="show"/>
+                <field name="done_at_exact" optional="show"/>
+                <field name="processing_time" optional="show"/>
                 <field name="source" optional="hide"/>
             </list>
         </field>
