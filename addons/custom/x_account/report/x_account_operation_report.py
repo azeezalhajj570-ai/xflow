@@ -29,7 +29,7 @@ class XAccountOperationReport(models.Model):
     _description = 'X Account Operations Report'
     _auto = False
     _log_access = False
-    _order = 'create_date desc'
+    _order = 'received_at desc, id desc'
     _rec_name = 'tweet_id'
 
     account_id = fields.Many2one(

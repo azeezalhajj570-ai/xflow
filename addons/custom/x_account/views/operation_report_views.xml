@@ -4,7 +4,7 @@
         <field name="name">x.account.operation.report.view.list</field>
         <field name="model">x.account.operation.report</field>
         <field name="arch" type="xml">
-            <list string="X Operations" create="false" edit="false" delete="false">
+            <list string="X Operations" create="false" edit="false" delete="false" default_order="received_at desc">
                 <field name="create_date" optional="hide"/>
                 <field name="received_at" widget="relative"/>
                 <field name="channel_link" string="Chat" widget="html"/>

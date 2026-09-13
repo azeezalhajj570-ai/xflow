@@ -140,6 +140,27 @@ class TestXAccountOperationReport(XAccountTestBase):
         row = self._row(task)
         self.assertEqual(row.received_at, message.external_created_at)
 
+    def test_default_order_is_latest_first(self):
+        for external_id, tweet, created in (
+                ('msg-old', '1001', '2026-09-13 10:00:00'),
+                ('msg-new', '1002', '2026-09-13 12:00:00')):
+            self.env['x.message'].create({
+                'channel_id': self.channel.id,
+                'account_id': self.account.id,
+                'direction': 'inbound',
+                'external_id': external_id,
+                'body_plain': 'https://x.com/alice/status/%s' % tweet,
+                'external_created_at': created,
+            })
+        old_task = self._task(
+            'like', {'post_id': '1001', 'channel_id': self.channel.id})
+        new_task = self._task(
+            'like', {'post_id': '1002', 'channel_id': self.channel.id})
+        self.env.flush_all()
+        rows = self.Report.search(
+            [('id', 'in', [old_task.id, new_task.id])])
+        self.assertEqual(rows.ids, [new_task.id, old_task.id])
+
     def test_processing_time_is_done_minus_received(self):
         self.env['x.message'].create({
             'channel_id': self.channel.id,
