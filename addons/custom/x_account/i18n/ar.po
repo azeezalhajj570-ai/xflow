@@ -535,3 +535,279 @@ msgstr "معلومات الحساب"
 #: model:ir.model.fields,field_description:x_account.field_social_account__x_subscription_event_ids
 msgid "Subscription Events"
 msgstr "أحداث الاشتراك"
+
+#. module: x_account
+#: model:ir.model,name:x_account.model_x_account_operation_report
+msgid "X Account Operations Report"
+msgstr "تقرير عمليات حساب X"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_x_account_operation_report__account_id
+msgid "X Account"
+msgstr "حساب X"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_x_account_operation_report__channel_id
+msgid "Discuss Channel"
+msgstr "قناة النقاش"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_x_account_operation_report__channel_name
+msgid "Channel Name"
+msgstr "اسم القناة"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_x_account_operation_report__channel_url
+msgid "Channel Link"
+msgstr "رابط القناة"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_x_account_operation_report__channel_link
+msgid "Channel"
+msgstr "القناة"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_x_account_operation_report__company_id
+msgid "Company"
+msgstr "الشركة"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_x_account_operation_report__operation
+msgid "Operation"
+msgstr "العملية"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_x_account_operation_report__tweet_id
+msgid "Tweet ID"
+msgstr "معرّف التغريدة"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_x_account_operation_report__tweet_screen_name
+msgid "Tweet Author"
+msgstr "كاتب التغريدة"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_x_account_operation_report__author_x_id
+msgid "Author X ID"
+msgstr "معرّف كاتب X"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_x_account_operation_report__author_url
+msgid "Author Link"
+msgstr "رابط الكاتب"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_x_account_operation_report__author_link
+msgid "Author"
+msgstr "الكاتب"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_x_account_operation_report__tweet_url
+msgid "Tweet Link"
+msgstr "رابط التغريدة"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_x_account_operation_report__status
+msgid "Status"
+msgstr "الحالة"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_x_account_operation_report__source
+msgid "Source"
+msgstr "المصدر"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_x_account_operation_report__create_date
+msgid "Task Created"
+msgstr "إنشاء المهمة"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_x_account_operation_report__received_at
+msgid "Received On"
+msgstr "تم الاستلام في"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_x_account_operation_report__done_at
+msgid "Processed On"
+msgstr "تمت المعالجة في"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_x_account_operation_report__processing_time
+msgid "Processing Time"
+msgstr "مدة المعالجة"
+
+#. module: x_account
+#: model:ir.model.fields,help:x_account.field_x_account_operation_report__processing_time
+msgid "Hours between the received post and the processed task."
+msgstr "عدد الساعات بين استلام المنشور ومعالجة المهمة."
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_x_account_operation_report__operation_count
+msgid "Operations"
+msgstr "العمليات"
+
+#. module: x_account
+#: model:ir.model.fields.selection,name:x_account.selection__x_account_operation_report__operation__like
+msgid "Like"
+msgstr "إعجاب"
+
+#. module: x_account
+#: model:ir.model.fields.selection,name:x_account.selection__x_account_operation_report__operation__repost
+msgid "Repost"
+msgstr "إعادة نشر"
+
+#. module: x_account
+#: model:ir.model.fields.selection,name:x_account.selection__x_account_operation_report__operation__bookmark
+msgid "Bookmark"
+msgstr "حفظ"
+
+#. module: x_account
+#: model:ir.model.fields.selection,name:x_account.selection__x_account_operation_report__operation__comment
+msgid "Comment"
+msgstr "تعليق"
+
+#. module: x_account
+#: model:ir.model.fields.selection,name:x_account.selection__x_account_operation_report__status__pending
+msgid "Pending"
+msgstr "قيد الانتظار"
+
+#. module: x_account
+#: model:ir.model.fields.selection,name:x_account.selection__x_account_operation_report__status__running
+msgid "Running"
+msgstr "قيد التنفيذ"
+
+#. module: x_account
+#: model:ir.model.fields.selection,name:x_account.selection__x_account_operation_report__status__success
+msgid "Success"
+msgstr "ناجحة"
+
+#. module: x_account
+#: model:ir.model.fields.selection,name:x_account.selection__x_account_operation_report__status__failed
+msgid "Failed"
+msgstr "فاشلة"
+
+#. module: x_account
+#: model:ir.model.fields.selection,name:x_account.selection__x_account_operation_report__status__cancelled
+msgid "Cancelled"
+msgstr "ملغاة"
+
+#. module: x_account
+#: model:ir.ui.menu,name:x_account.menu_x_account_reporting
+msgid "Reporting"
+msgstr "التقارير"
+
+#. module: x_account
+#: model:ir.actions.act_window,name:x_account.action_x_account_operation_report
+#: model:ir.ui.menu,name:x_account.menu_x_account_operation_report
+msgid "Operations"
+msgstr "العمليات"
+
+#. module: x_account
+#: model:ir.actions.act_window,help:x_account.action_x_account_operation_report
+msgid "<p class=\"o_view_nocontent_smiling_face\">No X operations recorded yet.</p>\n            <p>\n                Likes, reposts, bookmarks and comments performed by X accounts are\n                listed here, grouped by discuss channel, account and tweet.\n            </p>\n        "
+msgstr "<p class=\"o_view_nocontent_smiling_face\">لم يتم تسجيل أي عمليات X بعد.</p>\n            <p>\n                تظهر هنا الإعجابات وإعادة النشر والحفظ والتعليقات التي تنفّذها حسابات X،\n                مجمّعة حسب قناة النقاش والحساب والتغريدة.\n            </p>\n        "
+
+#. module: x_account
+#: model_terms:ir.ui.view,arch_db:x_account.x_account_operation_report_view_list
+#: model_terms:ir.ui.view,arch_db:x_account.x_account_operation_report_view_pivot
+#: model_terms:ir.ui.view,arch_db:x_account.x_account_operation_report_view_graph
+#: model_terms:ir.ui.view,arch_db:x_account.x_account_operation_report_view_search
+msgid "X Operations"
+msgstr "عمليات X"
+
+#. module: x_account
+#: model_terms:ir.ui.view,arch_db:x_account.x_account_operation_report_view_list
+#: model_terms:ir.ui.view,arch_db:x_account.x_account_operation_report_view_search
+msgid "Chat"
+msgstr "الدردشة"
+
+#. module: x_account
+#: model_terms:ir.ui.view,arch_db:x_account.x_account_operation_report_view_list
+msgid "Author"
+msgstr "الكاتب"
+
+#. module: x_account
+#: model_terms:ir.ui.view,arch_db:x_account.x_account_operation_report_view_list
+#: model_terms:ir.ui.view,arch_db:x_account.x_account_operation_report_view_search
+msgid "Tweet"
+msgstr "التغريدة"
+
+#. module: x_account
+#: model_terms:ir.ui.view,arch_db:x_account.x_account_operation_report_view_search
+msgid "Like"
+msgstr "إعجاب"
+
+#. module: x_account
+#: model_terms:ir.ui.view,arch_db:x_account.x_account_operation_report_view_search
+msgid "Repost"
+msgstr "إعادة نشر"
+
+#. module: x_account
+#: model_terms:ir.ui.view,arch_db:x_account.x_account_operation_report_view_search
+msgid "Bookmark"
+msgstr "حفظ"
+
+#. module: x_account
+#: model_terms:ir.ui.view,arch_db:x_account.x_account_operation_report_view_search
+msgid "Comment"
+msgstr "تعليق"
+
+#. module: x_account
+#: model_terms:ir.ui.view,arch_db:x_account.x_account_operation_report_view_search
+msgid "Success"
+msgstr "ناجحة"
+
+#. module: x_account
+#: model_terms:ir.ui.view,arch_db:x_account.x_account_operation_report_view_search
+msgid "Failed"
+msgstr "فاشلة"
+
+#. module: x_account
+#: model_terms:ir.ui.view,arch_db:x_account.x_account_operation_report_view_search
+msgid "Pending"
+msgstr "قيد الانتظار"
+
+#. module: x_account
+#: model_terms:ir.ui.view,arch_db:x_account.x_account_operation_report_view_search
+msgid "Created On"
+msgstr "تاريخ الإنشاء"
+
+#. module: x_account
+#: model_terms:ir.ui.view,arch_db:x_account.x_account_operation_report_view_search
+msgid "Done On"
+msgstr "تاريخ الإنجاز"
+
+#. module: x_account
+#: model_terms:ir.ui.view,arch_db:x_account.x_account_operation_report_view_search
+msgid "X Account"
+msgstr "حساب X"
+
+#. module: x_account
+#: model_terms:ir.ui.view,arch_db:x_account.x_account_operation_report_view_search
+msgid "Operation"
+msgstr "العملية"
+
+#. module: x_account
+#: model_terms:ir.ui.view,arch_db:x_account.x_account_operation_report_view_search
+msgid "Status"
+msgstr "الحالة"
+
+#. module: x_account
+#: model_terms:ir.ui.view,arch_db:x_account.x_account_operation_report_view_search
+msgid "Source"
+msgstr "المصدر"
+
+#. module: x_account
+#: model_terms:ir.ui.view,arch_db:x_account.x_account_operation_report_view_search
+msgid "Company"
+msgstr "الشركة"
+
+#. module: x_account
+#: model_terms:ir.ui.view,arch_db:x_account.x_account_operation_report_view_search
+msgid "Created Date"
+msgstr "تاريخ الإنشاء"
+
+#. module: x_account
+#: model_terms:ir.ui.view,arch_db:x_account.x_account_operation_report_view_search
+msgid "Created Month"
+msgstr "شهر الإنشاء"
