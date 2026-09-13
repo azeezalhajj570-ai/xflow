@@ -140,6 +140,15 @@ class TestXAccountOperationReport(XAccountTestBase):
         row = self._row(task)
         self.assertEqual(row.received_at, message.external_created_at)
 
+    def test_exact_time_columns_include_seconds(self):
+        task = self._task(
+            'like', {'post_id': '111', 'channel_id': self.channel.id})
+        task.write({'status': 'success', 'done_at': '2026-09-13 20:30:45'})
+        row = self._row(task)
+        self.assertEqual(row.done_at_exact, '2026-09-13 20:30:45')
+        self.assertRegex(
+            row.received_at_exact, r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$')
+
     def test_default_order_is_latest_first(self):
         for external_id, tweet, created in (
                 ('msg-old', '1001', '2026-09-13 10:00:00'),
@@ -174,7 +183,7 @@ class TestXAccountOperationReport(XAccountTestBase):
             'like', {'post_id': '555', 'channel_id': self.channel.id})
         task.write({'status': 'success', 'done_at': '2026-09-13 20:30:00'})
         row = self._row(task)
-        self.assertAlmostEqual(row.processing_time, 0.5)
+        self.assertAlmostEqual(row.processing_time, 30.0)
 
     def test_received_at_falls_back_to_task_create(self):
         task = self._task(

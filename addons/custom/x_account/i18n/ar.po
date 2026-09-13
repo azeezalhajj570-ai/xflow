@@ -633,13 +633,13 @@ msgstr "تمت المعالجة في"
 
 #. module: x_account
 #: model:ir.model.fields,field_description:x_account.field_x_account_operation_report__processing_time
-msgid "Processing Time"
-msgstr "مدة المعالجة"
+msgid "Processing Time (min)"
+msgstr "مدة المعالجة (بالدقائق)"
 
 #. module: x_account
 #: model:ir.model.fields,help:x_account.field_x_account_operation_report__processing_time
-msgid "Hours between the received post and the processed task."
-msgstr "عدد الساعات بين استلام المنشور ومعالجة المهمة."
+msgid "Minutes between the received post and the processed task."
+msgstr "عدد الدقائق بين استلام المنشور ومعالجة المهمة."
 
 #. module: x_account
 #: model:ir.model.fields,field_description:x_account.field_x_account_operation_report__operation_count
@@ -811,3 +811,13 @@ msgstr "تاريخ الإنشاء"
 #: model_terms:ir.ui.view,arch_db:x_account.x_account_operation_report_view_search
 msgid "Created Month"
 msgstr "شهر الإنشاء"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_x_account_operation_report__received_at_exact
+msgid "Received At"
+msgstr "وقت الاستلام"
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_x_account_operation_report__done_at_exact
+msgid "Processed At"
+msgstr "وقت المعالجة"

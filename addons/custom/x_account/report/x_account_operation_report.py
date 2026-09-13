@@ -62,12 +62,14 @@ class XAccountOperationReport(models.Model):
     source = fields.Char(string='Source', readonly=True)
     create_date = fields.Datetime(string='Task Created', readonly=True)
     received_at = fields.Datetime(string='Received On', readonly=True)
+    received_at_exact = fields.Char(string='Received At', readonly=True)
     done_at = fields.Datetime(string='Processed On', readonly=True)
+    done_at_exact = fields.Char(string='Processed At', readonly=True)
     processing_time = fields.Float(
-        string='Processing Time',
+        string='Processing Time (min)',
         readonly=True,
         group_operator='avg',
-        help='Hours between the received post and the processed task.',
+        help='Minutes between the received post and the processed task.',
     )
     operation_count = fields.Integer(
         string='Operations', readonly=True, group_operator='sum')
@@ -131,13 +133,16 @@ class XAccountOperationReport(models.Model):
                 sub.source,
                 sub.create_date,
                 COALESCE(sub.received_at, sub.create_date) AS received_at,
+                to_char(COALESCE(sub.received_at, sub.create_date),
+                        'YYYY-MM-DD HH24:MI:SS') AS received_at_exact,
                 sub.done_at,
+                to_char(sub.done_at, 'YYYY-MM-DD HH24:MI:SS') AS done_at_exact,
                 CASE
                     WHEN sub.done_at IS NOT NULL THEN
                         EXTRACT(EPOCH FROM (
                             sub.done_at
                             - COALESCE(sub.received_at, sub.create_date)
-                        )) / 3600.0
+                        )) / 60.0
                 END AS processing_time,
                 1 AS operation_count
             FROM (
