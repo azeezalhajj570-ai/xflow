@@ -18,7 +18,7 @@
             <field name="model">getxapi.api.usage</field>
             <field name="arch" type="xml">
                 <list string="GetXAPI Usage" default_order="create_date desc" create="false">
-                    <field name="timestamp"/>
+                    <field name="timestamp" widget="datetime" options="{'show_seconds': True}"/>
                     <field name="account_id" optional="show"/>
                     <field name="endpoint"/>
                     <field name="method" widget="badge"/>
@@ -47,7 +47,7 @@
                                 <field name="status_code"/>
                             </group>
                             <group>
-                                <field name="timestamp"/>
+                                <field name="timestamp" widget="datetime" options="{'show_seconds': True}"/>
                                 <field name="success"/>
                                 <field name="estimated_cost"/>
                                 <field name="request_duration"/>

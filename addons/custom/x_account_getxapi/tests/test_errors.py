@@ -3,8 +3,9 @@ from odoo.tests import tagged
 from odoo.addons.x_account_getxapi.services.getxapi_errors import (
     GetXAPIError,
     GetXAPIAuthenticationError,
-    GetXAPIRateLimitError,
     GetXAPINotFoundError,
+    GetXAPIPreflightError,
+    GetXAPIRateLimitError,
     GetXAPITemporaryError,
     classify,
 )
@@ -76,6 +77,28 @@ class TestGetXAPIErrors(XAccountGetXAPITestBase):
         error = classify(402, '/twitter/tweet/favorite')
         self.assertEqual(error.code, 'credit_exhausted')
         self.assertFalse(error.retryable)
+
+    def test_429_credit_is_credit_exhausted_not_retryable(self):
+        """GetXAPI also wraps billing failures in 429; those must not retry."""
+        error = classify(429, '/twitter/tweet/favorite', {
+            'error': 'Insufficient balance',
+            'message': 'Add credit to continue',
+        })
+        self.assertEqual(error.code, 'credit_exhausted')
+        self.assertFalse(error.retryable)
+        self.assertEqual(error.status_code, 429)
+
+    def test_429_plain_is_still_retryable_rate_limit(self):
+        error = classify(429, '/twitter/tweet/favorite', {
+            'error': 'Too Many Requests'})
+        self.assertEqual(error.code, 'rate_limit')
+        self.assertTrue(error.retryable)
+
+    def test_preflight_error_is_not_retryable(self):
+        error = GetXAPIPreflightError('follow', 'missing_getxapi_auth_token')
+        self.assertEqual(error.code, 'preflight_failed')
+        self.assertFalse(error.retryable)
+        self.assertEqual(error.status_code, 0)
 
     def test_500_is_temporary_error(self):
         error = classify(500, '/test')

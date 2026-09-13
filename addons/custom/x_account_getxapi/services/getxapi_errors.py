@@ -27,6 +27,33 @@ Classification relevant to 429s:
 
 _RETRYABLE = frozenset({'rate_limit', 'temporary_error', 'upstream_rejection', 'timeout'})
 
+# Substrings that mark a response as a GetXAPI billing/credit problem rather
+# than a transient upstream throttle. Kept here (not in the transport) so the
+# transport's "do not retry" guard and the error taxonomy agree on one rule.
+_CREDIT_TOKENS = (
+    'credit', 'insufficient balance', 'insufficient_balance',
+    'payment', 'no balance',
+)
+
+
+def is_credit_error(response_body):
+    """Whether a response body signals an exhausted GetXAPI credit balance.
+
+    GetXAPI wraps some billing failures in an HTTP 429 rather than 402; both
+    mean "add credit", never "try again", so both must classify as
+    ``credit_exhausted`` and never be retried.
+    """
+    if not isinstance(response_body, dict):
+        return False
+    message = ('%s %s %s %s' % (
+        response_body.get('error') or '',
+        response_body.get('error_description') or '',
+        response_body.get('message') or '',
+        response_body.get('detail') or '',
+    )).lower()
+    return any(token in message for token in _CREDIT_TOKENS)
+
+
 _HTTP_ERROR_CODES = {
     400: 'bad_request',
     401: 'authentication_failure',
@@ -97,6 +124,19 @@ class GetXAPITemporaryError(GetXAPIError):
         super().__init__(500, endpoint, message or 'temporary_error')
 
 
+class GetXAPIPreflightError(GetXAPIError):
+    """A paid call was not sent because a local precondition failed.
+
+    Used by providers to fail fast (missing auth token, unknown own user id,
+    self-follow) BEFORE spending a paid API call on a request that cannot
+    succeed. ``status_code`` is 0 because no HTTP request was made.
+    """
+
+    def __init__(self, endpoint, message=''):
+        super().__init__(0, endpoint, message or 'preflight_failed',
+                         code='preflight_failed')
+
+
 def classify(status_code, endpoint, response_body=None):
     """Return a GetXAPIError for an HTTP status + optional response body.
 
@@ -105,6 +145,8 @@ def classify(status_code, endpoint, response_body=None):
     signals (``twitter_error_code`` / ``retry_after``) are preserved.
     """
     code = _HTTP_ERROR_CODES.get(status_code)
+    if code == 'rate_limit' and is_credit_error(response_body):
+        code = 'credit_exhausted'
     if code:
         return _build_error(code, status_code, endpoint, response_body)
     if status_code >= 500:
@@ -134,7 +176,7 @@ def _build_error(code, status_code, endpoint, response_body):
         return GetXAPITemporaryError(endpoint, detail)
     if code == 'credit_exhausted':
         return GetXAPIError(
-            402, endpoint, detail or 'getxapi_credit_exhausted',
+            status_code, endpoint, detail or 'getxapi_credit_exhausted',
             code='credit_exhausted', twitter_error_code=twitter_code,
             retry_after=retry_after)
     return GetXAPIError(status_code, endpoint, detail,

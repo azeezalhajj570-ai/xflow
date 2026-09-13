@@ -34,6 +34,11 @@ class TestGetXAPIUsageViews(XAccountGetXAPITestBase):
         self.assertIn('type="row"', arch)
         self.assertIn('type="col"', arch)
 
+    def test_list_view_shows_timestamp_with_seconds(self):
+        self.env.ref('x_account_getxapi.getxapi_usage_view_list')
+        arch = self._arch('getxapi.api.usage', 'list')
+        self.assertIn('show_seconds', arch)
+
     def test_action_offers_pivot_and_groups_by_account(self):
         action = self.env.ref('x_account_getxapi.getxapi_usage_action')
         self.assertIn('pivot', action.view_mode)

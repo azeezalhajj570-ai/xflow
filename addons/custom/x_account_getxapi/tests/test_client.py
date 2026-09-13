@@ -25,6 +25,22 @@ class TestGetXAPIClient(XAccountGetXAPITestBase):
         resp.headers = {}
         return resp
 
+    def _usage_account(self, name='Usage Account', **vals):
+        base = {
+            'name': name,
+            'media_id': self.twitter_media.id,
+            'social_account_handle': 'usage_user',
+            'twitter_user_id': '999',
+            'x_provider': 'getxapi',
+            'x_getxapi_auth_token': 'tok',
+        }
+        base.update(vals)
+        return self.env['social.account'].create(base)
+
+    def _last_usage(self, account):
+        return self.env['getxapi.api.usage'].search(
+            [('account_id', '=', account.id)], order='id desc', limit=1)
+
     def test_get_request(self):
         with patch('requests.request') as mocked:
             mocked.return_value = self._mock_response(200, {'data': {'id': '1'}})
@@ -176,6 +192,85 @@ class TestGetXAPIClient(XAccountGetXAPITestBase):
         self.assertEqual(record.twitter_error_code, 502)
         self.assertEqual(record.retry_after, 3600.0)
         self.assertIn('daily DM', record.error_message)
+
+    def test_preflight_call_not_billed(self):
+        account = self._usage_account()
+        client = GetXAPIClient(self.env, 'test_api_key', account_id=account.id)
+        with patch('requests.request') as mocked:
+            mocked.return_value = self._mock_response(200, {'data': {}})
+            client.get('/twitter/user/info', billable=False)
+        record = self._last_usage(account)
+        self.assertTrue(record.success)
+        self.assertEqual(record.estimated_cost, 0.0)
+
+    def test_successful_paid_call_billed_at_endpoint_price(self):
+        account = self._usage_account()
+        client = GetXAPIClient(self.env, 'test_api_key', account_id=account.id)
+        with patch('requests.request') as mocked:
+            mocked.return_value = self._mock_response(200, {'data': {}})
+            client.get('/twitter/user/info')
+        record = self._last_usage(account)
+        self.assertAlmostEqual(record.estimated_cost, 0.001)
+
+    def test_credit_402_logged_at_zero_and_trips_breaker(self):
+        account = self._usage_account()
+        client = GetXAPIClient(self.env, 'test_api_key', account_id=account.id)
+        with patch('requests.request') as mocked:
+            mocked.return_value = self._mock_response(
+                402, {'error': 'Insufficient balance'}, ok=False)
+            try:
+                client.post('/twitter/tweet/favorite', json={'tweet_id': '1'})
+                self.fail('GetXAPIError was not raised')
+            except GetXAPIError:
+                pass
+        record = self._last_usage(account)
+        self.assertEqual(record.error_type, 'credit_exhausted')
+        self.assertEqual(record.estimated_cost, 0.0)
+        account.invalidate_recordset()
+        self.assertTrue(account.x_getxapi_credit_blocked)
+        self.assertTrue(account.x_getxapi_credit_blocked_at)
+        self.assertTrue(account.x_getxapi_credit_error)
+
+    def test_credit_429_logged_at_zero_never_retried(self):
+        account = self._usage_account(name='Credit 429')
+        client = GetXAPIClient(self.env, 'test_api_key', account_id=account.id)
+        with patch('requests.request') as mocked:
+            mocked.return_value = self._mock_response(
+                429, {'error': 'Insufficient balance'}, ok=False)
+            with patch.object(GetXAPIClient, '_sleep'):
+                try:
+                    client.post('/twitter/tweet/favorite', json={'tweet_id': '1'})
+                    self.fail('GetXAPIError was not raised')
+                except GetXAPIError:
+                    pass
+        record = self._last_usage(account)
+        self.assertEqual(record.error_type, 'credit_exhausted')
+        self.assertEqual(record.estimated_cost, 0.0)
+        self.assertFalse(record.success)
+        self.assertEqual(mocked.call_count, 1)
+
+    def test_credit_blocked_client_refuses_paid_call(self):
+        account = self._usage_account(
+            name='Blocked', x_getxapi_credit_blocked=True)
+        client = GetXAPIClient(self.env, 'test_api_key', account_id=account.id)
+        with patch('requests.request') as mocked:
+            try:
+                client.get('/twitter/user/info')
+                self.fail('GetXAPIError was not raised')
+            except GetXAPIError as exc:
+                self.assertEqual(exc.code, 'credit_exhausted')
+        self.assertEqual(mocked.call_count, 0)
+        self.assertFalse(self.env['getxapi.api.usage'].search_count(
+            [('account_id', '=', account.id)]))
+
+    def test_resume_action_lifts_breaker(self):
+        account = self._usage_account(
+            name='Resume', x_getxapi_credit_blocked=True)
+        account.action_resume_getxapi_credit()
+        account.invalidate_recordset()
+        self.assertFalse(account.x_getxapi_credit_blocked)
+        self.assertFalse(account.x_getxapi_credit_blocked_at)
+        self.assertFalse(account.x_getxapi_credit_error)
 
     def test_pagination_first_page(self):
         with patch('requests.request') as mocked:

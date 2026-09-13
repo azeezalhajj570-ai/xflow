@@ -26,6 +26,7 @@ from .getxapi_dm_service import GetXAPIDMService
 from .getxapi_media_service import GetXAPIMediaService
 from .getxapi_tweet_service import GetXAPITweetService
 from .getxapi_user_service import GetXAPIUserService
+from . import getxapi_errors
 from . import getxapi_envelope
 
 _LOGGER = logging.getLogger(__name__)
@@ -66,6 +67,34 @@ class GetXAPIProvider:
         self._dms = GetXAPIDMService(self._client)
         self._media = GetXAPIMediaService(self._client)
 
+    def _preflight_write(self, operation, screen_name=None, target_user_id=None):
+        """Fail fast BEFORE spending a paid write on a doomed request.
+
+        Validates the local preconditions every paid write depends on:
+        a GetXAPI auth token, the account's own numeric X user id, and (for
+        follows) that the target is not the account itself. Raises
+        :class:`GetXAPIPreflightError` — a non-retryable error — so the task
+        queue does not re-queue it and no paid HTTP call is made.
+        """
+        if not self._auth_token:
+            raise getxapi_errors.GetXAPIPreflightError(
+                operation, 'missing_getxapi_auth_token')
+        own_user_id = str(
+            getattr(self.account, 'twitter_user_id', '') or '').strip()
+        if not own_user_id:
+            raise getxapi_errors.GetXAPIPreflightError(
+                operation, 'missing_twitter_user_id')
+        if target_user_id and str(target_user_id).strip() == own_user_id:
+            raise getxapi_errors.GetXAPIPreflightError(
+                operation, 'cannot_follow_self')
+        own_handle = (
+            getattr(self.account, 'social_account_handle', '') or ''
+        ).lstrip('@').strip().lower()
+        if (screen_name and own_handle
+                and str(screen_name).lstrip('@').strip().lower() == own_handle):
+            raise getxapi_errors.GetXAPIPreflightError(
+                operation, 'cannot_follow_self')
+
     def validate_session(self):
         """Return dict {valid, user, reason, status}.
 
@@ -79,7 +108,7 @@ class GetXAPIProvider:
             if not handle:
                 return {'valid': False, 'user': None,
                         'reason': 'Account has no X handle configured'}
-            user = self._users.info(handle)
+            user = self._users.info(handle, billable=False)
             if not user or not user.get('id'):
                 return {'valid': False, 'user': None,
                         'reason': 'Response missing user ID'}
@@ -95,8 +124,8 @@ class GetXAPIProvider:
         post_id = self._post_id(post)
         if not post_id:
             raise ValueError('post_id is required')
-        if self._auth_token:
-            kwargs['auth_token'] = self._auth_token
+        self._preflight_write('like')
+        kwargs['auth_token'] = self._auth_token
         return self._tweets.like(post_id, **kwargs)
 
     def comment(self, post, text=None, **kwargs):
@@ -105,8 +134,8 @@ class GetXAPIProvider:
         if not post_id:
             raise ValueError('post_id is required')
         text = (text or '').strip() or 'Thanks for sharing!'
-        if self._auth_token:
-            kwargs['auth_token'] = self._auth_token
+        self._preflight_write('comment')
+        kwargs['auth_token'] = self._auth_token
         return self._tweets.create(text, reply_to_tweet_id=post_id, **kwargs)
 
     def repost(self, post, **kwargs):
@@ -114,8 +143,8 @@ class GetXAPIProvider:
         post_id = self._post_id(post)
         if not post_id:
             raise ValueError('post_id is required')
-        if self._auth_token:
-            kwargs['auth_token'] = self._auth_token
+        self._preflight_write('repost')
+        kwargs['auth_token'] = self._auth_token
         return self._tweets.retweet(post_id, **kwargs)
 
     def bookmark(self, post, **kwargs):
@@ -123,8 +152,8 @@ class GetXAPIProvider:
         post_id = self._post_id(post)
         if not post_id:
             raise ValueError('post_id is required')
-        if self._auth_token:
-            kwargs['auth_token'] = self._auth_token
+        self._preflight_write('bookmark')
+        kwargs['auth_token'] = self._auth_token
         return self._tweets.bookmark(post_id, **kwargs)
 
     def unbookmark(self, post, **kwargs):
@@ -132,27 +161,30 @@ class GetXAPIProvider:
         post_id = self._post_id(post)
         if not post_id:
             raise ValueError('post_id is required')
-        if self._auth_token:
-            kwargs['auth_token'] = self._auth_token
+        self._preflight_write('unbookmark')
+        kwargs['auth_token'] = self._auth_token
         return self._tweets.unbookmark(post_id, **kwargs)
 
     def follow(self, screen_name=None, target_user_id=None, **kwargs):
         """Follow a user via GetXAPI."""
+        if not target_user_id and not screen_name:
+            raise ValueError('target_user_id or screen_name is required')
+        self._preflight_write(
+            'follow', screen_name=screen_name, target_user_id=target_user_id)
         if target_user_id:
-            user = self._users.info_by_id(target_user_id)
+            user = self._users.info_by_id(target_user_id, billable=False)
             screen_name = user.get('username')
         if not screen_name:
             raise ValueError('target_user_id or screen_name is required')
-        if self._auth_token:
-            kwargs['auth_token'] = self._auth_token
+        kwargs['auth_token'] = self._auth_token
         return self._users.follow(screen_name, **kwargs)
 
     def post_tweet(self, text, **kwargs):
         """Create a new tweet via GetXAPI."""
         if not text:
             raise ValueError('text is required')
-        if self._auth_token:
-            kwargs['auth_token'] = self._auth_token
+        self._preflight_write('post_tweet')
+        kwargs['auth_token'] = self._auth_token
         return self._tweets.create(text, **kwargs)
 
     def get_dms(self, conversation_id, limit=100, cursor=None):
@@ -163,6 +195,7 @@ class GetXAPIProvider:
 
     def send_dm(self, recipient_id, text):
         """Send a direct message via GetXAPI."""
+        self._preflight_write('send_dm')
         return self._dms.send(recipient_id, text, auth_token=self._auth_token)
 
     def fetch_groups(self, account, limit=100, create_missing=True):
