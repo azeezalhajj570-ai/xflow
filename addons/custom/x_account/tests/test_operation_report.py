@@ -123,6 +123,28 @@ class TestXAccountOperationReport(XAccountTestBase):
             {'like', 'repost', 'bookmark', 'comment'})
         self.assertEqual(sum(rows.mapped('operation_count')), 4)
 
+    def test_company_comes_from_the_account(self):
+        company = self.env['res.company'].create({'name': 'Report Co B'})
+        account = self.env['social.account'].create({
+            'name': 'Other Account',
+            'media_id': self.media.id,
+            'company_id': company.id,
+        })
+        task = self.env['x.account.task'].create({
+            'account_id': account.id,
+            'operation': 'like',
+            'task_context': json.dumps({'post_id': '999'}),
+        })
+        row = self.Report.search([('id', '=', task.id)])
+        self.assertEqual(row.company_id, company)
+
+    def test_multi_company_rule(self):
+        rule = self.env.ref(
+            'x_account.security_rule_x_account_operation_report_company')
+        self.assertEqual(rule.model_id.model, 'x.account.operation.report')
+        self.assertIn('company_id', rule.domain_force)
+        self.assertFalse(rule.groups)
+
     def test_action_and_menu_wired(self):
         action = self.env.ref('x_account.action_x_account_operation_report')
         self.assertEqual(action.res_model, 'x.account.operation.report')

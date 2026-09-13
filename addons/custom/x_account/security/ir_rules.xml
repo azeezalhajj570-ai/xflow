@@ -13,6 +13,12 @@
         <field name="domain_force">[('company_id', 'in', company_ids)]</field>
     </record>
 
+    <record id="security_rule_x_account_operation_report_company" model="ir.rule">
+        <field name="name">X Account Operations Report: Multi-Company</field>
+        <field name="model_id" ref="model_x_account_operation_report"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+
     <record id="security_rule_discuss_channel_x_company" model="ir.rule">
         <field name="name">Discuss Channel (X): Multi-Company</field>
         <field name="model_id" ref="mail.model_discuss_channel"/>
