@@ -534,8 +534,8 @@ class SocialAccount(models.Model):
                 signal.signal(signal.SIGALRM, _timeout_handler)
                 signal.alarm(10)  # 10 second hard timeout
                 try:
-                    from odoo.addons.x_account.services.x_service import XService
-                    provider = XService.get_provider(account)
+                    provider = account.get_provider_for_operation(
+                        'unsubscribe_all_events')
                     if hasattr(provider, 'unsubscribe_all_events'):
                         provider.unsubscribe_all_events(account)
                 finally:
@@ -576,18 +576,40 @@ class SocialAccount(models.Model):
             kind='warning')
 
     def action_delete_x_subscriptions(self):
-        """Delete XAA subscriptions for this account via the X API."""
+        """Delete XAA subscriptions for this account via the official X API.
+
+        Subscription and webhook management always runs against the official X
+        API (*event* provider), independently of the account's action provider
+        — e.g. GetXAPI drives like/repost but cannot manage XAA subscriptions.
+        """
         self.ensure_one()
         if not self.twitter_user_id:
-            return {'account_id': self.id, 'skipped': True}
-        from odoo.addons.x_account.services.x_service import XService
-        provider = XService.get_provider(self)
+            return self._display_notification(
+                'Delete X Subscriptions',
+                'Account has no twitter_user_id',
+                kind='warning')
+        try:
+            provider = self.get_provider_for_operation('unsubscribe_all_events')
+        except UserError as exc:
+            return self._display_notification(
+                'Delete X Subscriptions', str(exc), kind='warning')
         if not hasattr(provider, 'unsubscribe_all_events'):
-            return {'account_id': self.id, 'skipped': True}
-        result = provider.unsubscribe_all_events(self)
+            return self._display_notification(
+                'Delete X Subscriptions',
+                'The configured event provider does not support deleting '
+                'X subscriptions',
+                kind='warning')
+        try:
+            result = provider.unsubscribe_all_events(self)
+        except Exception as exc:
+            _logger.exception(
+                'x_account_twitter: delete X subscriptions failed for %s',
+                self.id)
+            return self._display_notification(
+                'Delete X Subscriptions', 'Failed: %s' % exc, kind='danger')
         return self._display_notification(
             'Delete X Subscriptions',
-            'Deleted %d subscription(s)' % result.get('deleted', 0),
+            'Deleted %d subscription(s)' % (result or {}).get('deleted', 0),
             kind='success')
 
     def action_resubscribe_x_subscriptions(self):
