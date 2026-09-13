@@ -6,7 +6,8 @@
         <field name="arch" type="xml">
             <list string="X Operations" create="false" edit="false" delete="false">
                 <field name="create_date"/>
-                <field name="channel_id"/>
+                <field name="channel_link" string="Chat" widget="html"/>
+                <field name="channel_id" optional="hide"/>
                 <field name="account_id"/>
                 <field name="operation" widget="badge"/>
                 <field name="author_link" string="Author" widget="html"/>
@@ -26,8 +27,8 @@
         <field name="model">x.account.operation.report</field>
         <field name="arch" type="xml">
             <pivot string="X Operations">
-                <field name="channel_id" type="row"/>
-                <field name="account_id" type="row" optional="hide"/>
+                <field name="account_id" type="row"/>
+                <field name="channel_id" type="row" optional="hide"/>
                 <field name="tweet_id" type="row" optional="hide"/>
                 <field name="operation" type="col"/>
                 <field name="status" type="col" optional="hide"/>
@@ -41,8 +42,8 @@
         <field name="model">x.account.operation.report</field>
         <field name="arch" type="xml">
             <graph string="X Operations" type="bar">
-                <field name="channel_id"/>
-                <field name="account_id" optional="hide"/>
+                <field name="account_id"/>
+                <field name="channel_id" optional="hide"/>
                 <field name="operation"/>
                 <field name="operation_count" type="measure"/>
             </graph>
@@ -72,8 +73,8 @@
                 <filter string="Done On" name="filter_done_at" date="done_at"/>
                 <separator/>
                 <group>
-                    <filter string="Discuss Channel" name="groupby_channel" domain="[]" context="{'group_by': 'channel_id'}"/>
                     <filter string="X Account" name="groupby_account" domain="[]" context="{'group_by': 'account_id'}"/>
+                    <filter string="Chat" name="groupby_channel" domain="[]" context="{'group_by': 'channel_id'}"/>
                     <filter string="Tweet" name="groupby_tweet" domain="[]" context="{'group_by': 'tweet_id'}"/>
                     <filter string="Operation" name="groupby_operation" domain="[]" context="{'group_by': 'operation'}"/>
                     <filter string="Status" name="groupby_status" domain="[]" context="{'group_by': 'status'}"/>
@@ -87,10 +88,10 @@
     </record>
 
     <record id="action_x_account_operation_report" model="ir.actions.act_window">
-        <field name="name">Operations Report</field>
+        <field name="name">Operations</field>
         <field name="res_model">x.account.operation.report</field>
         <field name="view_mode">list,pivot,graph</field>
-        <field name="context">{'search_default_groupby_channel': 1, 'search_default_groupby_operation': 2}</field>
+        <field name="context">{'search_default_groupby_account': 1, 'search_default_groupby_channel': 2, 'search_default_groupby_operation': 3}</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">No X operations recorded yet.</p>
             <p>

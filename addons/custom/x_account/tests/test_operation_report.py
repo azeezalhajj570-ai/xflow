@@ -21,6 +21,7 @@ class TestXAccountOperationReport(XAccountTestBase):
         cls.channel = cls.env['discuss.channel'].create({
             'name': 'Report Channel',
             'channel_type': 'group',
+            'x_conversation_id': 'g2090169325890269541',
         })
         cls.Report = cls.env['x.account.operation.report']
 
@@ -48,6 +49,24 @@ class TestXAccountOperationReport(XAccountTestBase):
         self.assertEqual(row.tweet_screen_name, 'alice')
         self.assertEqual(row.tweet_url, 'https://x.com/alice/status/111')
         self.assertEqual(row.operation_count, 1)
+
+    def test_channel_links_to_x_chat(self):
+        task = self._task('like', {
+            'post_id': '111', 'channel_id': self.channel.id})
+        row = self._row(task)
+        self.assertEqual(
+            row.channel_url,
+            'https://x.com/i/chat/g2090169325890269541')
+        self.assertIn(
+            'href="https://x.com/i/chat/g2090169325890269541"',
+            row.channel_link)
+        self.assertIn('Report Channel', row.channel_link)
+
+    def test_channel_without_conversation_has_no_link(self):
+        task = self._task('like', {'post_id': '111', 'channel_id': 7})
+        row = self._row(task)
+        self.assertFalse(row.channel_url)
+        self.assertFalse(row.channel_link)
 
     def test_nested_channel_context_uses_generic_link(self):
         task = self._task(
@@ -107,7 +126,10 @@ class TestXAccountOperationReport(XAccountTestBase):
     def test_action_and_menu_wired(self):
         action = self.env.ref('x_account.action_x_account_operation_report')
         self.assertEqual(action.res_model, 'x.account.operation.report')
+        self.assertIn("search_default_groupby_account': 1", action.context or '')
         self.assertIn('groupby_channel', action.context or '')
-        self.env.ref('x_account.menu_x_account_operation_report')
+        menu = self.env.ref('x_account.menu_x_account_operation_report')
+        self.assertEqual(
+            menu.parent_id, self.env.ref('x_account.menu_x_account_reporting'))
         self.env.ref('x_account.x_account_operation_report_view_pivot')
         self.env.ref('x_account.x_account_operation_report_view_graph')

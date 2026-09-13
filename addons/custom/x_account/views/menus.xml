@@ -74,11 +74,17 @@
         sequence="40"/>
 
     <menuitem
-        id="menu_x_account_operation_report"
-        name="Operations Report"
+        id="menu_x_account_reporting"
+        name="Reporting"
         parent="menu_x_account_root"
-        action="action_x_account_operation_report"
         sequence="42"/>
+
+    <menuitem
+        id="menu_x_account_operation_report"
+        name="Operations"
+        parent="menu_x_account_reporting"
+        action="action_x_account_operation_report"
+        sequence="10"/>
 
     <menuitem
         id="menu_x_account_automation"
