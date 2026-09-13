@@ -65,6 +65,20 @@ class TestXAccountOperationReport(XAccountTestBase):
         self.assertEqual(row.channel_id, self.channel)
         self.assertEqual(row.tweet_url, 'https://x.com/i/web/status/333')
 
+    def test_author_link_is_clickable_profile(self):
+        task = self._task('like', {'post_id': '111', 'screen_name': 'alice'})
+        row = self._row(task)
+        self.assertEqual(row.author_url, 'https://x.com/alice')
+        self.assertIn('href="https://x.com/alice"', row.author_link)
+        self.assertIn('>alice<', row.author_link)
+
+    def test_author_falls_back_to_numeric_user_id(self):
+        task = self._task('like', {'post_id': '112', 'author_x_id': '4242424242'})
+        row = self._row(task)
+        self.assertEqual(row.tweet_screen_name, '4242424242')
+        self.assertEqual(row.author_url, 'https://x.com/i/user/4242424242')
+        self.assertIn('href="https://x.com/i/user/4242424242"', row.author_link)
+
     def test_author_partner_supplies_screen_name(self):
         self.env['res.partner'].create({
             'name': 'Bob', 'x_user_id': '42', 'x_username': 'bob',

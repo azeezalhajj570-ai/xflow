@@ -9,8 +9,10 @@
                 <field name="channel_id"/>
                 <field name="account_id"/>
                 <field name="operation" widget="badge"/>
+                <field name="author_link" string="Author" widget="html"/>
                 <field name="tweet_url" widget="url" string="Tweet"/>
-                <field name="tweet_screen_name" optional="show"/>
+                <field name="tweet_screen_name" optional="hide"/>
+                <field name="author_x_id" optional="hide"/>
                 <field name="tweet_id" optional="hide"/>
                 <field name="status" optional="show"/>
                 <field name="done_at" optional="show"/>
@@ -56,6 +58,7 @@
                 <field name="account_id"/>
                 <field name="tweet_id"/>
                 <field name="tweet_screen_name"/>
+                <field name="author_x_id"/>
                 <filter string="Like" name="op_like" domain="[('operation', '=', 'like')]"/>
                 <filter string="Repost" name="op_repost" domain="[('operation', '=', 'repost')]"/>
                 <filter string="Bookmark" name="op_bookmark" domain="[('operation', '=', 'bookmark')]"/>

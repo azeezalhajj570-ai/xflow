@@ -42,6 +42,9 @@ class XAccountOperationReport(models.Model):
         string='Operation', readonly=True)
     tweet_id = fields.Char(string='Tweet ID', readonly=True)
     tweet_screen_name = fields.Char(string='Tweet Author', readonly=True)
+    author_x_id = fields.Char(string='Author X ID', readonly=True)
+    author_url = fields.Char(string='Author Link', readonly=True)
+    author_link = fields.Html(string='Author', readonly=True)
     tweet_url = fields.Char(string='Tweet Link', readonly=True)
     status = fields.Selection(
         [
@@ -74,7 +77,24 @@ class XAccountOperationReport(models.Model):
                 sub.company_id,
                 sub.operation,
                 sub.tweet_id,
-                sub.tweet_screen_name,
+                COALESCE(sub.tweet_screen_name, sub.author_x_id) AS tweet_screen_name,
+                sub.author_x_id,
+                CASE
+                    WHEN sub.tweet_screen_name IS NOT NULL
+                        THEN 'https://x.com/' || sub.tweet_screen_name
+                    WHEN sub.author_x_id IS NOT NULL
+                        THEN 'https://x.com/i/user/' || sub.author_x_id
+                END AS author_url,
+                CASE
+                    WHEN sub.tweet_screen_name IS NOT NULL
+                        THEN '<a href="https://x.com/' || sub.tweet_screen_name
+                             || '" target="_blank" rel="noopener">'
+                             || sub.tweet_screen_name || '</a>'
+                    WHEN sub.author_x_id IS NOT NULL
+                        THEN '<a href="https://x.com/i/user/' || sub.author_x_id
+                             || '" target="_blank" rel="noopener">'
+                             || sub.author_x_id || '</a>'
+                END AS author_link,
                 CASE
                     WHEN sub.tweet_id IS NULL THEN NULL
                     WHEN sub.tweet_screen_name IS NOT NULL
@@ -104,6 +124,7 @@ class XAccountOperationReport(models.Model):
                         NULLIF(task.task_json ->> 'screen_name', ''),
                         author.x_username
                     ) AS tweet_screen_name,
+                    NULLIF(task.task_json ->> 'author_x_id', '') AS author_x_id,
                     task.status,
                     task.source,
                     task.create_date,
