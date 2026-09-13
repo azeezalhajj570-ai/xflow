@@ -98,6 +98,8 @@ class XAccountTask(models.Model):
     )
 
     _MAX_RUNNING_PER_ACCOUNT = 1
+    # Advisory-lock namespace for the per-account claim (arbitrary fixed int4).
+    _ACCOUNT_LOCK_NAMESPACE = 0x58414354  # 'XACT'
     # Used only by the manual "Ignore Stale" action (action_ignore_stale).
     # Claiming itself no longer age-gates tasks: every due pending task is
     # candidate, so nothing can sit in ``pending`` forever waiting to be
@@ -135,24 +137,25 @@ class XAccountTask(models.Model):
         return super().write(vals)
 
     @api.model
-    def _process_queue(self, limit=100):
-        """Claim and run due tasks (per-account single-flight).
+    def _process_queue(self, limit=100, shard=0, shards=1, commit=False):
+        """Claim and run due tasks for one shard of the queue.
 
-        The single-flight guard must not count the tasks this run has just
-        claimed itself: they were already flushed as ``running`` and are
-        executed sequentially in this same transaction, so counting them
-        throttled claiming to one task per account per sweep (a 13k-event
-        backlog at one webhook event per minute). Only genuinely concurrent
-        claims — a stale ``running`` task left by another worker — block.
+        ``shard``/``shards`` let several cron jobs (one per shard) drain
+        disjoint account buckets concurrently. ``commit`` is set only by the
+        cron path: it commits after each account so a sweep never holds one
+        long transaction. The manual action and tests leave it off so they stay
+        inside their own transaction.
         """
-        claimed = self._claim_and_run(limit=limit)
+        claimed = self._claim_and_run(
+            limit=limit, shard=shard, shards=shards, commit=commit)
         return len(claimed)
 
     @api.model
-    def _claim_and_run(self, limit=100, company_ids=None):
+    def _claim_and_run(self, limit=100, company_ids=None, shard=0, shards=1,
+                       commit=False):
         """Claim and run due tasks, returning the claimed recordset.
 
-        Shared by the cron worker (`_process_queue`) and the manual "Process
+        Shared by the cron worker(s) (`_process_queue`) and the manual "Process
         Queue" action so the caller can inspect per-task results afterwards.
 
         Fair-share: the sweep is split evenly among every account that has due
@@ -164,6 +167,14 @@ class XAccountTask(models.Model):
         ``process_webhook_event`` backfill only fills whatever capacity the
         account's share still has. Within each bucket tasks run in
         ``priority desc, create_date asc`` order.
+
+        Concurrency: the account is the unit of work. Claiming takes a
+        transaction-scoped advisory lock per account (per-account
+        single-flight) and selects rows with ``FOR UPDATE SKIP LOCKED``, so two
+        workers — e.g. the sharded cron jobs — never run the same account, let
+        alone the same task. With ``shards > 1`` only accounts whose id falls
+        in this shard are handled, so the shards cover the queue without
+        contending.
 
         Company-scoped: when ``company_ids`` is given, only tasks belonging to
         those companies are claimed. No filter keeps ``_process_queue`` (the
@@ -190,6 +201,9 @@ class XAccountTask(models.Model):
         import logging
         _logger = logging.getLogger(__name__)
         _logger.info('Task queue: searching with domain=%s', domain)
+        # Claiming below reads rows directly, so push pending ORM writes (e.g.
+        # a just-created task's ``next_retry_at``) to the database first.
+        self.env.flush_all()
         grouped = self.sudo()._read_group(
             domain, ['account_id'], ['account_id:count'], order='account_id')
         account_ids = [account.id for g in grouped for account in g[0]]
@@ -201,45 +215,87 @@ class XAccountTask(models.Model):
         account_ids = [
             account.id for account in accounts
             if not account._x_action_blocked_reason()]
+        if shards > 1:
+            account_ids = [
+                account_id for account_id in account_ids
+                if account_id % shards == shard]
         if not account_ids:
             return self.env['x.account.task']
         share = max(limit // len(account_ids), 1)
-        action_domain = [
-            ('status', 'in', ('pending',)),
-            ('next_retry_at', '<=', now),
-            ('operation', '!=', self._WEBHOOK_OPERATION),
-        ]
-        webhook_domain = [
-            ('status', 'in', ('pending',)),
-            ('next_retry_at', '<=', now),
-            ('operation', '=', self._WEBHOOK_OPERATION),
-        ]
-        candidate_ids = []
-        for account_id in account_ids:
-            ids = self.sudo().search(
-                [('account_id', '=', account_id)] + action_domain,
-                order='priority desc, create_date asc', limit=share).ids
-            candidate_ids += ids
-            fill = share - len(ids)
-            if fill > 0:
-                candidate_ids += self.sudo().search(
-                    [('account_id', '=', account_id)] + webhook_domain,
-                    order='priority desc, create_date asc', limit=fill).ids
-        tasks = self.sudo().browse(candidate_ids)
         claimed = self.env['x.account.task']
-        for task in tasks:
-            account = task.account_id
-            running = self.sudo().search_count([
-                ('account_id', '=', account.id),
-                ('status', '=', 'running'),
-                ('id', 'not in', claimed.ids),
-            ])
-            if running >= self._MAX_RUNNING_PER_ACCOUNT:
-                continue
-            task.write({'status': 'running', 'claimed_at': now})
-            claimed |= task
-        self._execute_operation_batch(claimed)
+        for account_id in account_ids:
+            tasks = self._claim_account_tasks(account_id, share, now)
+            if tasks:
+                claimed |= tasks
+                self._execute_operation_batch(tasks)
+            if commit:
+                self._commit_queue_progress()
         return claimed
+
+    def _claim_account_tasks(self, account_id, share, now):
+        """Atomically claim up to ``share`` due tasks for one account.
+
+        Returns the claimed ``running`` tasks — empty when another worker owns
+        the account, when it already has a RUNNING task, or when nothing is
+        due.
+        """
+        if share <= 0:
+            return self.env['x.account.task']
+        cr = self.env.cr
+        # Per-account single-flight: the transaction-scoped advisory lock means
+        # only one worker owns this account at a time. It is released by the
+        # per-account commit (or at the end of the sweep when not committing).
+        cr.execute(
+            'SELECT pg_try_advisory_xact_lock(%s, %s)',
+            (self._ACCOUNT_LOCK_NAMESPACE, account_id))
+        if not cr.fetchone()[0]:
+            return self.env['x.account.task']
+        # A pre-existing RUNNING task — including a stale one left by a crashed
+        # worker — still blocks new claims for the account.
+        running = self.sudo().search_count([
+            ('account_id', '=', account_id),
+            ('status', '=', 'running'),
+        ])
+        if running >= self._MAX_RUNNING_PER_ACCOUNT:
+            return self.env['x.account.task']
+        # User-facing actions first, then fill the account's share with the
+        # webhook backfill.
+        ids = self._claim_account_rows(account_id, share, now, webhook=False)
+        if len(ids) < share:
+            ids += self._claim_account_rows(
+                account_id, share - len(ids), now, webhook=True)
+        if not ids:
+            return self.env['x.account.task']
+        cr.execute(
+            'UPDATE x_account_task SET status = %s, claimed_at = %s '
+            'WHERE id = ANY(%s)',
+            ('running', now, ids))
+        # The rows changed outside the ORM: drop the cached claim fields.
+        self.invalidate_model(['status', 'claimed_at'])
+        return self.browse(ids)
+
+    def _claim_account_rows(self, account_id, limit, now, webhook):
+        """Select due task ids for one account with a non-blocking row lock."""
+        operator = '=' if webhook else '<>'
+        self.env.cr.execute(
+            "SELECT id FROM x_account_task "
+            "WHERE account_id = %s AND status = %s AND next_retry_at <= %s "
+            "AND operation " + operator + " %s "
+            "ORDER BY priority DESC, create_date ASC "
+            "FOR UPDATE SKIP LOCKED LIMIT %s",
+            (account_id, 'pending', now, self._WEBHOOK_OPERATION, limit))
+        return [row[0] for row in self.env.cr.fetchall()]
+
+    def _commit_queue_progress(self):
+        """Commit the current account's work so locks release incrementally.
+
+        Only the cron path (``commit=True``) calls this; the manual action and
+        tests keep a single transaction.
+        """
+        self.env.cr.commit()
+        # The committed transaction invalidated nothing ORM-side; drop caches
+        # so later reads (e.g. the caller inspecting task.status) re-fetch.
+        self.env.invalidate_all(flush=False)
 
     def _execute_operation_batch(self, tasks, operation=None, **extra_ctx):
         """Execute multiple tasks' operations in batch when supported.
