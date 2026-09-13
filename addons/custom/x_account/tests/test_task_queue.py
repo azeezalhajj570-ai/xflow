@@ -145,3 +145,57 @@ class TestXTaskQueue(XAccountTestBase):
         self.assertEqual(claimed, 0)
         fresh.invalidate_recordset()
         self.assertEqual(fresh.status, 'pending')
+
+    def test_done_at_stamped_on_success(self):
+        task = self._make_task(self.account_a)
+        self.assertFalse(task.done_at)
+        with patch('odoo.addons.x_account.services.providers.session_web.SessionWebProvider.get_conversations',
+                   return_value={'conversations': []}):
+            self.env['x.account.task']._process_queue()
+        task.invalidate_recordset()
+        self.assertEqual(task.status, 'success')
+        self.assertTrue(task.done_at)
+
+    def test_done_at_stamped_on_permanent_failure(self):
+        task = self._make_task(self.account_a, max_attempts=1)
+
+        class PermanentError(Exception):
+            retryable = False
+
+        with patch('odoo.addons.x_account.services.providers.session_web.SessionWebProvider.get_conversations',
+                   side_effect=PermanentError('permanent')):
+            self.env['x.account.task']._process_queue()
+        task.invalidate_recordset()
+        self.assertEqual(task.status, 'failed')
+        self.assertTrue(task.done_at)
+
+    def test_done_at_stamped_on_cancel(self):
+        task = self._make_task(self.account_a)
+        task.action_cancel()
+        task.invalidate_recordset()
+        self.assertEqual(task.status, 'cancelled')
+        self.assertTrue(task.done_at)
+
+    def test_retry_does_not_stamp_done_at(self):
+        """An in-flight retry stays pending and keeps done_at empty."""
+        task = self._make_task(self.account_a, max_attempts=3)
+        with patch('odoo.addons.x_account.services.providers.session_web.SessionWebProvider.get_conversations',
+                   side_effect=RuntimeError('transient')):
+            self.env['x.account.task']._process_queue()
+        task.invalidate_recordset()
+        self.assertEqual(task.status, 'pending')
+        self.assertEqual(task.retry_count, 1)
+        self.assertFalse(task.done_at)
+
+    def test_task_targets_parsed_from_context(self):
+        task = self._make_task(
+            self.account_a, operation='repost',
+            task_context='{"post_id": "191919", "screen_name": "@alice", '
+                         '"channel_id": 7, "source": "channel_automation"}')
+        self.assertEqual(task.target_post_id, '191919')
+        self.assertEqual(task.target_screen_name, '@alice')
+        self.assertEqual(task.source, 'channel_automation')
+        empty = self._make_task(self.account_a, operation='follow')
+        self.assertFalse(empty.target_post_id)
+        self.assertFalse(empty.target_screen_name)
+        self.assertFalse(empty.source)

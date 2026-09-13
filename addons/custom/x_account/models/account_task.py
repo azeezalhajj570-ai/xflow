@@ -53,6 +53,13 @@ class XAccountTask(models.Model):
     max_attempts = fields.Integer(string='Max Attempts', default=3)
     claimed_at = fields.Datetime(string='Claimed At', readonly=True)
     next_retry_at = fields.Datetime(string='Next Retry At', index=True)
+    done_at = fields.Datetime(
+        string='Done At',
+        readonly=True,
+        index=True,
+        help='When the task reached a terminal state (success, failed or '
+             'cancelled). Empty while the task is pending or running.',
+    )
     error = fields.Text(string='Error', readonly=True)
     result = fields.Text(string='Result', readonly=True)
     backoff_base = fields.Integer(string='Backoff Base (seconds)', default=30)
@@ -60,6 +67,27 @@ class XAccountTask(models.Model):
         string='Task Context',
         help='JSON call kwargs passed to the provider operation. Must not '
              'contain credentials.',
+    )
+    target_post_id = fields.Char(
+        string='Target Post ID',
+        compute='_compute_task_targets',
+        store=True,
+        index=True,
+        help='Target tweet/post id extracted from the task context.',
+    )
+    target_screen_name = fields.Char(
+        string='Target Screen Name',
+        compute='_compute_task_targets',
+        store=True,
+        index=True,
+        help='Target X username extracted from the task context.',
+    )
+    source = fields.Char(
+        string='Source',
+        compute='_compute_task_targets',
+        store=True,
+        index=True,
+        help='Where the task came from (e.g. channel_automation, group, webhook).',
     )
     company_id = fields.Many2one(
         'res.company',
@@ -70,7 +98,21 @@ class XAccountTask(models.Model):
     )
 
     _MAX_RUNNING_PER_ACCOUNT = 1
+    # Used only by the manual "Ignore Stale" action (action_ignore_stale).
+    # Claiming itself no longer age-gates tasks: every due pending task is
+    # candidate, so nothing can sit in ``pending`` forever waiting to be
+    # processed.
     _QUEUE_MAX_AGE_MINUTES = 60
+    _WEBHOOK_OPERATION = 'process_webhook_event'
+    _TERMINAL_STATUSES = ('success', 'failed', 'cancelled')
+
+    @api.depends('task_context')
+    def _compute_task_targets(self):
+        for task in self:
+            ctx = task._task_context()
+            task.target_post_id = str(ctx.get('post_id') or '') or False
+            task.target_screen_name = ctx.get('screen_name') or False
+            task.source = ctx.get('source') or False
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -79,6 +121,18 @@ class XAccountTask(models.Model):
             if not task.next_retry_at:
                 task.write({'next_retry_at': fields.Datetime.now()})
         return res
+
+    def write(self, vals):
+        """Stamp ``done_at`` when a task reaches a terminal state.
+
+        Done in ``write`` so every path that settles a task (success, permanent
+        failure, manual cancel/ignore) records when it finished, which the
+        operations pivot/report groups on.
+        """
+        if vals.get('status') in self._TERMINAL_STATUSES and not vals.get('done_at'):
+            vals = dict(vals)
+            vals['done_at'] = fields.Datetime.now()
+        return super().write(vals)
 
     @api.model
     def _process_queue(self, limit=100):
@@ -104,8 +158,12 @@ class XAccountTask(models.Model):
         Fair-share: the sweep is split evenly among every account that has due
         tasks, so a huge backlog on one account (e.g. a broken token) cannot
         starve other accounts — each account is drained in lock-step instead
-        of one account monopolizing the ``limit``. Within an account tasks run
-        in ``priority desc, create_date asc`` order.
+        of one account monopolizing the ``limit``. Within an account the
+        user-facing operations (like, repost, comment, bookmark, follow, DMs,
+        ...) are claimed first so a webhook backfill never starves them; the
+        ``process_webhook_event`` backfill only fills whatever capacity the
+        account's share still has. Within each bucket tasks run in
+        ``priority desc, create_date asc`` order.
 
         Company-scoped: when ``company_ids`` is given, only tasks belonging to
         those companies are claimed. No filter keeps ``_process_queue`` (the
@@ -116,17 +174,16 @@ class XAccountTask(models.Model):
         searches below bypass the company record rule, hence the explicit
         domain filter.
 
-        Freshness: only tasks created within the last
-        ``_QUEUE_MAX_AGE_MINUTES`` minutes are claimed; older pending backlog
-        is ignored so a stale queue (e.g. accumulated during an outage) does
-        not get drained at once.
+        No age gate: claiming ignores ``create_date`` so a pending task is
+        always a candidate — nothing gets stranded in ``pending`` forever
+        (older backlog is drained in fair-share order at the same bounded
+        rate). Use ``action_ignore_stale`` to manually fail tasks you no
+        longer want processed.
         """
         now = fields.Datetime.now()
-        min_create_date = now - timedelta(minutes=self._QUEUE_MAX_AGE_MINUTES)
         domain = [
             ('status', 'in', ('pending',)),
             ('next_retry_at', '<=', now),
-            ('create_date', '>=', min_create_date),
         ]
         if company_ids:
             domain.append(('company_id', 'in', list(company_ids)))
@@ -140,14 +197,27 @@ class XAccountTask(models.Model):
         if not account_ids:
             return self.env['x.account.task']
         share = max(limit // len(account_ids), 1)
+        action_domain = [
+            ('status', 'in', ('pending',)),
+            ('next_retry_at', '<=', now),
+            ('operation', '!=', self._WEBHOOK_OPERATION),
+        ]
+        webhook_domain = [
+            ('status', 'in', ('pending',)),
+            ('next_retry_at', '<=', now),
+            ('operation', '=', self._WEBHOOK_OPERATION),
+        ]
         candidate_ids = []
         for account_id in account_ids:
-            candidate_ids += self.sudo().search([
-                ('account_id', '=', account_id),
-                ('status', 'in', ('pending',)),
-                ('next_retry_at', '<=', now),
-                ('create_date', '>=', min_create_date),
-            ], order='priority desc, create_date asc', limit=share).ids
+            ids = self.sudo().search(
+                [('account_id', '=', account_id)] + action_domain,
+                order='priority desc, create_date asc', limit=share).ids
+            candidate_ids += ids
+            fill = share - len(ids)
+            if fill > 0:
+                candidate_ids += self.sudo().search(
+                    [('account_id', '=', account_id)] + webhook_domain,
+                    order='priority desc, create_date asc', limit=fill).ids
         tasks = self.sudo().browse(candidate_ids)
         claimed = self.env['x.account.task']
         for task in tasks:
@@ -199,7 +269,7 @@ class XAccountTask(models.Model):
                             ctx = {}
                         ctx.update(extra_ctx)
                         ctx_list.append(ctx)
-                    if op == 'process_webhook_event':
+                    if op == self._WEBHOOK_OPERATION:
                         event_uuids = [ctx.get('event_uuid') for ctx in ctx_list if ctx.get('event_uuid')]
                         if event_uuids:
                             result = batch_fn(event_uuids=event_uuids)
@@ -330,14 +400,15 @@ class XAccountTask(models.Model):
         account.sudo().write({'x_following_ids': [(4, partner.id)]})
 
     def action_ignore_stale(self, age_minutes=None):
-        """Mark pending tasks older than the freshness window as failed.
+        """Mark pending tasks older than the given age as failed.
 
-        Tasks created more than ``_QUEUE_MAX_AGE_MINUTES`` minutes ago are
-        never claimed again (see ``_claim_and_run``), so this action sweeps
-        them to ``failed`` to keep the queue readable instead of letting dead
-        backlog accumulate forever. Linked ``x.twitter.event`` records still
-        queued are marked ``skipped`` so the webhook inbox reflects the same
-        stale state.
+        Manual cleanup tool: claiming no longer age-gates tasks (every due
+        pending task is processed in fair-share order), so this is only for
+        tasks you no longer want to run. Tasks created more than
+        ``age_minutes`` (default ``_QUEUE_MAX_AGE_MINUTES``) ago are swept to
+        ``failed``. Linked ``x.twitter.event`` records still queued are
+        marked ``skipped`` so the webhook inbox reflects the same stale
+        state.
         """
         minutes = age_minutes or self._QUEUE_MAX_AGE_MINUTES
         cutoff = fields.Datetime.now() - timedelta(minutes=minutes)
