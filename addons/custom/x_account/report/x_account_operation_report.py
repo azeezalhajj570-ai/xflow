@@ -60,8 +60,15 @@ class XAccountOperationReport(models.Model):
         ],
         string='Status', readonly=True)
     source = fields.Char(string='Source', readonly=True)
-    create_date = fields.Datetime(string='Created On', readonly=True)
-    done_at = fields.Datetime(string='Done On', readonly=True)
+    create_date = fields.Datetime(string='Task Created', readonly=True)
+    received_at = fields.Datetime(string='Received On', readonly=True)
+    done_at = fields.Datetime(string='Processed On', readonly=True)
+    processing_time = fields.Float(
+        string='Processing Time',
+        readonly=True,
+        group_operator='avg',
+        help='Hours between the received post and the processed task.',
+    )
     operation_count = fields.Integer(
         string='Operations', readonly=True, group_operator='sum')
 
@@ -123,13 +130,31 @@ class XAccountOperationReport(models.Model):
                 sub.status,
                 sub.source,
                 sub.create_date,
+                COALESCE(sub.received_at, sub.create_date) AS received_at,
                 sub.done_at,
+                CASE
+                    WHEN sub.done_at IS NOT NULL THEN
+                        EXTRACT(EPOCH FROM (
+                            sub.done_at
+                            - COALESCE(sub.received_at, sub.create_date)
+                        )) / 3600.0
+                END AS processing_time,
                 1 AS operation_count
             FROM (
                 SELECT
                     base.*,
                     channel.name AS channel_name,
-                    channel.x_conversation_id AS channel_conversation_id
+                    channel.x_conversation_id AS channel_conversation_id,
+                    (
+                        SELECT COALESCE(message.external_created_at,
+                                        message.create_date)
+                        FROM x_message message
+                        WHERE message.channel_id = base.channel_id
+                          AND base.tweet_id IS NOT NULL
+                          AND message.body_plain LIKE '%' || base.tweet_id || '%'
+                        ORDER BY message.create_date DESC
+                        LIMIT 1
+                    ) AS received_at
                 FROM (
                     SELECT
                         task.id,
@@ -158,7 +183,7 @@ class XAccountOperationReport(models.Model):
                             CASE WHEN t.task_context ~ '^\\s*\\{'
                                  THEN t.task_context::jsonb END AS task_json
                         FROM x_account_task t
-                        WHERE t.operation IN (%s)
+                        WHERE t.operation IN (__OPERATIONS__)
                     ) task
                     LEFT JOIN social_account account ON account.id = task.account_id
                     LEFT JOIN res_partner author
@@ -166,4 +191,4 @@ class XAccountOperationReport(models.Model):
                 ) base
                 LEFT JOIN discuss_channel channel ON channel.id = base.channel_id
             ) sub
-        """ % operations
+        """.replace('__OPERATIONS__', operations)

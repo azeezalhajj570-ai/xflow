@@ -34,6 +34,9 @@ class TestXAccountOperationReport(XAccountTestBase):
         })
 
     def _row(self, task):
+        # Odoo defers pending writes until flush; the report is a SQL view, so
+        # flush first to make sure it reads the just-written task values.
+        self.env.flush_all()
         return self.Report.search([('id', '=', task.id)], limit=1)
 
     def test_view_exposes_channel_account_operation_and_link(self):
@@ -122,6 +125,41 @@ class TestXAccountOperationReport(XAccountTestBase):
             set(rows.mapped('operation')),
             {'like', 'repost', 'bookmark', 'comment'})
         self.assertEqual(sum(rows.mapped('operation_count')), 4)
+
+    def test_received_at_comes_from_the_message(self):
+        message = self.env['x.message'].create({
+            'channel_id': self.channel.id,
+            'account_id': self.account.id,
+            'direction': 'inbound',
+            'external_id': 'msg-111',
+            'body_plain': 'https://x.com/alice/status/111',
+            'external_created_at': '2026-09-13 20:00:00',
+        })
+        task = self._task(
+            'like', {'post_id': '111', 'channel_id': self.channel.id})
+        row = self._row(task)
+        self.assertEqual(row.received_at, message.external_created_at)
+
+    def test_processing_time_is_done_minus_received(self):
+        self.env['x.message'].create({
+            'channel_id': self.channel.id,
+            'account_id': self.account.id,
+            'direction': 'inbound',
+            'external_id': 'msg-pt',
+            'body_plain': 'https://x.com/alice/status/555',
+            'external_created_at': '2026-09-13 20:00:00',
+        })
+        task = self._task(
+            'like', {'post_id': '555', 'channel_id': self.channel.id})
+        task.write({'status': 'success', 'done_at': '2026-09-13 20:30:00'})
+        row = self._row(task)
+        self.assertAlmostEqual(row.processing_time, 0.5)
+
+    def test_received_at_falls_back_to_task_create(self):
+        task = self._task(
+            'like', {'post_id': '999999999', 'channel_id': self.channel.id})
+        row = self._row(task)
+        self.assertEqual(row.received_at, task.create_date)
 
     def test_company_comes_from_the_account(self):
         company = self.env['res.company'].create({'name': 'Report Co B'})
