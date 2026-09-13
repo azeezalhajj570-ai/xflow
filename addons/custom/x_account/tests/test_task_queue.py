@@ -2,7 +2,8 @@ from datetime import timedelta
 from unittest.mock import patch
 import time
 
-from odoo import fields
+from odoo import api, fields
+from odoo.sql_db import Cursor
 from odoo.tests import tagged
 from odoo.addons.x_account.tests.common import XAccountTestBase
 
@@ -199,3 +200,98 @@ class TestXTaskQueue(XAccountTestBase):
         self.assertFalse(empty.target_post_id)
         self.assertFalse(empty.target_screen_name)
         self.assertFalse(empty.source)
+
+    # ------------------------------------------------- concurrency / sharding
+
+    def _second_cursor_env(self):
+        """A second, independent DB connection to simulate a concurrent worker."""
+        cr = self.env.registry.cursor()
+        return cr, api.Environment(cr, self.env.uid, {})
+
+    def test_claim_is_atomic_and_skip_locked(self):
+        """Claiming uses the account advisory lock and FOR UPDATE SKIP LOCKED.
+
+        A cross-connection row lock cannot be used to prove skipping here: the
+        test's rows are uncommitted, so a second session cannot lock or even
+        see them. The advisory-lock test below exercises the real cross-worker
+        guard; this asserts claiming issues the non-blocking, atomic SQL.
+        """
+        self._make_task(self.account_a, operation='get_conversations')
+        self.env.flush_all()
+        queries = []
+        original = Cursor.execute
+
+        def spy(cursor, query, params=None):
+            queries.append(str(query))
+            return original(cursor, query, params)
+
+        with patch.object(Cursor, 'execute', spy):
+            self.env['x.account.task']._claim_account_tasks(
+                self.account_a.id, 10, fields.Datetime.now())
+        self.assertTrue(
+            any('FOR UPDATE SKIP LOCKED' in q for q in queries), queries)
+        self.assertTrue(
+            any('pg_try_advisory_xact_lock' in q for q in queries), queries)
+
+    def test_account_advisory_lock_enforces_single_flight(self):
+        """A worker that does not own the account lock claims nothing for it."""
+        self._make_task(self.account_a, operation='get_conversations')
+        self.env.flush_all()
+        namespace = self.env['x.account.task']._ACCOUNT_LOCK_NAMESPACE
+        cr2, _env2 = self._second_cursor_env()
+        try:
+            cr2.execute(
+                'SELECT pg_try_advisory_xact_lock(%s, %s)',
+                (namespace, self.account_a.id))
+            self.assertTrue(cr2.fetchone()[0])
+            claimed = self.env['x.account.task']._claim_account_tasks(
+                self.account_a.id, 10, fields.Datetime.now())
+            self.assertFalse(claimed)
+        finally:
+            cr2.rollback()
+            cr2.close()
+
+    def test_shards_cover_every_account_once(self):
+        """Running all shards processes every account exactly once."""
+        accounts = self.env['social.account'].create([
+            {'name': 'Shard Account %d' % i, 'media_id': self.twitter_media.id}
+            for i in range(3)
+        ])
+        tasks = [self._make_task(a, operation='get_conversations')
+                 for a in accounts]
+        calls = []
+
+        def fake_get_conversations(**kwargs):
+            calls.append(kwargs)
+            return {'conversations': []}
+
+        with patch('odoo.addons.x_account.services.providers.session_web.SessionWebProvider.get_conversations',
+                   side_effect=fake_get_conversations):
+            self.env['x.account.task']._process_queue(shard=0, shards=2)
+            self.env['x.account.task']._process_queue(shard=1, shards=2)
+        self.assertEqual(len(calls), len(tasks))
+        for task in tasks:
+            task.invalidate_recordset()
+            self.assertEqual(task.status, 'success')
+
+    def test_shard_ignores_accounts_outside_its_bucket(self):
+        """With shards=2, a shard only claims accounts whose id is in its bucket."""
+        self._make_task(self.account_a, operation='get_conversations')
+        target = self.account_a.id % 2
+        with patch('odoo.addons.x_account.services.providers.session_web.SessionWebProvider.get_conversations',
+                   return_value={'conversations': []}):
+            other = self.env['x.account.task']._claim_and_run(
+                limit=100, shard=1 - target, shards=2)
+            self.assertFalse(other)
+            mine = self.env['x.account.task']._claim_and_run(
+                limit=100, shard=target, shards=2)
+            self.assertTrue(mine)
+
+    def test_manual_path_never_commits(self):
+        """The manual/test path (commit=False) must not commit the transaction."""
+        self._make_task(self.account_a, operation='get_conversations')
+        with patch.object(Cursor, 'commit') as commit_mock:
+            with patch('odoo.addons.x_account.services.providers.session_web.SessionWebProvider.get_conversations',
+                       return_value={'conversations': []}):
+                self.env['x.account.task']._process_queue()
+        self.assertFalse(commit_mock.called)

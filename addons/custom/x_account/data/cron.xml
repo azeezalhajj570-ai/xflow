@@ -10,12 +10,36 @@
             <field name="interval_type">minutes</field>
             <field name="active">True</field>
         </record>
+    </data>
 
+    <!-- Task-queue worker shards. Each job drains the accounts whose id falls
+         in its bucket (account_id % shards == shard), so several cron threads
+         process disjoint accounts in parallel. Per-account semantics are
+         unchanged: an account still runs one task at a time (single-flight),
+         and claiming is atomic (per-account advisory lock + FOR UPDATE SKIP
+         LOCKED). Requires max_cron_threads >= shards.
+
+         These records are deliberately NOT noupdate: the shard code/count is
+         part of the deployment contract and must follow module upgrades. The
+         legacy ``cron_process_x_task_queue`` record predates this and was
+         created noupdate, so its linked server action is rewired by
+         migrations/19.0.1.4.0/post-migrate.py. -->
+    <data>
         <record id="cron_process_x_task_queue" model="ir.cron">
-            <field name="name">X: Process Task Queue</field>
+            <field name="name">X: Process Task Queue (shard 0)</field>
             <field name="model_id" ref="model_x_account_task"/>
             <field name="state">code</field>
-            <field name="code">model._process_queue()</field>
+            <field name="code">model._process_queue(shard=0, shards=2, commit=True)</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">minutes</field>
+            <field name="active">True</field>
+        </record>
+
+        <record id="cron_process_x_task_queue_1" model="ir.cron">
+            <field name="name">X: Process Task Queue (shard 1)</field>
+            <field name="model_id" ref="model_x_account_task"/>
+            <field name="state">code</field>
+            <field name="code">model._process_queue(shard=1, shards=2, commit=True)</field>
             <field name="interval_number">1</field>
             <field name="interval_type">minutes</field>
             <field name="active">True</field>
