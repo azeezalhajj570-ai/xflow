@@ -4,11 +4,11 @@
 
 One row per ``x.account.task`` whose operation is one of the four engagement
 actions (like, repost, bookmark, comment), enriched with the acting X account,
-its account group, the discuss channel the automation fired from, and the
-target tweet (id, author handle and a clickable link).
+the discuss channel the automation fired from, and the target tweet (id,
+author handle and a clickable link).
 
 Implemented as a PostgreSQL view (``_auto = False``) so the raw operation log
-can be sliced by group / account / tweet in list, pivot and graph views
+can be sliced by channel / account / tweet in list, pivot and graph views
 without storing a denormalized table.
 
 ``x.account.task.task_context`` is free-form JSON, and the target tweet id has
@@ -33,10 +33,8 @@ class XAccountOperationReport(models.Model):
 
     account_id = fields.Many2one(
         'social.account', string='X Account', readonly=True)
-    group_id = fields.Many2one(
-        'x.account.group', string='Account Group', readonly=True)
     channel_id = fields.Many2one(
-        'discuss.channel', string='Channel', readonly=True)
+        'discuss.channel', string='Discuss Channel', readonly=True)
     company_id = fields.Many2one(
         'res.company', string='Company', readonly=True)
     operation = fields.Selection(
@@ -72,7 +70,6 @@ class XAccountOperationReport(models.Model):
             SELECT
                 sub.id,
                 sub.account_id,
-                sub.group_id,
                 sub.channel_id,
                 sub.company_id,
                 sub.operation,
@@ -94,7 +91,6 @@ class XAccountOperationReport(models.Model):
                 SELECT
                     task.id,
                     task.account_id,
-                    task.group_id,
                     COALESCE(task.company_id, account.company_id) AS company_id,
                     NULLIF(task.task_json ->> 'channel_id', '')::int AS channel_id,
                     task.operation,

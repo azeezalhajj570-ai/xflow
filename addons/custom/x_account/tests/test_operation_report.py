@@ -18,10 +18,9 @@ class TestXAccountOperationReport(XAccountTestBase):
             'media_id': cls.media.id,
             'social_account_handle': 'report_acc',
         })
-        # auto_execute stays False so creating the group enqueues nothing.
-        cls.group = cls.env['x.account.group'].create({
-            'name': 'Report Group',
-            'account_ids': [(6, 0, [cls.account.id])],
+        cls.channel = cls.env['discuss.channel'].create({
+            'name': 'Report Channel',
+            'channel_type': 'group',
         })
         cls.Report = cls.env['x.account.operation.report']
 
@@ -36,13 +35,14 @@ class TestXAccountOperationReport(XAccountTestBase):
     def _row(self, task):
         return self.Report.search([('id', '=', task.id)], limit=1)
 
-    def test_view_exposes_group_account_operation_and_link(self):
-        task = self._task(
-            'like', {'post_id': '111', 'screen_name': 'alice'},
-            group_id=self.group.id)
+    def test_view_exposes_channel_account_operation_and_link(self):
+        task = self._task('like', {
+            'post_id': '111', 'screen_name': 'alice',
+            'channel_id': self.channel.id,
+        })
         row = self._row(task)
         self.assertEqual(row.account_id, self.account)
-        self.assertEqual(row.group_id, self.group)
+        self.assertEqual(row.channel_id, self.channel)
         self.assertEqual(row.operation, 'like')
         self.assertEqual(row.tweet_id, '111')
         self.assertEqual(row.tweet_screen_name, 'alice')
@@ -57,11 +57,12 @@ class TestXAccountOperationReport(XAccountTestBase):
         self.assertEqual(row.channel_id.id, 7)
         self.assertEqual(row.tweet_url, 'https://x.com/i/web/status/222')
 
-    def test_group_target_id_context(self):
-        task = self._task(
-            'repost', {'target_id': '333'}, group_id=self.group.id)
+    def test_target_id_context(self):
+        task = self._task('repost', {
+            'target_id': '333', 'channel_id': self.channel.id})
         row = self._row(task)
         self.assertEqual(row.tweet_id, '333')
+        self.assertEqual(row.channel_id, self.channel)
         self.assertEqual(row.tweet_url, 'https://x.com/i/web/status/333')
 
     def test_author_partner_supplies_screen_name(self):
@@ -80,10 +81,10 @@ class TestXAccountOperationReport(XAccountTestBase):
         rows = self.Report.search([('account_id', '=', self.account.id)])
         self.assertEqual(set(rows.mapped('operation')), {'like'})
 
-    def test_all_four_operations_group_by_group(self):
+    def test_all_four_operations_group_by_channel(self):
         for op in ('like', 'repost', 'bookmark', 'comment'):
-            self._task(op, {'post_id': '900'}, group_id=self.group.id)
-        rows = self.Report.search([('group_id', '=', self.group.id)])
+            self._task(op, {'post_id': '900', 'channel_id': self.channel.id})
+        rows = self.Report.search([('channel_id', '=', self.channel.id)])
         self.assertEqual(
             set(rows.mapped('operation')),
             {'like', 'repost', 'bookmark', 'comment'})
@@ -92,6 +93,7 @@ class TestXAccountOperationReport(XAccountTestBase):
     def test_action_and_menu_wired(self):
         action = self.env.ref('x_account.action_x_account_operation_report')
         self.assertEqual(action.res_model, 'x.account.operation.report')
+        self.assertIn('groupby_channel', action.context or '')
         self.env.ref('x_account.menu_x_account_operation_report')
         self.env.ref('x_account.x_account_operation_report_view_pivot')
         self.env.ref('x_account.x_account_operation_report_view_graph')
