@@ -8,3 +8,4 @@ from . import test_twitter_webhook
 from . import test_xchat_decryptor
 from . import test_twitter_dm
 from . import test_x_subscriptions
+from . import test_xchat_conversation_keys
