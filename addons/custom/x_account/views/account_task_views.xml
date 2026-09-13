@@ -117,7 +117,6 @@
                 <field name="account_id" type="row" optional="hide"/>
                 <field name="source" type="row" optional="hide"/>
                 <field name="status" type="col"/>
-                <field name="target_screen_name" type="measure"/>
                 <field name="retry_count" type="measure"/>
             </pivot>
         </field>
