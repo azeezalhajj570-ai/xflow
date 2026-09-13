@@ -7,6 +7,10 @@ from odoo.addons.x_account.services.x_service import XService
 
 from odoo.addons.x_account_getxapi.services.getxapi_client import GetXAPIClient
 from odoo.addons.x_account_getxapi.services.getxapi_dm_service import GetXAPIDMService
+from odoo.addons.x_account_getxapi.services.getxapi_errors import (
+    GetXAPIError,
+    GetXAPIPreflightError,
+)
 from odoo.addons.x_account_getxapi.services.getxapi_provider import GetXAPIProvider
 
 from .common import XAccountGetXAPITestBase
@@ -96,14 +100,40 @@ class TestGetXAPIProvider(XAccountGetXAPITestBase):
         with self.assertRaises(ValueError):
             self.provider.follow()
 
-    def test_follow_without_auth_token_still_sends_request(self):
+    def test_follow_without_auth_token_raises_preflight(self):
+        """A missing auth token must fail fast, not spend a paid follow call."""
         with patch.object(self.provider, '_auth_token', ''):
-            with patch.object(GetXAPIClient, 'post', return_value={
-                'data': {'result': {'following': True}},
-            }) as mocked:
-                result = self.provider.follow(screen_name='someuser')
-        self.assertTrue(result['success'])
-        self.assertNotIn('auth_token', mocked.call_args.kwargs['json'])
+            with patch.object(GetXAPIClient, 'post') as mocked:
+                with self.assertRaises(GetXAPIPreflightError) as ctx:
+                    self.provider.follow(screen_name='someuser')
+        self.assertEqual(ctx.exception.code, 'preflight_failed')
+        self.assertFalse(ctx.exception.retryable)
+        self.assertEqual(mocked.call_count, 0)
+
+    def test_follow_self_handle_raises_preflight(self):
+        with patch.object(GetXAPIClient, 'post') as mocked:
+            with self.assertRaises(GetXAPIPreflightError) as ctx:
+                self.provider.follow(screen_name='@getxapi_user')
+        self.assertIn('cannot_follow_self', ctx.exception.message)
+        self.assertEqual(mocked.call_count, 0)
+
+    def test_follow_self_user_id_raises_before_paid_lookup(self):
+        with patch.object(GetXAPIClient, 'get') as mocked:
+            with self.assertRaises(GetXAPIPreflightError) as ctx:
+                self.provider.follow(target_user_id='12345')
+        self.assertIn('cannot_follow_self', ctx.exception.message)
+        self.assertEqual(mocked.call_count, 0)
+
+    def test_write_without_user_id_raises_preflight(self):
+        self.account.write({'twitter_user_id': False})
+        try:
+            with patch.object(GetXAPIClient, 'post') as mocked:
+                with self.assertRaises(GetXAPIPreflightError) as ctx:
+                    self.provider.like({'post_id': '111'})
+            self.assertIn('missing_twitter_user_id', ctx.exception.message)
+            self.assertEqual(mocked.call_count, 0)
+        finally:
+            self.account.write({'twitter_user_id': '12345'})
 
     def test_post_tweet(self):
         with patch.object(GetXAPIClient, 'post', return_value={
@@ -124,8 +154,10 @@ class TestGetXAPIProvider(XAccountGetXAPITestBase):
 
     def test_send_dm_requires_auth_token(self):
         with patch.object(self.provider, '_auth_token', ''):
-            with self.assertRaises(ValueError):
-                self.provider.send_dm('9', 'hello')
+            with patch.object(GetXAPIClient, 'post') as mocked:
+                with self.assertRaises(GetXAPIError):
+                    self.provider.send_dm('9', 'hello')
+        self.assertEqual(mocked.call_count, 0)
 
     def test_supported_operations(self):
         ops = self.provider.supported_operations()
@@ -143,6 +175,34 @@ class TestGetXAPIProvider(XAccountGetXAPITestBase):
             result = XService.validate(self.account)
         self.assertTrue(result['valid'])
         self.assertEqual(self.account.x_connection_status, 'active')
+
+    def test_credit_blocked_account_tasks_not_claimed(self):
+        task = self.env['x.account.task'].create({
+            'account_id': self.account.id,
+            'operation': 'like',
+            'task_context': '{"post_id": "1"}',
+        })
+        self.account.write({'x_getxapi_credit_blocked': True})
+        with patch.object(GetXAPIProvider, 'like') as mocked:
+            claimed = self.env['x.account.task']._claim_and_run(limit=10)
+        task.invalidate_recordset()
+        self.assertFalse(claimed)
+        self.assertEqual(task.status, 'pending')
+        self.assertEqual(mocked.call_count, 0)
+
+    def test_claimed_task_released_when_account_blocked(self):
+        """A task claimed just as the breaker trips is released, not run."""
+        task = self.env['x.account.task'].create({
+            'account_id': self.account.id,
+            'operation': 'like',
+            'task_context': '{"post_id": "1"}',
+        })
+        self.account.write({'x_getxapi_credit_blocked': True})
+        with patch.object(GetXAPIProvider, 'like') as mocked:
+            task._execute_operation()
+        task.invalidate_recordset()
+        self.assertEqual(task.status, 'pending')
+        self.assertEqual(mocked.call_count, 0)
 
 
 @tagged('post_install', '-at_install', 'x_account_getxapi')

@@ -28,6 +28,8 @@ import time
 
 import requests
 
+from odoo import fields
+
 from . import getxapi_errors
 from .getxapi_cost import estimate_cost
 
@@ -59,21 +61,26 @@ class GetXAPIClient:
         self._base_url = (base_url or _BASE_URL).rstrip('/')
         self._timeout = timeout or _TIMEOUT_SECONDS
 
-    def get(self, path, params=None):
+    def get(self, path, params=None, billable=True):
         """Send a GET request and return the parsed envelope."""
-        return self.request('GET', path, params=params)
+        return self.request('GET', path, params=params, billable=billable)
 
-    def post(self, path, json=None, params=None):
+    def post(self, path, json=None, params=None, billable=True):
         """Send a POST request and return the parsed envelope."""
-        return self.request('POST', path, params=params, json=json)
+        return self.request('POST', path, params=params, json=json,
+                            billable=billable)
 
-    def request(self, method, path, params=None, json=None):
+    def request(self, method, path, params=None, json=None, billable=True):
         """Send an authenticated request and return the parsed envelope.
 
         Raises GetXAPIError on failure. Automatically logs usage.
+
+        :param billable: when False the call is an internal pre-flight check,
+            so its usage row is logged with zero cost (see ``_log_usage``).
         """
         if not self._api_key:
             raise getxapi_errors.GetXAPIAuthenticationError(path, 'getxapi_api_key_missing')
+        self._raise_if_credit_blocked(path)
 
         url = self._base_url + (path if path.startswith('/') else '/' + path)
         is_write = method.upper() != 'GET'
@@ -87,13 +94,14 @@ class GetXAPIClient:
                 envelope = response.json() if response.content else {}
             except ValueError:
                 raise getxapi_errors.GetXAPITemporaryError(path, 'non_json_response')
-            self._log_usage(path, method, response.status_code, True, duration_ms)
+            self._log_usage(path, method, response.status_code, True,
+                            duration_ms, billable=billable)
             return envelope
 
         body = self._body_json(response)
         error = getxapi_errors.classify(response.status_code, path, body)
-        self._log_usage(
-            path, method, response.status_code, False, duration_ms, error)
+        self._log_usage(path, method, response.status_code, False,
+                        duration_ms, error, billable=billable)
         raise error
 
     def paginate(self, path, params=None, method='GET', json=None,
@@ -258,21 +266,21 @@ class GetXAPIClient:
         }
 
     def _log_usage(self, path, method, status_code, success, duration_ms,
-                   error=None):
+                   error=None, billable=True):
         """Log API usage to getxapi.api.usage. Failure to log propagates."""
         if not self._account_id:
             return
         try:
-            cost = estimate_cost(path)
+            error_type = (getattr(error, 'code', '') or '') if error is not None else ''
+            error_message = (getattr(error, 'message', '') or '')[:500]
+            if error_type == 'credit_exhausted':
+                self._trip_credit_breaker(error_message)
+            cost = self._billable_cost(path, billable, error_type)
             twitter_error_code = None
             retry_after = None
-            error_message = ''
-            error_type = ''
             if error is not None:
-                error_type = getattr(error, 'code', '') or ''
                 twitter_error_code = getattr(error, 'twitter_error_code', None)
                 retry_after = getattr(error, 'retry_after', None)
-                error_message = (getattr(error, 'message', '') or '')[:500]
             vals = {
                 'endpoint': path,
                 'method': method.upper(),
@@ -280,7 +288,7 @@ class GetXAPIClient:
                 'success': success,
                 'estimated_cost': cost,
                 'request_duration': duration_ms,
-                'error_type': error_type or '',
+                'error_type': error_type,
                 'twitter_error_code': twitter_error_code,
                 'retry_after': retry_after,
                 'error_message': error_message,
@@ -292,6 +300,54 @@ class GetXAPIClient:
         except Exception as exc:
             _LOGGER.warning('GetXAPI usage LOG FAILED: %r', exc, exc_info=True)
             raise
+
+    @staticmethod
+    def _billable_cost(path, billable, error_type):
+        """Estimated USD to bill this call.
+
+        Pre-flight calls (``billable=False``) and credit-exhausted responses
+        (402 / credit-429) did no paid upstream work, so they are recorded at
+        zero cost instead of inflating the spend report with fake charges.
+        Every other call — including genuine upstream errors — keeps its
+        endpoint price.
+        """
+        if not billable or error_type == 'credit_exhausted':
+            return 0.0
+        return estimate_cost(path)
+
+    def _credit_blocked(self):
+        """Whether the account's GetXAPI credit breaker is currently tripped."""
+        if not self._account_id:
+            return False
+        account = self._env['social.account'].sudo().browse(self._account_id)
+        if not account.exists():
+            return False
+        return bool(account.x_getxapi_credit_blocked)
+
+    def _raise_if_credit_blocked(self, path):
+        """Refuse a paid call while the account's credit breaker is tripped.
+
+        Prevents the queue from blindly retrying paid endpoints against an
+        account with no GetXAPI balance; the operator resumes once credit is
+        added.
+        """
+        if self._credit_blocked():
+            raise getxapi_errors.GetXAPIError(
+                402, path, 'getxapi_credit_blocked', code='credit_exhausted')
+
+    def _trip_credit_breaker(self, message=''):
+        """Halt paid calls for the account until credit is restored."""
+        account = self._env['social.account'].sudo().browse(self._account_id)
+        if not account.exists():
+            return
+        account.write({
+            'x_getxapi_credit_blocked': True,
+            'x_getxapi_credit_blocked_at': fields.Datetime.now(),
+            'x_getxapi_credit_error': (message or '')[:500],
+        })
+        _LOGGER.warning(
+            'GetXAPI credit exhausted for account %s; paid queue halted '
+            'until resumed.', self._account_id)
 
     @staticmethod
     def _retry_delay(attempt, retry_after):
@@ -328,15 +384,15 @@ class GetXAPIClient:
             return False
         if body.get('twitter_error_code') in (502, '502'):
             return True
+        if getxapi_errors.is_credit_error(body):
+            return True
         message = ('%s %s %s %s' % (
             body.get('error') or '',
             body.get('error_description') or '',
             body.get('message') or '',
             body.get('detail') or '',
         )).lower()
-        return any(
-            token in message
-            for token in ('credit', 'insufficient balance', 'payment', 'daily dm'))
+        return 'daily dm' in message
 
     @staticmethod
     def _retry_after_value(response, body):

@@ -194,6 +194,13 @@ class XAccountTask(models.Model):
             domain, ['account_id'], ['account_id:count'], order='account_id')
         account_ids = [account.id for g in grouped for account in g[0]]
         _logger.info('Task queue: found account_ids=%s grouped=%s', account_ids, grouped)
+        # Halt paid work for accounts whose provider reports it cannot help
+        # (e.g. GetXAPI credit exhaustion): their tasks stay pending, without
+        # burning attempts or paid calls, until the block is lifted.
+        accounts = self.env['social.account'].sudo().browse(account_ids).exists()
+        account_ids = [
+            account.id for account in accounts
+            if not account._x_action_blocked_reason()]
         if not account_ids:
             return self.env['x.account.task']
         share = max(limit // len(account_ids), 1)
@@ -295,6 +302,13 @@ class XAccountTask(models.Model):
         account = self.account_id
         if not account:
             self._schedule_retry('Missing account')
+            return None
+        blocked = account._x_action_blocked_reason()
+        if blocked:
+            # Already claimed when the provider tripped its breaker mid-sweep:
+            # release the task back to pending instead of paying for a doomed
+            # call or failing work the operator can resume.
+            self.write({'status': 'pending', 'error': blocked})
             return None
         try:
             op = operation or self.operation

@@ -14,23 +14,30 @@ class GetXAPIUserService:
     def __init__(self, client):
         self._client = client
 
-    def info(self, username):
+    def info(self, username, billable=True):
         """Get user info by username/handle.
 
         :param username: X username (with or without @).
+        :param billable: False when this is an internal pre-flight lookup, so
+            the usage row is recorded at zero cost.
         :returns: Normalized user DTO.
         """
         username = str(username).lstrip('@')
-        data = self._client.get('/twitter/user/info', params={'userName': username})
+        data = self._client.get(
+            '/twitter/user/info', params={'userName': username},
+            billable=billable)
         return getxapi_envelope.GetXAPIEnvelopeParser.user(data)
 
-    def info_by_id(self, user_id):
+    def info_by_id(self, user_id, billable=True):
         """Get user info by numeric user ID.
 
         :param user_id: X user ID.
+        :param billable: False when this is an internal pre-flight lookup.
         :returns: Normalized user DTO.
         """
-        data = self._client.get('/twitter/user/info_by_id', params={'userId': str(user_id)})
+        data = self._client.get(
+            '/twitter/user/info_by_id', params={'userId': str(user_id)},
+            billable=billable)
         return getxapi_envelope.GetXAPIEnvelopeParser.user(data)
 
     def search(self, query, **params):

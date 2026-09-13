@@ -278,6 +278,16 @@ class SocialAccount(models.Model):
         from odoo.addons.x_account.services.x_service import XService
         return XService.get_provider(self)
 
+    def _x_action_blocked_reason(self):
+        """Reason the account's paid action queue is halted, or False.
+
+        Generic extension point: provider modules override it to suspend
+        paid work when retrying cannot help (e.g. GetXAPI credit exhaustion).
+        The task queue skips blocked accounts so no provider call is made
+        until the condition is cleared.
+        """
+        return False
+
     def action_link_account(self):
         """Open the X link-account wizard (used by the X Accounts list 'New')."""
         return {
