@@ -441,6 +441,41 @@ class TwitterActivity:
                 except Exception:
                     pass
 
+    @staticmethod
+    def _missing_key_error(errors):
+        """Whether a decrypt error is a missing/rotated conversation key."""
+        return any('no matching key' in str(err).lower()
+                   for err in (errors or {}).values())
+
+    def _conversation_key_change_blobs(self, account, conversation_id,
+                                       current=''):
+        """Key-change blobs for a conversation, from already-stored events.
+
+        A webhook delivery carries only its own ``conversation_key_change_event``;
+        a message whose key rotated earlier needs the conversation's whole
+        key-change chain, which we rebuild from the events we already stored.
+        """
+        blobs = [current] if current else []
+        if not conversation_id:
+            return blobs
+        events = self.env['x.twitter.event'].sudo().search([
+            ('account_id', '=', account.id),
+            ('payload', 'ilike', 'conversation_key_change_event'),
+            ('payload', 'ilike', str(conversation_id)),
+        ], order='id desc', limit=100)
+        for event in events:
+            try:
+                data = json.loads(event.payload or '{}')
+            except ValueError:
+                continue
+            item = data.get('payload') or {}
+            if str(item.get('conversation_id')) != str(conversation_id):
+                continue
+            blob = item.get('conversation_key_change_event')
+            if blob and blob not in blobs:
+                blobs.append(blob)
+        return blobs
+
     def _decrypt_chat_event(self, account, payload):
         """Attempt to decrypt a webhook ``encoded_event`` blob.
 
@@ -454,6 +489,8 @@ class TwitterActivity:
                             'encoded_event account_id=%s event_id=%s',
                             account.id, payload.get('id'))
             return '', False
+        conversation_id = payload.get('conversation_id')
+        sender_id = payload.get('sender_id')
         key_change = payload.get('conversation_key_change_event') or ''
         try:
             from odoo.addons.x_account_twitter.services.xchat_decryptor import (
@@ -469,14 +506,43 @@ class TwitterActivity:
                                 account.id, payload.get('id'),
                                 account.x_chat_key_mode or 'key_blob')
                 return '', False
+            # Conversation keys recovered on earlier deliveries (persisted on
+            # the account) so a message whose key rotated before this delivery
+            # can still be decrypted.
+            cached_keys = {}
+            try:
+                cached_keys = (account.x_chat_conversation_keys or {}).get(
+                    str(conversation_id)) or {}
+            except Exception:
+                cached_keys = {}
             # Feed any key-change event first so the conversation key is
             # recoverable, then decrypt the message blob. Pass the sender so a
             # different-user sender in group chats can be signature-verified.
             result = decryptor.decrypt_events(
                 [encoded],
                 key_change_events=[key_change] if key_change else None,
-                sender_ids=[payload.get('sender_id')])
+                sender_ids=[sender_id],
+                cached_keys=cached_keys,
+                conversation_id=conversation_id)
             errors = result.get('errors') or {}
+            if errors and conversation_id and self._missing_key_error(errors):
+                # The message key rotated in an earlier event that this delivery
+                # does not carry: rebuild the conversation's key-change chain
+                # from events we already stored and retry once.
+                wider = self._conversation_key_change_blobs(
+                    account, conversation_id, current=key_change)
+                if len(wider) > (1 if key_change else 0):
+                    _logger.info(
+                        'x_account_twitter: retrying chat decrypt with %d '
+                        'key-change blob(s) account_id=%s conversation_id=%s',
+                        len(wider), account.id, conversation_id)
+                    result = decryptor.decrypt_events(
+                        [encoded],
+                        key_change_events=wider,
+                        sender_ids=[sender_id],
+                        cached_keys=cached_keys,
+                        conversation_id=conversation_id)
+                    errors = result.get('errors') or {}
             if errors:
                 # Chat XDK intentionally returns per-event crypto failures in
                 # ``errors`` rather than raising.  Log only stable metadata;

@@ -766,7 +766,7 @@ class XChatDecryptor:
         return self._conversation_keys
 
     def decrypt_events(self, raw_events, key_change_events=None,
-                       sender_ids=None):
+                       sender_ids=None, cached_keys=None, conversation_id=None):
         """Decrypt a batch of raw ``encoded_event`` blobs.
 
         ``raw_events`` is a list of base64 event strings (the ``encoded_event``
@@ -776,7 +776,9 @@ class XChatDecryptor:
         ``sender_id`` of each raw event so the caller can help resolve the
         signing key used to verify the sender's message signature in group
         conversations (fetching it from the X API when it is not the account's
-        own key).
+        own key). ``cached_keys`` seeds keys recovered for the conversation on
+        earlier deliveries (persisted on the account); ``conversation_id`` makes
+        freshly recovered keys persisted back for later deliveries.
 
         Returns ``{'messages': [...], 'errors': [...]}`` where each message is
         the SDK's decrypted event dict. Raises ValueError when no key material
@@ -784,6 +786,12 @@ class XChatDecryptor:
         """
         chat = self._chat_instance()
         signing_keys = self._signing_keys(sender_ids)
+        # Seed with keys recovered earlier: a webhook delivery carries only its
+        # own key-change blob, so a message whose key rotated before it must be
+        # decrypted with keys persisted from a previous delivery.
+        for version, key in self._conversation_key_material(cached_keys):
+            self._conversation_keys = self._conversation_keys or {}
+            self._conversation_keys[str(version)] = key
         self._absorb_key_changes(chat, signing_keys, key_change_events)
         # Only decrypt message events, not key change events
         blobs = list(raw_events or [])
@@ -802,7 +810,35 @@ class XChatDecryptor:
                 _LOGGER.warning('decrypt_event error: %s', str(exc)[:200])
                 errors[str(exc)[:100]] = str(exc)
         _LOGGER.info('decrypt_events done: %d messages, %d errors', len(messages), len(errors))
+        if conversation_id:
+            self._persist_conversation_keys(conversation_id)
         return {'messages': messages, 'errors': errors}
+
+    def _persist_conversation_keys(self, conversation_id):
+        """Merge the in-memory conversation keys into the account's cache.
+
+        Webhook deliveries each carry only their own key-change blob, so keys
+        recovered now must be stored to decrypt later messages whose key rotated
+        in an event we already saw. No-op when nothing new was recovered.
+        """
+        try:
+            encoded = {}
+            for version, key in (self._conversation_keys or {}).items():
+                if isinstance(key, (bytes, bytearray)):
+                    encoded[str(version)] = base64.b64encode(bytes(key)).decode()
+                else:
+                    encoded[str(version)] = str(key)
+            if not encoded:
+                return
+            account_cache = dict(self.account.x_chat_conversation_keys or {})
+            merged = dict(account_cache.get(str(conversation_id)) or {})
+            merged.update(encoded)
+            account_cache[str(conversation_id)] = merged
+            self.account.sudo().write({'x_chat_conversation_keys': account_cache})
+        except Exception as exc:
+            _LOGGER.warning(
+                'Failed to persist conversation keys for %s: %s',
+                conversation_id, str(exc)[:200])
 
     def decrypt_event(self, raw_event, key_change_events=None, sender_id=None):
         """Decrypt a single encoded event (raises on failure)."""
