@@ -145,16 +145,7 @@ class XAccountOperationReport(models.Model):
                     base.*,
                     channel.name AS channel_name,
                     channel.x_conversation_id AS channel_conversation_id,
-                    (
-                        SELECT COALESCE(message.external_created_at,
-                                        message.create_date)
-                        FROM x_message message
-                        WHERE message.channel_id = base.channel_id
-                          AND base.tweet_id IS NOT NULL
-                          AND message.body_plain LIKE '%' || base.tweet_id || '%'
-                        ORDER BY message.create_date DESC
-                        LIMIT 1
-                    ) AS received_at
+                    message.received_at AS received_at
                 FROM (
                     SELECT
                         task.id,
@@ -190,5 +181,18 @@ class XAccountOperationReport(models.Model):
                         ON author.x_user_id = task.task_json ->> 'author_x_id'
                 ) base
                 LEFT JOIN discuss_channel channel ON channel.id = base.channel_id
+                LEFT JOIN (
+                    SELECT channel_id,
+                           substring(body_plain FROM '/status/([0-9]+)')
+                               AS tweet_id,
+                           MAX(COALESCE(external_created_at, create_date))
+                               AS received_at
+                    FROM x_message
+                    WHERE body_plain LIKE '%/status/%'
+                    GROUP BY channel_id,
+                             substring(body_plain FROM '/status/([0-9]+)')
+                ) message
+                    ON message.channel_id = base.channel_id
+                   AND message.tweet_id = base.tweet_id
             ) sub
         """.replace('__OPERATIONS__', operations)
