@@ -104,7 +104,7 @@
         <field name="name">x.account.social.account.view.list</field>
         <field name="model">social.account</field>
         <field name="arch" type="xml">
-            <list string="X Accounts" create="false" editable="bottom">
+            <list string="X Accounts" create="false">
                 <field name="active" widget="boolean_toggle"/>
                 <field name="name"/>
                 <field name="social_account_handle"/>
@@ -123,6 +123,8 @@
             <xpath expr="//filter[@name='filter_active']" position="after">
                 <filter string="Active" name="x_filter_active"
                     domain="[('active', '=', True)]"/>
+                <filter string="Include Archived" name="x_filter_include_archived"
+                    context="{'active_test': False}"/>
             </xpath>
             <xpath expr="//search" position="inside">
                 <separator/>
@@ -155,6 +157,7 @@
         <field name="res_model">social.account</field>
         <field name="view_mode">list,form</field>
         <field name="domain">[('media_type', '=', 'twitter')]</field>
+        <field name="context">{'search_default_x_filter_include_archived': True}</field>
         <field name="view_ids" eval="[(5, 0, 0),
             (0, 0, {'view_mode': 'list', 'view_id': ref('x_account_social_account_view_list')}),
             (0, 0, {'view_mode': 'form', 'view_id': ref('x_account_social_account_view_form_standalone')})]"/>

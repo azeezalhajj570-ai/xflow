@@ -72,6 +72,8 @@
             <xpath expr="//filter[@name='inactive']" position="after">
                 <filter string="Active" name="x_filter_active"
                     domain="[('active', '=', True)]"/>
+                <filter string="Include Archived" name="x_filter_include_archived"
+                    context="{'active_test': False}"/>
             </xpath>
             <xpath expr="//search" position="inside">
                 <field name="x_conversation_id" string="X Conversation ID"/>
@@ -109,6 +111,7 @@
         <field name="res_model">discuss.channel</field>
         <field name="view_mode">list,form</field>
         <field name="domain">[('channel_type', 'in', ['x', 'x_group'])]</field>
+        <field name="context">{'search_default_x_filter_include_archived': True}</field>
         <field name="search_view_id" ref="mail.discuss_channel_view_search"/>
         <field name="view_ids" eval="[(5, 0, 0),
             (0, 0, {'view_mode': 'list', 'view_id': ref('x_group_channel_view_tree')}),
