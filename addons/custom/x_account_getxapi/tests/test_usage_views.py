@@ -44,3 +44,11 @@ class TestGetXAPIUsageViews(XAccountGetXAPITestBase):
         self.assertIn('pivot', action.view_mode)
         self.assertIn(
             "'search_default_groupby_account': 1", action.context or '')
+
+    def test_usage_menu_lives_under_reporting(self):
+        """The usage page moved from the app root into Reporting."""
+        menu = self.env.ref('x_account_getxapi.menu_getxapi_usage')
+        self.assertEqual(
+            menu.parent_id, self.env.ref('x_account.menu_x_account_reporting'))
+        self.assertEqual(
+            menu.action, self.env.ref('x_account_getxapi.getxapi_usage_action'))

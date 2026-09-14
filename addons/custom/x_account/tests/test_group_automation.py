@@ -22,9 +22,6 @@ class TestXGroupAutomation(XAccountTestBase):
         # the provider).
         for xmlid in (
             'x_account.base_automation_x_group_action',
-            'x_account.base_automation_x_task_like',
-            'x_account.base_automation_x_task_repost',
-            'x_account.base_automation_x_task_comment',
             'x_account.base_automation_x_task_follow',
             'x_account.base_automation_x_task_send_dm',
         ):

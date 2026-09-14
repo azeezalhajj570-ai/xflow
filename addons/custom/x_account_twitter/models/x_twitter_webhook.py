@@ -8,7 +8,9 @@ These models record that state so registration/subscription lifecycle calls are
 safe to run repeatedly (idempotent: never duplicate what already exists).
 """
 
-from odoo import fields, models
+import json
+
+from odoo import api, fields, models
 
 
 class XTwitterWebhook(models.Model):
@@ -136,6 +138,19 @@ class XTwitterEvent(models.Model):
         help='Normalized event payload (no OAuth credentials). Used by the task '
              'worker to reprocess on retry.',
     )
+    conversation_id = fields.Char(
+        string='Conversation ID',
+        index=True,
+        help='Conversation the delivery belongs to, extracted from the payload '
+             'at create time so a conversation lookup stays indexed instead of '
+             'LIKE-scanning the (large) payload text.',
+    )
+    has_key_change = fields.Boolean(
+        string='Carries Key Change',
+        index=True,
+        help='True when the delivery carries a conversation_key_change_event '
+             'blob.',
+    )
     company_id = fields.Many2one(
         'res.company',
         string='Company',
@@ -148,4 +163,34 @@ class XTwitterEvent(models.Model):
         'UNIQUE(account_id, event_uuid)',
         'An X event uuid may only be processed once per account.',
     )
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        for vals in vals_list:
+            if 'conversation_id' in vals and 'has_key_change' in vals:
+                continue
+            conversation_id, has_key_change = \
+                self._payload_conversation_fields(vals.get('payload'))
+            vals.setdefault('conversation_id', conversation_id)
+            vals.setdefault('has_key_change', has_key_change)
+        return super().create(vals_list)
+
+    @staticmethod
+    def _payload_conversation_fields(payload):
+        """Extract ``(conversation_id, has_key_change)`` from a stored payload.
+
+        The stored payload is ``json.dumps({'payload': {...}})``. A malformed
+        payload yields ``(False, False)`` instead of raising, so a bad row can
+        never block ingest.
+        """
+        try:
+            data = json.loads(payload or '{}')
+        except ValueError:
+            return False, False
+        inner = (data or {}).get('payload') or {}
+        conversation_id = inner.get('conversation_id')
+        return (
+            str(conversation_id) if conversation_id else False,
+            bool(inner.get('conversation_key_change_event')),
+        )
 

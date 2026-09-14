@@ -2,8 +2,10 @@
 
 import json
 import logging
+from datetime import timedelta
 
-from odoo import fields, models
+from odoo import _, api, fields, models
+from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
 
@@ -44,6 +46,18 @@ class XMessage(models.Model):
     )
     body_plain = fields.Text(string='Body (plain text)')
     external_created_at = fields.Datetime(string='External Created At', index=True)
+    age_minutes = fields.Float(
+        string='Minutes Since Received',
+        compute='_compute_age_minutes',
+        search='_search_age_minutes',
+        help="Minutes elapsed since the message was received, counted up to "
+             "the moment this field is read or searched. Use it in an "
+             "automation rule filter to target older messages: set the rule "
+             "filter to [('age_minutes', '>=', 5)] to only act on messages "
+             "received at least 5 minutes ago.\n"
+             "Received time is External Created At, falling back to the Odoo "
+             "creation date when the external timestamp is missing.",
+    )
     author_partner_id = fields.Many2one('res.partner', string='Author Partner')
     author_x_id = fields.Char(string='Author X ID')
     author_x_username = fields.Char(string='Author X Username')
@@ -104,6 +118,53 @@ class XMessage(models.Model):
                             if tweet_id.isdigit() and tweet_id not in tweet_ids:
                                 tweet_ids.append(tweet_id)
         return tweet_ids
+
+    _AGE_INVERTED_OPERATORS = {
+        '=': '=',
+        '!=': '!=',
+        '<': '>',
+        '<=': '>=',
+        '>': '<',
+        '>=': '<=',
+    }
+
+    @api.depends('external_created_at', 'create_date')
+    def _compute_age_minutes(self):
+        now = fields.Datetime.now()
+        for message in self:
+            received_at = message.external_created_at or message.create_date
+            message.age_minutes = (
+                (now - received_at).total_seconds() / 60.0 if received_at else 0.0
+            )
+
+    def _search_age_minutes(self, operator, value):
+        """Rewrite an age filter as a comparison on the received datetime.
+
+        ``age_minutes`` is ``now - received_at``, and ``now`` is resolved when
+        the search runs, so the operator is inverted onto the stored datetime:
+        "at least 5 minutes old" becomes "received at or before now - 5 min".
+        """
+        if operator not in self._AGE_INVERTED_OPERATORS:
+            raise UserError(_(
+                "Operator %(operator)s is not supported by the "
+                "'Minutes Since Received' filter.",
+                operator=operator,
+            ))
+        try:
+            cutoff = fields.Datetime.now() - timedelta(minutes=float(value))
+        except (TypeError, ValueError):
+            raise UserError(_(
+                "'Minutes Since Received' expects a number of minutes, got "
+                "%(value)s.", value=value,
+            )) from None
+        received_operator = self._AGE_INVERTED_OPERATORS[operator]
+        return [
+            '|',
+            '&', ('external_created_at', '!=', False),
+            ('external_created_at', received_operator, cutoff),
+            '&', ('external_created_at', '=', False),
+            ('create_date', received_operator, cutoff),
+        ]
 
     def _run_channel_automation(self, operation):
         """Generic helper for channel automation.

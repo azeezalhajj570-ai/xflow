@@ -94,17 +94,24 @@
         sequence="45"/>
 
     <menuitem
+        id="menu_x_account_configuration"
+        name="Configuration"
+        parent="menu_x_account_root"
+        sequence="46"/>
+
+    <menuitem
         id="menu_x_account_server_actions"
         name="Server Actions"
-        parent="menu_x_account_root"
+        parent="menu_x_account_configuration"
         action="action_x_account_server_actions"
-        sequence="46"
+        sequence="10"
         groups="social.group_social_manager"/>
 
     <menuitem
         id="menu_x_account_settings"
         name="Settings"
-        parent="menu_x_account_root"
+        parent="menu_x_account_configuration"
         action="action_x_account_settings"
-        sequence="50"/>
+        sequence="20"
+        groups="base.group_system"/>
 </odoo>

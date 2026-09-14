@@ -1,5 +1,7 @@
 import json
+from datetime import timedelta
 
+from odoo import fields
 from odoo.tests import tagged
 
 from odoo.addons.x_account.tests.common import XAccountTestBase
@@ -140,14 +142,30 @@ class TestXAccountOperationReport(XAccountTestBase):
         row = self._row(task)
         self.assertEqual(row.received_at, message.external_created_at)
 
-    def test_exact_time_columns_include_seconds(self):
+    def test_later_message_for_same_tweet_does_not_date_the_receipt(self):
+        """A repost of the same link must not be read as the task's receipt."""
+        received = self.env['x.message'].create({
+            'channel_id': self.channel.id,
+            'account_id': self.account.id,
+            'direction': 'inbound',
+            'external_id': 'msg-later-first',
+            'body_plain': 'https://x.com/alice/status/777',
+            'external_created_at': '2026-09-13 20:00:00',
+        })
         task = self._task(
-            'like', {'post_id': '111', 'channel_id': self.channel.id})
-        task.write({'status': 'success', 'done_at': '2026-09-13 20:30:45'})
+            'like', {'post_id': '777', 'channel_id': self.channel.id})
+        task.write({'status': 'success', 'done_at': '2026-09-13 20:05:00'})
+        self.env['x.message'].create({
+            'channel_id': self.channel.id,
+            'account_id': self.account.id,
+            'direction': 'inbound',
+            'external_id': 'msg-later-second',
+            'body_plain': 'https://x.com/alice/status/777',
+            'external_created_at': fields.Datetime.now() + timedelta(hours=1),
+        })
         row = self._row(task)
-        self.assertEqual(row.done_at_exact, '2026-09-13 20:30:45')
-        self.assertRegex(
-            row.received_at_exact, r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$')
+        self.assertEqual(row.received_at, received.external_created_at)
+        self.assertGreaterEqual(row.processing_time, 0)
 
     def test_default_order_is_latest_first(self):
         for external_id, tweet, created in (
@@ -213,11 +231,27 @@ class TestXAccountOperationReport(XAccountTestBase):
         self.assertIn('company_id', rule.domain_force)
         self.assertFalse(rule.groups)
 
+    def test_list_shows_only_received_at_and_period_of_processing(self):
+        arch = self.env['x.account.operation.report'].get_view(
+            view_type='list')['arch']
+        for dropped in ('received_at_exact', 'done_at_exact'):
+            self.assertNotIn('name="%s"' % dropped, arch)
+        self.assertIn('name="received_at"', arch)
+        self.assertIn('name="processing_time"', arch)
+
+    def test_search_view_offers_today_and_last_hour(self):
+        arch = self.env['x.account.operation.report'].get_view(
+            view_type='search')['arch']
+        self.assertIn('name="received_today"', arch)
+        self.assertIn('name="received_last_hour"', arch)
+
+    def test_action_lists_records_without_default_grouping(self):
+        action = self.env.ref('x_account.action_x_account_operation_report')
+        self.assertNotIn('search_default_groupby', action.context or '')
+
     def test_action_and_menu_wired(self):
         action = self.env.ref('x_account.action_x_account_operation_report')
         self.assertEqual(action.res_model, 'x.account.operation.report')
-        self.assertIn("search_default_groupby_account': 1", action.context or '')
-        self.assertIn('groupby_channel', action.context or '')
         menu = self.env.ref('x_account.menu_x_account_operation_report')
         self.assertEqual(
             menu.parent_id, self.env.ref('x_account.menu_x_account_reporting'))

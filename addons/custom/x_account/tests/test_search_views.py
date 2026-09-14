@@ -95,6 +95,38 @@ class TestXSearchViews(XAccountTestBase):
         ))
 
     # ----------------------------------------------------------------- menus
+    def test_account_and_chat_lists_show_the_archive_state(self):
+        """Both X lists surface the archive state the same way the Automation
+        Rules list does: a toggle leading the columns. The lists are editable
+        because a toggle in a read-only list silently does nothing."""
+        for xmlid in ('x_account.x_account_social_account_view_list',
+                      'x_account.x_group_channel_view_tree'):
+            arch = self.env.ref(xmlid).arch
+            self.assertIn('name="active"', arch, xmlid)
+            self.assertIn('widget="boolean_toggle"', arch, xmlid)
+            self.assertIn('editable="bottom"', arch, xmlid)
+            self.assertLess(
+                arch.index('name="active"'), arch.index('name="name"'), xmlid)
+
+    def test_automation_rule_list_leads_with_the_toggle(self):
+        """Reference for the pattern above: the Automation Rules list puts the
+        toggle before `name`."""
+        arch = self.env['base.automation'].get_view(view_type='list')['arch']
+        self.assertIn('name="active"', arch)
+        self.assertIn('widget="boolean_toggle"', arch)
+        self.assertLess(
+            arch.index('name="active"'), arch.index('name="name"'))
+
+    def test_account_and_chat_searches_offer_active_and_archived(self):
+        """The archive filter pair must be reachable from both search views.
+        The `Archived` half comes from the base social/mail views, so only the
+        `Active` half is declared here - assert both are in the final arch."""
+        for model in ('social.account', 'discuss.channel'):
+            arch = self._search_arch(model)
+            self.assertIn('name="x_filter_active"', arch, model)
+            self.assertIn("('active', '=', True)", arch, model)
+            self.assertIn("('active', '=', False)", arch, model)
+
     def test_message_action_groups_by_chat(self):
         """Opening Messages must land grouped by chat."""
         action = self.env.ref('x_account.action_x_account_messages')

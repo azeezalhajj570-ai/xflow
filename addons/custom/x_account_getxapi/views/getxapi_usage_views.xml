@@ -118,9 +118,9 @@
 
         <menuitem id="menu_getxapi_usage"
                   name="GetXAPI Usage"
-                  parent="x_account.menu_x_account_root"
+                  parent="x_account.menu_x_account_reporting"
                   action="getxapi_usage_action"
-                  sequence="100"
+                  sequence="20"
                   groups="x_account.group_x_account_manager"/>
     </data>
 </odoo>

@@ -104,7 +104,8 @@
         <field name="name">x.account.social.account.view.list</field>
         <field name="model">social.account</field>
         <field name="arch" type="xml">
-            <list string="X Accounts" create="false">
+            <list string="X Accounts" create="false" editable="bottom">
+                <field name="active" widget="boolean_toggle"/>
                 <field name="name"/>
                 <field name="social_account_handle"/>
                 <field name="x_provider" column_invisible="1"/>
@@ -119,6 +120,10 @@
         <field name="model">social.account</field>
         <field name="inherit_id" ref="social.social_account_view_search"/>
         <field name="arch" type="xml">
+            <xpath expr="//filter[@name='filter_active']" position="after">
+                <filter string="Active" name="x_filter_active"
+                    domain="[('active', '=', True)]"/>
+            </xpath>
             <xpath expr="//search" position="inside">
                 <separator/>
                 <filter string="X: Active" name="x_connection_active"

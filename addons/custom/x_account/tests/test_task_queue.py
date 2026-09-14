@@ -295,3 +295,27 @@ class TestXTaskQueue(XAccountTestBase):
                        return_value={'conversations': []}):
                 self.env['x.account.task']._process_queue()
         self.assertFalse(commit_mock.called)
+
+    def test_cron_path_commits_each_chunk(self):
+        """The cron path (commit=True) drains the account in bounded chunks and
+        commits after each, so a sweep killed at ``limit_time_real`` loses at
+        most one chunk instead of rolling the whole batch back to pending.
+
+        ``_commit_queue_progress`` is substituted because the test framework
+        forbids committing a test transaction; the loop's chunking is what is
+        under test.
+        """
+        tasks = [self._make_task(self.account_a, operation='get_conversations')
+                 for _ in range(5)]
+        model = self.env['x.account.task']
+        with patch.object(type(model), '_CLAIM_CHUNK_SIZE', 2), \
+             patch.object(type(model), '_commit_queue_progress') as commit_mock, \
+             patch('odoo.addons.x_account.services.providers.session_web.SessionWebProvider.get_conversations',
+                   return_value={'conversations': []}):
+            claimed = model._process_queue(commit=True)
+        self.assertEqual(claimed, 5)
+        # ceil(5 / 2) chunks -> one commit per chunk, never a single batch commit.
+        self.assertEqual(commit_mock.call_count, 3)
+        for task in tasks:
+            task.invalidate_recordset()
+            self.assertEqual(task.status, 'success')
