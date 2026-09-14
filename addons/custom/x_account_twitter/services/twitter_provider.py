@@ -295,7 +295,13 @@ class TwitterProvider:
         return result
 
     def register_webhook(self, safe=True):
-        """Register the app webhook with X and persist its state."""
+        """Register the app webhook with X and persist its state.
+
+        Self-heal: when the webhook is already registered (the ``safe`` path)
+        it is re-validated with a CRC (``PUT /2/webhooks/<id>``). X disables a
+        webhook whose endpoint returned errors — e.g. the 502s while the server
+        was down for a maintenance restart — and that PUT re-enables delivery.
+        """
         service = TwitterWebhook(self.env)
         data = service.register_webhook(safe=safe)
         webhook_id = data.get('webhook_id') or data.get('id')
@@ -312,6 +318,13 @@ class TwitterProvider:
             })
         else:
             hook.write({'valid': True})
+            if safe and webhook_id:
+                try:
+                    service.validate_webhook(webhook_id)
+                except Exception as exc:  # self-heal is best-effort
+                    _LOGGER.warning(
+                        'x_account_twitter: webhook re-validation failed for '
+                        '%s: %s', webhook_id, exc)
         self._subscribe_all(service, hook)
         return {'webhook_id': (webhook_id or '') and hook.id,
                 'registered': True}

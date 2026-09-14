@@ -10,6 +10,7 @@ from odoo.addons.x_account.services.x_service import XService
 from odoo.addons.x_account_twitter.services.twitter_api_client import TwitterApiClient
 from odoo.addons.x_account_twitter.services.twitter_link import TwitterLink
 from odoo.addons.x_account_twitter.services.twitter_provider import TwitterProvider
+from odoo.addons.x_account_twitter.services.twitter_webhook import TwitterWebhook
 
 from .common import XAccountTwitterTestBase
 
@@ -117,6 +118,36 @@ class TestTwitterProviderRepost(XAccountTwitterTestBase):
         response.content = b'{}' if status_code < 400 else b''
         response.json.return_value = json_data if json_data is not None else {}
         return response
+
+    # ------------------------------------------------------- webhook self-heal
+    def test_register_webhook_self_heals_existing_webhook(self):
+        """Re-registering re-validates (PUT) the existing webhook, so a webhook
+        X disabled after endpoint errors is re-enabled on the next cron tick."""
+        self.env['x.twitter.webhook'].sudo().create({
+            'name': 'https://x.example.com/x_account/twitter/webhook',
+            'webhook_id': 'wh-self-heal',
+            'valid': True,
+        })
+        existing = {'id': 'wh-self-heal',
+                    'url': 'https://x.example.com/x_account/twitter/webhook'}
+        with patch.object(TwitterWebhook, 'register_webhook',
+                          return_value=existing), \
+                patch.object(TwitterWebhook, 'validate_webhook',
+                             return_value={'ok': True}) as validate, \
+                patch.object(TwitterProvider, '_subscribe_all'):
+            self.provider.register_webhook(safe=True)
+        self.assertTrue(validate.called)
+        self.assertEqual(validate.call_args.args[0], 'wh-self-heal')
+
+    def test_register_webhook_first_time_does_not_validate(self):
+        fresh = {'id': 'wh-fresh',
+                 'url': 'https://x.example.com/x_account/twitter/webhook'}
+        with patch.object(TwitterWebhook, 'register_webhook',
+                          return_value=fresh), \
+                patch.object(TwitterWebhook, 'validate_webhook') as validate, \
+                patch.object(TwitterProvider, '_subscribe_all'):
+            self.provider.register_webhook(safe=True)
+        self.assertFalse(validate.called)
 
     # ------------------------------------------------------------- repost
     def test_repost_calls_api_and_normalizes(self):
