@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <record id="action_x_account_settings" model="ir.actions.act_window">
-        <field name="name">X Account Settings</field>
+        <field name="name">Settings</field>
         <field name="res_model">res.config.settings</field>
         <field name="view_mode">form</field>
         <field name="context">{'module': 'x_account', 'bin_size': False}</field>
@@ -13,55 +13,37 @@
         <field name="inherit_id" ref="base.res_config_settings_view_form"/>
         <field name="arch" type="xml">
             <xpath expr="//form" position="inside">
-                <div class="app_settings_block" id="x_account_settings_block"
-                     data-string="X Account" string="X Account"
-                     data-key="x_account" groups="base.group_system">
-                    <h2>Authentication</h2>
-                    <div class="row mt16 o_settings_container">
-                        <div class="col-12 col-lg-6 o_setting_box">
-                            <div class="o_setting_right_pane">
-                                <label for="x_auth_method"/>
-                                <field name="x_auth_method"/>
-                            </div>
-                        </div>
-                    </div>
-                    <h2>Providers</h2>
-                    <div class="row mt16 o_settings_container">
-                        <div class="col-12 col-lg-6 o_setting_box">
-                            <div class="o_setting_right_pane">
-                                <label for="x_provider"/>
-                                <field name="x_provider"/>
-                            </div>
-                        </div>
-                        <div class="col-12 col-lg-6 o_setting_box">
-                            <div class="o_setting_right_pane">
-                                <label for="x_event_provider"/>
-                                <field name="x_event_provider"/>
-                            </div>
-                        </div>
-                        <div class="col-12 col-lg-6 o_setting_box">
-                            <div class="o_setting_right_pane">
-                                <label for="x_action_provider"/>
-                                <field name="x_action_provider"/>
-                            </div>
-                        </div>
-                    </div>
-                    <h2>Advanced</h2>
-                    <div class="row mt16 o_settings_container">
-                        <div class="col-12 col-lg-6 o_setting_box">
-                            <div class="o_setting_right_pane">
-                                <label for="x_web_api_base"/>
-                                <field name="x_web_api_base"/>
-                            </div>
-                        </div>
-                        <div class="col-12 col-lg-6 o_setting_box">
-                            <div class="o_setting_right_pane">
-                                <label for="x_encryption_key_configured"/>
-                                <field name="x_encryption_key_configured"/>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <app data-string="X Account" string="X Account" name="x_account" groups="base.group_system">
+                    <block title="Authentication">
+                        <setting string="Authentication Method" help="Authentication method used when adding X accounts.">
+                            <field name="x_auth_method"/>
+                        </setting>
+                    </block>
+
+                    <block title="Providers">
+                        <setting string="Provider" help="Provider implementation used for X HTTP operations.">
+                            <field name="x_provider"/>
+                        </setting>
+                        <setting string="Event Provider" help="Provider for webhooks, event subscriptions, and incoming event processing.">
+                            <field name="x_event_provider"/>
+                        </setting>
+                        <setting string="Action Provider" help="Provider for mutations (retweet, reply, like, follow, send DM, etc.) and data reads.">
+                            <field name="x_action_provider"/>
+                        </setting>
+                    </block>
+
+                    <block title="Advanced">
+                        <setting string="Web API Base URL">
+                            <field name="x_web_api_base"/>
+                        </setting>
+                        <setting string="Web Bearer Token" help="Bearer token used by the undocumented web-session provider. Stored encrypted/out of direct exposure; used only by the provider.">
+                            <field name="x_web_bearer_token" password="True"/>
+                        </setting>
+                        <setting string="Session Encryption Key Configured" help="Indicates that the encryption key is supplied via deployment config (X_SESSION_ENCRYPTION_KEY). The key itself is never stored in Odoo.">
+                            <field name="x_encryption_key_configured"/>
+                        </setting>
+                    </block>
+                </app>
             </xpath>
         </field>
     </record>

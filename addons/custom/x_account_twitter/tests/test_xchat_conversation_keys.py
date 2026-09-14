@@ -113,3 +113,27 @@ class TestXChatConversationKeys(XAccountTwitterTestBase):
         self.assertIn('KC0', blobs)
         self.assertIn('KC1', blobs)
         self.assertNotIn('KC2', blobs)
+
+    def test_event_create_extracts_conversation_fields(self):
+        """A created event indexes its conversation and key-change presence, so
+        the key-change lookup never LIKE-scans the payload text."""
+        event = self.env['x.twitter.event'].create({
+            'account_id': self.account.id,
+            'event_uuid': 'kc-fields-1',
+            'event_type': 'chat.received',
+            'payload': json.dumps({'payload': {
+                'conversation_id': 'c9',
+                'conversation_key_change_event': 'KC9'}}),
+        })
+        self.assertEqual(event.conversation_id, 'c9')
+        self.assertTrue(event.has_key_change)
+
+    def test_event_create_tolerates_malformed_payload(self):
+        event = self.env['x.twitter.event'].create({
+            'account_id': self.account.id,
+            'event_uuid': 'kc-bad-1',
+            'event_type': 'chat.received',
+            'payload': 'not json',
+        })
+        self.assertFalse(event.conversation_id)
+        self.assertFalse(event.has_key_change)

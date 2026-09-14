@@ -375,9 +375,6 @@ class TestOmniXDispatch(XAccountOmniXTestBase):
         # Deactivate the task base_automation rules so the queue worker (not
         # the on-create automation) executes the task under the test's patch.
         for xmlid in (
-            'x_account.base_automation_x_task_like',
-            'x_account.base_automation_x_task_repost',
-            'x_account.base_automation_x_task_comment',
             'x_account.base_automation_x_task_follow',
             'x_account.base_automation_x_task_send_dm',
         ):

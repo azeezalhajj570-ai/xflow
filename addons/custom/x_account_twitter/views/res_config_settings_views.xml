@@ -5,51 +5,29 @@
         <field name="model">res.config.settings</field>
         <field name="inherit_id" ref="x_account.x_account_res_config_settings_view_form"/>
         <field name="arch" type="xml">
-            <xpath expr="//div[@id='x_account_settings_block']" position="inside">
-                <h2>X API Credentials</h2>
-                <div class="row mt16 o_settings_container">
-                    <div class="col-12 col-lg-6 o_setting_box">
-                        <div class="o_setting_right_pane">
-                            <label for="x_oauth2_client_id"/>
-                            <field name="x_oauth2_client_id"/>
-                        </div>
-                    </div>
-                    <div class="col-12 col-lg-6 o_setting_box">
-                        <div class="o_setting_right_pane">
-                            <label for="x_oauth2_client_secret"/>
-                            <field name="x_oauth2_client_secret" password="True"/>
-                        </div>
-                    </div>
-                </div>
-                <h2>Webhooks</h2>
-                <div class="row mt16 o_settings_container">
-                    <div class="col-12 col-lg-6 o_setting_box">
-                        <div class="o_setting_left_pane">
-                            <field name="x_twitter_webhook_enabled"/>
-                        </div>
-                        <div class="o_setting_right_pane">
-                            <label for="x_twitter_webhook_enabled"/>
-                        </div>
-                    </div>
-                    <div class="col-12 col-lg-6 o_setting_box">
-                        <div class="o_setting_right_pane">
-                            <label for="x_twitter_webhook_base_url"/>
-                            <field name="x_twitter_webhook_base_url"/>
-                        </div>
-                    </div>
-                    <div class="col-12 col-lg-6 o_setting_box">
-                        <div class="o_setting_right_pane">
-                            <label for="x_twitter_app_consumer_secret"/>
-                            <field name="x_twitter_app_consumer_secret" password="True"/>
-                        </div>
-                    </div>
-                    <div class="col-12 col-lg-6 o_setting_box">
-                        <div class="o_setting_right_pane">
-                            <label for="x_twitter_app_bearer_token"/>
-                            <field name="x_twitter_app_bearer_token" password="True"/>
-                        </div>
-                    </div>
-                </div>
+            <xpath expr="//app[@name='x_account']" position="inside">
+                <block title="X API Credentials">
+                    <setting string="OAuth 2.0 Client ID">
+                        <field name="x_oauth2_client_id"/>
+                    </setting>
+                    <setting string="OAuth 2.0 Client Secret">
+                        <field name="x_oauth2_client_secret" password="True"/>
+                    </setting>
+                </block>
+                <block title="Webhooks">
+                    <setting string="Enable Webhooks">
+                        <field name="x_twitter_webhook_enabled"/>
+                    </setting>
+                    <setting string="Webhook Base URL">
+                        <field name="x_twitter_webhook_base_url"/>
+                    </setting>
+                    <setting string="App Consumer Secret">
+                        <field name="x_twitter_app_consumer_secret" password="True"/>
+                    </setting>
+                    <setting string="App Bearer Token">
+                        <field name="x_twitter_app_bearer_token" password="True"/>
+                    </setting>
+                </block>
             </xpath>
         </field>
     </record>

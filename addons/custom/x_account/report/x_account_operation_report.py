@@ -17,6 +17,12 @@ been stored under different keys over time (``post_id`` for action tasks,
 ``target_id`` for group automation, a nested ``post.post_id`` for channel
 automation). The view normalizes all of them, and falls back to the task's
 stored ``target_post_id`` column.
+
+``received_at`` is the timestamp of the message the task was created from: the
+latest message of the channel linking the same tweet that was already received
+when the task was created. ``processing_time`` (``done_at - received_at``) can
+therefore never come out negative, which it did when a later repost of the same
+link was picked up as the receipt.
 """
 
 from odoo import fields, models, tools
@@ -61,12 +67,10 @@ class XAccountOperationReport(models.Model):
         string='Status', readonly=True)
     source = fields.Char(string='Source', readonly=True)
     create_date = fields.Datetime(string='Task Created', readonly=True)
-    received_at = fields.Datetime(string='Received On', readonly=True)
-    received_at_exact = fields.Char(string='Received At', readonly=True)
-    done_at = fields.Datetime(string='Processed On', readonly=True)
-    done_at_exact = fields.Char(string='Processed At', readonly=True)
+    received_at = fields.Datetime(string='Received At', readonly=True)
+    done_at = fields.Datetime(string='Processed At', readonly=True)
     processing_time = fields.Float(
-        string='Processing Time (min)',
+        string='Period of Processing (min)',
         readonly=True,
         group_operator='avg',
         help='Minutes between the received post and the processed task.',
@@ -79,6 +83,26 @@ class XAccountOperationReport(models.Model):
         self.env.cr.execute(
             'CREATE OR REPLACE VIEW %s AS (%s)'
             % (self._table, self._view_sql()))
+        self._init_message_index()
+
+    def _init_message_index(self):
+        """Index the tweet link extracted from the message body.
+
+        The view resolves the receipt through
+        ``substring(body_plain FROM '/status/([0-9]+)')``. Without statistics
+        on that expression the planner estimates the join at a handful of rows
+        and falls back to a nested loop, which re-scans every message of the
+        channel for every task (minutes on a loaded database). Indexing the
+        expression gives the planner the real selectivity and turns each probe
+        into a single index lookup.
+        """
+        self.env.cr.execute("SELECT to_regclass('x_message')")
+        if self.env.cr.fetchone()[0] is None:
+            return
+        self.env.cr.execute("""
+            CREATE INDEX IF NOT EXISTS x_message__tweet_link_index
+            ON x_message (channel_id, substring(body_plain FROM '/status/([0-9]+)'))
+        """)
 
     def _view_sql(self):
         operations = ', '.join("'%s'" % op for op in _ENGAGEMENT_OPERATIONS)
@@ -133,10 +157,7 @@ class XAccountOperationReport(models.Model):
                 sub.source,
                 sub.create_date,
                 COALESCE(sub.received_at, sub.create_date) AS received_at,
-                to_char(COALESCE(sub.received_at, sub.create_date),
-                        'YYYY-MM-DD HH24:MI:SS') AS received_at_exact,
                 sub.done_at,
-                to_char(sub.done_at, 'YYYY-MM-DD HH24:MI:SS') AS done_at_exact,
                 CASE
                     WHEN sub.done_at IS NOT NULL THEN
                         EXTRACT(EPOCH FROM (
@@ -150,7 +171,8 @@ class XAccountOperationReport(models.Model):
                     base.*,
                     channel.name AS channel_name,
                     channel.x_conversation_id AS channel_conversation_id,
-                    message.received_at AS received_at
+                    MAX(COALESCE(message.external_created_at, message.create_date))
+                        AS received_at
                 FROM (
                     SELECT
                         task.id,
@@ -186,18 +208,22 @@ class XAccountOperationReport(models.Model):
                         ON author.x_user_id = task.task_json ->> 'author_x_id'
                 ) base
                 LEFT JOIN discuss_channel channel ON channel.id = base.channel_id
-                LEFT JOIN (
-                    SELECT channel_id,
-                           substring(body_plain FROM '/status/([0-9]+)')
-                               AS tweet_id,
-                           MAX(COALESCE(external_created_at, create_date))
-                               AS received_at
-                    FROM x_message
-                    WHERE body_plain LIKE '%/status/%'
-                    GROUP BY channel_id,
-                             substring(body_plain FROM '/status/([0-9]+)')
-                ) message
+                -- The message the task was created from: the latest message of
+                -- the channel that links the target tweet and was already
+                -- received when the task was created. Taking the latest message
+                -- of the channel regardless of the task would pick up a later
+                -- repost of the same link and date the receipt after the task
+                -- was processed, which made `processing_time` negative.
+                LEFT JOIN x_message message
                     ON message.channel_id = base.channel_id
-                   AND message.tweet_id = base.tweet_id
+                   AND substring(message.body_plain FROM '/status/([0-9]+)')
+                           = base.tweet_id
+                   AND COALESCE(message.external_created_at,
+                                message.create_date) <= base.create_date
+                GROUP BY base.id, base.account_id, base.company_id,
+                         base.channel_id, base.operation, base.tweet_id,
+                         base.tweet_screen_name, base.author_x_id, base.status,
+                         base.source, base.create_date, base.done_at,
+                         channel.name, channel.x_conversation_id
             ) sub
         """.replace('__OPERATIONS__', operations)

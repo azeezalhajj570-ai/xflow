@@ -4,12 +4,13 @@
         <field name="name">x.group.channel.view.tree</field>
         <field name="model">discuss.channel</field>
         <field name="arch" type="xml">
-            <list string="Chat" create="false" delete="false">
+            <list string="Chat" create="false" delete="false" editable="bottom">
+                <field name="active" widget="boolean_toggle"/>
                 <field name="name"/>
-                <field name="channel_type" string="Type"/>
-                <field name="x_conversation_id" string="Conversation ID"/>
-                <field name="x_account_id"/>
-                <field name="x_group_member_count" string="Members"/>
+                <field name="channel_type" string="Type" readonly="1"/>
+                <field name="x_conversation_id" string="Conversation ID" readonly="1"/>
+                <field name="x_account_id" readonly="1"/>
+                <field name="x_group_member_count" string="Members" readonly="1"/>
             </list>
         </field>
     </record>
@@ -68,6 +69,10 @@
         <field name="model">discuss.channel</field>
         <field name="inherit_id" ref="mail.discuss_channel_view_search"/>
         <field name="arch" type="xml">
+            <xpath expr="//filter[@name='inactive']" position="after">
+                <filter string="Active" name="x_filter_active"
+                    domain="[('active', '=', True)]"/>
+            </xpath>
             <xpath expr="//search" position="inside">
                 <field name="x_conversation_id" string="X Conversation ID"/>
                 <field name="x_account_id" string="X Account"/>

@@ -34,6 +34,7 @@ class XAccountTask(models.Model):
     operation = fields.Char(
         string='Operation',
         required=True,
+        index=True,
         help='Provider operation to execute (e.g. like, comment, send_dm).',
     )
     status = fields.Selection(
@@ -98,6 +99,10 @@ class XAccountTask(models.Model):
     )
 
     _MAX_RUNNING_PER_ACCOUNT = 1
+    # Tasks claimed + run per commit in the cron path. Bounds the work (and so
+    # the rollback) of one transaction well under ``limit_time_real``: a sweep
+    # killed at the timeout loses at most one chunk, not the whole batch.
+    _CLAIM_CHUNK_SIZE = 20
     # Advisory-lock namespace for the per-account claim (arbitrary fixed int4).
     _ACCOUNT_LOCK_NAMESPACE = 0x58414354  # 'XACT'
     # Used only by the manual "Ignore Stale" action (action_ignore_stale).
@@ -224,10 +229,31 @@ class XAccountTask(models.Model):
         share = max(limit // len(account_ids), 1)
         claimed = self.env['x.account.task']
         for account_id in account_ids:
-            tasks = self._claim_account_tasks(account_id, share, now)
-            if tasks:
-                claimed |= tasks
-                self._execute_operation_batch(tasks)
+            claimed |= self._drain_account(account_id, share, now, commit)
+        return claimed
+
+    def _drain_account(self, account_id, share, now, commit):
+        """Claim, run and commit one account's due tasks in bounded chunks.
+
+        The worker can be killed at ``limit_time_real`` (or crash) between
+        commits, so each chunk is claimed, executed and committed on its own.
+        Committing only once after the whole account batch meant a slow sweep
+        (e.g. webhook decryption) that hit the timeout rolled the entire batch
+        back, leaving it ``pending`` to be retried forever while the backlog
+        grew. ``commit`` is off for the manual action and tests, which stay in
+        one transaction and therefore drain in a single chunk.
+        """
+        chunk = self._CLAIM_CHUNK_SIZE if commit else share
+        claimed = self.env['x.account.task']
+        remaining = share
+        while remaining > 0:
+            tasks = self._claim_account_tasks(
+                account_id, min(chunk, remaining), now)
+            if not tasks:
+                break
+            claimed |= tasks
+            self._execute_operation_batch(tasks)
+            remaining -= len(tasks)
             if commit:
                 self._commit_queue_progress()
         return claimed

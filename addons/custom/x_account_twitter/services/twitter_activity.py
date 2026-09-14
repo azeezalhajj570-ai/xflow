@@ -43,6 +43,12 @@ class TwitterActivity:
 
     def __init__(self, env):
         self.env = env
+        # One X Chat decryptor per account, reused across the events of a
+        # batch: building a fresh decryptor per event re-ran the Juicebox
+        # unlock, the public-key API fetch and the signing-version write for
+        # every single event, which is what made a batch outrun
+        # ``limit_time_real`` and get killed mid-sweep.
+        self._chat_decryptors = {}
 
     # ---------------------------------------------------------------- ingress
     def ingest_webhook(self, envelope):
@@ -460,8 +466,8 @@ class TwitterActivity:
             return blobs
         events = self.env['x.twitter.event'].sudo().search([
             ('account_id', '=', account.id),
-            ('payload', 'ilike', 'conversation_key_change_event'),
-            ('payload', 'ilike', str(conversation_id)),
+            ('conversation_id', '=', str(conversation_id)),
+            ('has_key_change', '=', True),
         ], order='id desc', limit=100)
         for event in events:
             try:
@@ -475,6 +481,24 @@ class TwitterActivity:
             if blob and blob not in blobs:
                 blobs.append(blob)
         return blobs
+
+    def _chat_decryptor_for(self, account):
+        """Return this account's Chat decryptor, building it at most once.
+
+        Reusing the instance across a batch means the Juicebox unlock, the
+        public-key API fetch and the signing-version write happen once per
+        batch instead of once per event.
+        """
+        decryptor = self._chat_decryptors.get(account.id)
+        if decryptor is None:
+            from odoo.addons.x_account_twitter.services.xchat_decryptor import (
+                XChatDecryptor)
+            from odoo.addons.x_account_twitter.services.twitter_api_client import (
+                TwitterApiClient)
+            decryptor = XChatDecryptor(
+                self.env, account, client=TwitterApiClient(account))
+            self._chat_decryptors[account.id] = decryptor
+        return decryptor
 
     def _decrypt_chat_event(self, account, payload):
         """Attempt to decrypt a webhook ``encoded_event`` blob.
@@ -493,13 +517,8 @@ class TwitterActivity:
         sender_id = payload.get('sender_id')
         key_change = payload.get('conversation_key_change_event') or ''
         try:
-            from odoo.addons.x_account_twitter.services.xchat_decryptor import (
-                XChatDecryptor)
-            from odoo.addons.x_account_twitter.services.twitter_api_client import (
-                TwitterApiClient)
             account = account.sudo()
-            decryptor = XChatDecryptor(
-                self.env, account, client=TwitterApiClient(account))
+            decryptor = self._chat_decryptor_for(account)
             if not decryptor.available:
                 _logger.warning('x_account_twitter: chat decryption key missing '
                                 'account_id=%s event_id=%s key_mode=%s',

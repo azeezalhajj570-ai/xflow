@@ -5,9 +5,7 @@
         <field name="model">x.account.operation.report</field>
         <field name="arch" type="xml">
             <list string="X Operations" create="false" edit="false" delete="false" default_order="received_at desc">
-                <field name="create_date" optional="hide"/>
-                <field name="received_at" widget="relative"/>
-                <field name="received_at_exact" optional="show"/>
+                <field name="received_at"/>
                 <field name="channel_link" string="Chat" widget="html"/>
                 <field name="channel_id" optional="hide"/>
                 <field name="account_id"/>
@@ -18,10 +16,10 @@
                 <field name="author_x_id" optional="hide"/>
                 <field name="tweet_id" optional="hide"/>
                 <field name="status" optional="show"/>
-                <field name="done_at" widget="relative" optional="show"/>
-                <field name="done_at_exact" optional="show"/>
-                <field name="processing_time" optional="show"/>
+                <field name="processing_time"/>
                 <field name="source" optional="hide"/>
+                <field name="create_date" optional="hide"/>
+                <field name="done_at" optional="hide"/>
             </list>
         </field>
     </record>
@@ -67,6 +65,12 @@
                 <field name="author_x_id"/>
                 <field name="received_at"/>
                 <field name="done_at"/>
+                <separator/>
+                <filter string="Today" name="received_today"
+                        domain="[('received_at', '&gt;=', context_today().strftime('%Y-%m-%d')), ('received_at', '&lt;', (context_today() + datetime.timedelta(days=1)).strftime('%Y-%m-%d'))]"/>
+                <filter string="Last Hour" name="received_last_hour"
+                        domain="[('received_at', '&gt;=', (datetime.datetime.now() - datetime.timedelta(hours=1)).strftime('%Y-%m-%d %H:%M:%S'))]"/>
+                <separator/>
                 <filter string="Like" name="op_like" domain="[('operation', '=', 'like')]"/>
                 <filter string="Repost" name="op_repost" domain="[('operation', '=', 'repost')]"/>
                 <filter string="Bookmark" name="op_bookmark" domain="[('operation', '=', 'bookmark')]"/>
@@ -98,12 +102,12 @@
         <field name="name">Operations</field>
         <field name="res_model">x.account.operation.report</field>
         <field name="view_mode">list,pivot,graph</field>
-        <field name="context">{'search_default_groupby_account': 1, 'search_default_groupby_channel': 2, 'search_default_groupby_operation': 3}</field>
+        <field name="context">{}</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">No X operations recorded yet.</p>
             <p>
                 Likes, reposts, bookmarks and comments performed by X accounts are
-                listed here, grouped by discuss channel, account and tweet.
+                listed here, one row per operation.
             </p>
         </field>
     </record>
