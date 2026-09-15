@@ -1,6 +1,7 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 import logging
+from datetime import datetime
 
 from markupsafe import escape
 
@@ -8,6 +9,25 @@ from odoo import _, api, fields, models
 from odoo.exceptions import UserError, ValidationError
 
 _logger = logging.getLogger(__name__)
+
+
+def _to_minute_of_day(value):
+    """Convert an hours-since-midnight value (e.g. 22.5) to minutes."""
+    try:
+        return int(round(float(value) * 60)) % 1440
+    except (TypeError, ValueError):
+        return 0
+
+
+def _in_daily_window(now_minute, start, end):
+    """Whether a minute-of-day falls inside a daily window.
+
+    A window whose end is before its start wraps past midnight
+    (e.g. 23:00 -> 01:00); equal ends mean a single minute.
+    """
+    if start <= end:
+        return start <= now_minute <= end
+    return now_minute >= start or now_minute <= end
 
 
 _EVENT_PROVIDER_REGISTRY_MAP = {
@@ -66,15 +86,18 @@ class SocialAccount(models.Model):
              'X Activity API subscriptions and cancels its queued tasks, so '
              'none of its automation runs anymore.',
     )
-    x_auto_archive_start = fields.Datetime(
+    x_auto_archive_start = fields.Float(
         string='Archive From',
-        help='Start of this account\'s archive window (displayed in your '
-             'timezone). Required when "Archive Daily" is enabled.',
+        help='Start of this account\'s daily archive window, in hours since '
+             'midnight server time (e.g. 22.5 = 22:30). Required when '
+             '"Archive Daily" is enabled.',
     )
-    x_auto_archive_end = fields.Datetime(
+    x_auto_archive_end = fields.Float(
         string='Archive Until',
-        help='End of this account\'s archive window (displayed in your '
-             'timezone). Required when "Archive Daily" is enabled.',
+        help='End of this account\'s daily archive window, in hours since '
+             'midnight server time. If earlier than "Archive From" the window '
+             'wraps past midnight (e.g. 23:00 -> 01:00). Required when '
+             '"Archive Daily" is enabled.',
     )
     x_provider = fields.Selection(
         [
@@ -667,9 +690,13 @@ class SocialAccount(models.Model):
 
     @api.constrains('x_auto_archive', 'x_auto_archive_start', 'x_auto_archive_end')
     def _check_auto_archive_window(self):
-        """A flagged account must carry an explicit archive window."""
+        """A flagged account must carry an explicit archive window.
+
+        Floats cannot be NULL in the ORM (an unset one reads as 0.0), so the
+        window counts as unset only when both bounds are zero.
+        """
         for account in self.filtered('x_auto_archive'):
-            if not account.x_auto_archive_start or not account.x_auto_archive_end:
+            if not account.x_auto_archive_start and not account.x_auto_archive_end:
                 raise ValidationError(_(
                     'Set the archive window (Archive From / Archive Until) on '
                     '"%s" before enabling "Archive Daily".', account.display_name))
@@ -679,14 +706,18 @@ class SocialAccount(models.Model):
         """Archive accounts flagged "Archive Daily" inside their window.
 
         Runs from ir.cron every few minutes and archives each flagged account
-        while the current time falls inside the window set on the account.
-        Only X accounts (twitter media) that are still active and flagged
-        ``x_auto_archive`` are archived; archiving prunes their X Activity API
-        subscriptions and cancels their queued tasks. Accounts left flagged
-        without a window (e.g. flagged before this field existed) are skipped,
-        and each account is isolated so one failure cannot stop the rest.
+        while the current server-local time falls inside the window set on the
+        account (hours since midnight in the server timezone). A window whose
+        end is before its start wraps past midnight (e.g. 23:00 -> 01:00);
+        equal ends mean a single minute. Only X accounts (twitter media) that
+        are still active and flagged ``x_auto_archive`` are archived; archiving
+        prunes their X Activity API subscriptions and cancels their queued
+        tasks. Accounts left flagged without a window (e.g. flagged before this
+        field existed) are skipped, and each account is isolated so one failure
+        cannot stop the rest.
         """
-        now = fields.Datetime.now()
+        now = datetime.now().replace(microsecond=0)
+        now_minute = now.hour * 60 + now.minute
         flagged = self.sudo().search([
             ('media_type', '=', 'twitter'),
             ('active', '=', True),
@@ -694,9 +725,11 @@ class SocialAccount(models.Model):
         ])
         archived = 0
         for account in flagged:
-            if not account.x_auto_archive_start or not account.x_auto_archive_end:
+            if not account.x_auto_archive_start and not account.x_auto_archive_end:
                 continue
-            if not account.x_auto_archive_start <= now <= account.x_auto_archive_end:
+            start = _to_minute_of_day(account.x_auto_archive_start)
+            end = _to_minute_of_day(account.x_auto_archive_end)
+            if not _in_daily_window(now_minute, start, end):
                 continue
             try:
                 account.write({'active': False})
