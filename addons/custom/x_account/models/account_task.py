@@ -90,6 +90,12 @@ class XAccountTask(models.Model):
         index=True,
         help='Where the task came from (e.g. channel_automation, group, webhook).',
     )
+    processing_time = fields.Float(
+        string='Period of Processing (min)',
+        compute='_compute_processing_time',
+        readonly=True,
+        help='Minutes between task creation and completion (done_at - create_date).',
+    )
     company_id = fields.Many2one(
         'res.company',
         string='Company',
@@ -120,6 +126,15 @@ class XAccountTask(models.Model):
             task.target_post_id = str(ctx.get('post_id') or '') or False
             task.target_screen_name = ctx.get('screen_name') or False
             task.source = ctx.get('source') or False
+
+    @api.depends('create_date', 'done_at')
+    def _compute_processing_time(self):
+        for task in self:
+            if task.create_date and task.done_at:
+                task.processing_time = (
+                    (task.done_at - task.create_date).total_seconds() / 60.0)
+            else:
+                task.processing_time = 0.0
 
     @api.model_create_multi
     def create(self, vals_list):

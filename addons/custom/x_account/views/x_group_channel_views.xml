@@ -4,7 +4,7 @@
         <field name="name">x.group.channel.view.tree</field>
         <field name="model">discuss.channel</field>
         <field name="arch" type="xml">
-            <list string="Chat" create="false" delete="false" editable="bottom">
+            <list string="Chat" create="false" editable="bottom">
                 <field name="active" widget="boolean_toggle"/>
                 <field name="name"/>
                 <field name="channel_type" string="Type" readonly="1"/>

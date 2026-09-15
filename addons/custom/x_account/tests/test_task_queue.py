@@ -188,6 +188,17 @@ class TestXTaskQueue(XAccountTestBase):
         self.assertEqual(task.retry_count, 1)
         self.assertFalse(task.done_at)
 
+    def test_processing_time_is_minutes_between_created_and_done(self):
+        """Processing time mirrors the operations report: minutes between
+        creation and completion, 0 for tasks still in flight."""
+        task = self._make_task(self.account_a)
+        self.assertEqual(task.processing_time, 0.0)
+        task.write({'status': 'success'})
+        task.invalidate_recordset()
+        expected = (task.done_at - task.create_date).total_seconds() / 60.0
+        self.assertAlmostEqual(task.processing_time, expected, places=0)
+        self.assertGreater(task.processing_time, 0.0)
+
     def test_task_targets_parsed_from_context(self):
         task = self._make_task(
             self.account_a, operation='repost',

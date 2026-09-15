@@ -176,3 +176,29 @@ class TestXSaveXMessage(XAccountTestBase):
         }
         self.assertTrue(flags[followed])
         self.assertFalse(flags[other])
+
+    def test_chat_list_allows_delete(self):
+        view = self.env.ref('x_account.x_group_channel_view_tree')
+        arch = view.arch
+        self.assertNotIn('delete="false"', arch)
+        self.assertIn('name="active"', arch)
+
+    def test_deleting_chat_cascades_messages_and_members(self):
+        channel = self._channel('g-test-del')
+        xm = channel._save_x_message(
+            direction='inbound',
+            external_id='66666666-6666-6666-6666-666666666666',
+            body='bye',
+            external_created_at=False,
+            no_mail=True,
+        )
+        partner = self.env['res.partner'].create({'name': 'Ghost Member'})
+        self.env['discuss.channel.member'].sudo().create({
+            'channel_id': channel.id,
+            'partner_id': partner.id,
+        })
+        channel_id = channel.id
+        channel.unlink()
+        self.assertFalse(
+            self.env['discuss.channel'].sudo().browse(channel_id).exists())
+        self.assertFalse(xm.exists())
