@@ -1,8 +1,8 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 import logging
-from datetime import datetime
 
+import pytz
 from markupsafe import escape
 
 from odoo import _, api, fields, models
@@ -17,6 +17,21 @@ def _to_minute_of_day(value):
         return int(round(float(value) * 60)) % 1440
     except (TypeError, ValueError):
         return 0
+
+
+def _local_minute_of_day(now_utc, tz_name):
+    """Minute of day of a UTC datetime in ``tz_name``.
+
+    Odoo forces the process timezone to UTC, so a bare ``datetime.now()`` is
+    not the wall clock the person configuring the window is looking at. An
+    unknown or empty ``tz_name`` falls back to UTC (same as Odoo).
+    """
+    utc_datetime = pytz.utc.localize(now_utc, is_dst=False)
+    try:
+        localized = utc_datetime.astimezone(pytz.timezone(tz_name))
+    except Exception:
+        localized = utc_datetime
+    return localized.hour * 60 + localized.minute
 
 
 def _in_daily_window(now_minute, start, end):
@@ -88,14 +103,16 @@ class SocialAccount(models.Model):
     )
     x_auto_archive_start = fields.Float(
         string='Archive From',
-        help='Start of this account\'s daily archive window, in server time '
-             '(e.g. 22:30). Required when "Archive Daily" is enabled.',
+        help='Start of this account\'s daily archive window, read on the '
+             'timezone of the account\'s company (e.g. 22:30). Required when '
+             '"Archive Daily" is enabled.',
     )
     x_auto_archive_end = fields.Float(
         string='Archive Until',
-        help='End of this account\'s daily archive window, in server time. If '
-             'earlier than "Archive From" the window wraps past midnight '
-             '(e.g. 23:00 -> 01:00). Required when "Archive Daily" is enabled.',
+        help='End of this account\'s daily archive window, read on the '
+             'timezone of the account\'s company. If earlier than "Archive '
+             'From" the window wraps past midnight (e.g. 23:00 -> 01:00). '
+             'Required when "Archive Daily" is enabled.',
     )
     x_provider = fields.Selection(
         [
@@ -704,18 +721,20 @@ class SocialAccount(models.Model):
         """Archive accounts flagged "Archive Daily" inside their window.
 
         Runs from ir.cron every few minutes and archives each flagged account
-        while the current server-local time falls inside the window set on the
-        account (hours since midnight in the server timezone). A window whose
-        end is before its start wraps past midnight (e.g. 23:00 -> 01:00);
-        equal ends mean a single minute. Only X accounts (twitter media) that
-        are still active and flagged ``x_auto_archive`` are archived; archiving
-        prunes their X Activity API subscriptions and cancels their queued
-        tasks. Accounts left flagged without a window (e.g. flagged before this
-        field existed) are skipped, and each account is isolated so one failure
-        cannot stop the rest.
+        while the current time falls inside the window set on the account. The
+        window is read on the wall clock of the account's company (falling back
+        to the cron user's timezone, then UTC) — Odoo runs with TZ forced to
+        UTC, so comparing against the process clock would make an account
+        configured in local hours miss its window. A window whose end is before
+        its start wraps past midnight (e.g. 23:00 -> 01:00); equal ends mean a
+        single minute. Only X accounts (twitter media) that are still active
+        and flagged ``x_auto_archive`` are archived; archiving prunes their X
+        Activity API subscriptions and cancels their queued tasks. Accounts
+        left flagged without a window (e.g. flagged before this field existed)
+        are skipped, and each account is isolated so one failure cannot stop
+        the rest.
         """
-        now = datetime.now().replace(microsecond=0)
-        now_minute = now.hour * 60 + now.minute
+        now = fields.Datetime.now()
         flagged = self.sudo().search([
             ('media_type', '=', 'twitter'),
             ('active', '=', True),
@@ -727,6 +746,8 @@ class SocialAccount(models.Model):
                 continue
             start = _to_minute_of_day(account.x_auto_archive_start)
             end = _to_minute_of_day(account.x_auto_archive_end)
+            now_minute = _local_minute_of_day(
+                now, account.company_id.partner_id.tz or self.env.user.tz)
             if not _in_daily_window(now_minute, start, end):
                 continue
             try:
