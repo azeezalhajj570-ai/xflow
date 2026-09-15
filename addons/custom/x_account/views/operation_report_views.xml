@@ -69,7 +69,7 @@
                 <filter string="Today" name="received_today"
                         domain="[('received_at', '&gt;=', context_today().strftime('%Y-%m-%d')), ('received_at', '&lt;', (context_today() + datetime.timedelta(days=1)).strftime('%Y-%m-%d'))]"/>
                 <filter string="Last Hour" name="received_last_hour"
-                        domain="[('received_at', '&gt;=', (datetime.datetime.now() - datetime.timedelta(hours=1)).strftime('%Y-%m-%d %H:%M:%S'))]"/>
+                        domain="[('received_at', '&gt;=', (datetime.datetime.now().to_utc() - datetime.timedelta(hours=1)).strftime('%Y-%m-%d %H:%M:%S'))]"/>
                 <separator/>
                 <filter string="Like" name="op_like" domain="[('operation', '=', 'like')]"/>
                 <filter string="Repost" name="op_repost" domain="[('operation', '=', 'repost')]"/>

@@ -7,13 +7,12 @@
             <list string="X Account Tasks" create="false">
                 <field name="account_id"/>
                 <field name="operation"/>
-                <field name="target_post_id" optional="show"/>
-                <field name="target_screen_name" optional="show"/>
                 <field name="status"/>
                 <field name="priority"/>
                 <field name="retry_count"/>
                 <field name="claimed_at"/>
                 <field name="done_at" optional="show"/>
+                <field name="processing_time" optional="show"/>
                 <field name="next_retry_at"/>
                 <field name="source" optional="hide"/>
                 <control>
@@ -56,6 +55,7 @@
                             <field name="max_attempts"/>
                             <field name="claimed_at" readonly="1"/>
                             <field name="done_at" readonly="1"/>
+                            <field name="processing_time" readonly="1"/>
                             <field name="next_retry_at" readonly="1"/>
                         </group>
                     </group>
@@ -89,6 +89,9 @@
                 <filter string="Executed" name="executed" domain="[('done_at', '!=', False)]"/>
                 <filter string="Overdue" name="overdue" domain="[('status', '=', 'pending'), ('next_retry_at', '&lt;', context_today().strftime('%Y-%m-%d %H:%M:%S'))]"/>
                 <filter string="Retried" name="retried" domain="[('retry_count', '&gt;', 0)]"/>
+                <separator/>
+                <filter string="Today" name="filter_created_today" domain="[('create_date', '&gt;=', context_today().strftime('%Y-%m-%d 00:00:00'))]"/>
+                <filter string="Last Hour" name="filter_created_last_hour" domain="[('create_date', '&gt;=', (datetime.datetime.now().to_utc() - datetime.timedelta(hours=1)).strftime('%Y-%m-%d %H:%M:%S'))]"/>
                 <separator/>
                 <filter string="Scheduled" name="filter_next_retry_at" date="next_retry_at"/>
                 <filter string="Done" name="filter_done_at" date="done_at"/>
@@ -126,6 +129,6 @@
         <field name="name">X Account Tasks</field>
         <field name="res_model">x.account.task</field>
         <field name="view_mode">list,form,pivot</field>
-        <field name="context">{'search_default_groupby_account': 1, 'search_default_groupby_operation': 2, 'search_default_groupby_status': 3}</field>
+        <field name="context">{'search_default_filter_created_last_hour': 1}</field>
     </record>
 </odoo>

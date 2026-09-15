@@ -28,7 +28,8 @@ class TestXSearchViews(XAccountTestBase):
         self._assert_arch_has(arch, (
             'direction_inbound', 'direction_outbound', 'acked', 'delivered',
             'participant_joined', 'participant_left',
-            'filter_external_created_at',
+            'filter_external_created_at', 'filter_received_today',
+            'filter_received_last_hour',
             'groupby_direction', 'groupby_account', 'groupby_channel',
             'groupby_author', 'groupby_company', 'groupby_create_date',
         ))
@@ -39,7 +40,8 @@ class TestXSearchViews(XAccountTestBase):
         self._assert_arch_has(arch, (
             'status_pending', 'status_running', 'status_failed',
             'status_success', 'status_cancelled', 'overdue', 'retried',
-            'filter_next_retry_at',
+            'filter_next_retry_at', 'filter_created_today',
+            'filter_created_last_hour',
             'groupby_status', 'groupby_operation', 'groupby_account',
             'groupby_group', 'groupby_create_date',
         ))
@@ -53,21 +55,17 @@ class TestXSearchViews(XAccountTestBase):
             'groupby_create_date',
         ))
 
-    def test_account_task_action_groups_by_account_operation_status(self):
-        """Opening Tasks must land on Account > Operation > Status."""
+    def test_account_task_action_defaults_to_last_hour_without_groupby(self):
+        """Opening Tasks must land on plain list with Last Hour pre-applied,
+        with no group-by forced."""
         action = self.env.ref('x_account.action_x_account_task')
         context = action.context or ''
-        expected = {
-            'search_default_groupby_account': 1,
-            'search_default_groupby_operation': 2,
-            'search_default_groupby_status': 3,
-        }
-        for key, order in expected.items():
-            self.assertIn("'%s': %s" % (key, order), context)
-        # every default must name a filter that really exists in the search view
-        arch = self._search_arch('x.account.task')
-        for key in expected:
-            self.assertIn('name="%s"' % key[len('search_default_'):], arch)
+        self.assertIn("'search_default_filter_created_last_hour': 1", context)
+        for key in ('groupby_account', 'groupby_operation', 'groupby_status'):
+            self.assertNotIn("'search_default_%s'" % key, context)
+        # the default must name a filter that really exists in the search view
+        self.assertIn('name="filter_created_last_hour"',
+                      self._search_arch('x.account.task'))
 
     # -------------------------------------------------------- inherited models
     def test_social_account_search_view_extends_base(self):
@@ -97,16 +95,18 @@ class TestXSearchViews(XAccountTestBase):
     # ----------------------------------------------------------------- menus
     def test_account_and_chat_lists_show_the_archive_state(self):
         """Both X lists surface the archive state the same way the Automation
-        Rules list does: a toggle leading the columns. The lists are editable
-        because a toggle in a read-only list silently does nothing."""
+        Rules list does: a toggle leading the columns. Only the chat list is
+        inline-editable; the accounts list shows the toggle without full inline
+        editing."""
         for xmlid in ('x_account.x_account_social_account_view_list',
                       'x_account.x_group_channel_view_tree'):
             arch = self.env.ref(xmlid).arch
             self.assertIn('name="active"', arch, xmlid)
             self.assertIn('widget="boolean_toggle"', arch, xmlid)
-            self.assertIn('editable="bottom"', arch, xmlid)
             self.assertLess(
                 arch.index('name="active"'), arch.index('name="name"'), xmlid)
+        chat_arch = self.env.ref('x_account.x_group_channel_view_tree').arch
+        self.assertIn('editable="bottom"', chat_arch)
 
     def test_automation_rule_list_leads_with_the_toggle(self):
         """Reference for the pattern above: the Automation Rules list puts the
@@ -127,10 +127,13 @@ class TestXSearchViews(XAccountTestBase):
             self.assertIn("('active', '=', True)", arch, model)
             self.assertIn("('active', '=', False)", arch, model)
 
-    def test_message_action_groups_by_chat(self):
-        """Opening Messages must land grouped by chat."""
+    def test_message_action_defaults_to_last_hour_without_groupby(self):
+        """Opening Messages must land on a plain list with Last Hour
+        pre-applied, with no group-by forced."""
         action = self.env.ref('x_account.action_x_account_messages')
-        self.assertIn("'search_default_groupby_channel': 1", action.context or '')
+        context = action.context or ''
+        self.assertIn("'search_default_filter_received_last_hour': 1", context)
+        self.assertNotIn("'search_default_groupby_channel'", context)
         self.assertIn('name="groupby_channel"', self._search_arch('x.message'))
 
     def test_groups_menu_is_hidden(self):
@@ -155,3 +158,21 @@ class TestXSearchViews(XAccountTestBase):
         self.assertEqual(
             action.search_view_id,
             self.env.ref('mail.discuss_channel_view_search'))
+
+    def test_task_list_hides_target_id_columns(self):
+        """Tasks list must not show target_post_id or target_screen_name."""
+        arch = self.env.ref('x_account.x_account_task_view_tree').arch
+        self.assertNotIn('name="target_post_id"', arch)
+        self.assertNotIn('name="target_screen_name"', arch)
+
+    def test_task_list_shows_processing_time(self):
+        """Tasks list must expose the processing-time column like Operations."""
+        arch = self.env.ref('x_account.x_account_task_view_tree').arch
+        self.assertIn('name="processing_time"', arch)
+
+    def test_automation_rules_action_includes_archived_by_default(self):
+        """Automation Rules list must default to 'Include Archived'."""
+        action = self.env.ref('x_account.action_x_account_automation_rules')
+        self.assertIn("'search_default_inactive': 1", action.context or '')
+        arch = self._search_arch('base.automation')
+        self._assert_arch_has(arch, ['inactive', 'archived'])
