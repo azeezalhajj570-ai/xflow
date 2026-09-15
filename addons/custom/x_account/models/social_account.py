@@ -88,16 +88,14 @@ class SocialAccount(models.Model):
     )
     x_auto_archive_start = fields.Float(
         string='Archive From',
-        help='Start of this account\'s daily archive window, in hours since '
-             'midnight server time (e.g. 22.5 = 22:30). Required when '
-             '"Archive Daily" is enabled.',
+        help='Start of this account\'s daily archive window, in server time '
+             '(e.g. 22:30). Required when "Archive Daily" is enabled.',
     )
     x_auto_archive_end = fields.Float(
         string='Archive Until',
-        help='End of this account\'s daily archive window, in hours since '
-             'midnight server time. If earlier than "Archive From" the window '
-             'wraps past midnight (e.g. 23:00 -> 01:00). Required when '
-             '"Archive Daily" is enabled.',
+        help='End of this account\'s daily archive window, in server time. If '
+             'earlier than "Archive From" the window wraps past midnight '
+             '(e.g. 23:00 -> 01:00). Required when "Archive Daily" is enabled.',
     )
     x_provider = fields.Selection(
         [
