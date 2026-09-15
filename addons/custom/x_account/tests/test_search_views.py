@@ -1,3 +1,5 @@
+import ast
+
 from odoo.tests import tagged
 
 from odoo.addons.x_account.tests.common import XAccountTestBase
@@ -95,9 +97,7 @@ class TestXSearchViews(XAccountTestBase):
     # ----------------------------------------------------------------- menus
     def test_account_and_chat_lists_show_the_archive_state(self):
         """Both X lists surface the archive state the same way the Automation
-        Rules list does: a toggle leading the columns. Only the chat list is
-        inline-editable; the accounts list shows the toggle without full inline
-        editing."""
+        Rules list does: a toggle leading the columns, without inline editing."""
         for xmlid in ('x_account.x_account_social_account_view_list',
                       'x_account.x_group_channel_view_tree'):
             arch = self.env.ref(xmlid).arch
@@ -105,8 +105,7 @@ class TestXSearchViews(XAccountTestBase):
             self.assertIn('widget="boolean_toggle"', arch, xmlid)
             self.assertLess(
                 arch.index('name="active"'), arch.index('name="name"'), xmlid)
-        chat_arch = self.env.ref('x_account.x_group_channel_view_tree').arch
-        self.assertIn('editable="bottom"', chat_arch)
+            self.assertNotIn('editable="bottom"', arch, xmlid)
 
     def test_automation_rule_list_leads_with_the_toggle(self):
         """Reference for the pattern above: the Automation Rules list puts the
@@ -144,12 +143,18 @@ class TestXSearchViews(XAccountTestBase):
         self.assertTrue(self.env.ref('x_account.action_x_account_group'))
 
     def test_automation_lists_include_channel_rules(self):
-        """The X Automation / Server Actions lists must cover discuss.channel:
-        the 'fetch group info after creation' rule lives on that model."""
-        for xmlid in ('x_account.action_x_account_automation_rules',
-                      'x_account.action_x_account_server_actions'):
-            domain = self.env.ref(xmlid).domain or ''
-            self.assertIn("'discuss.channel'", domain, xmlid)
+        """The X Automation / Server Actions lists must cover discuss.channel
+        alongside the x.* models. Both leaves in one implicit AND match nothing,
+        which is what hid every rule from the list."""
+        for xmlid, model in (
+                ('x_account.action_x_account_automation_rules', 'base.automation'),
+                ('x_account.action_x_account_server_actions', 'ir.actions.server')):
+            domain = ast.literal_eval(self.env.ref(xmlid).domain or '[]')
+            found = self.env[model].with_context(active_test=False).search(domain)
+            models = set(found.mapped('model_id.model'))
+            self.assertTrue(
+                any(name.startswith('x.') for name in models), (xmlid, models))
+            self.assertIn('discuss.channel', models, xmlid)
 
     def test_chat_action_pins_the_base_search_view(self):
         """The Chat list must resolve deterministically to the search view our
@@ -170,9 +175,10 @@ class TestXSearchViews(XAccountTestBase):
         arch = self.env.ref('x_account.x_account_task_view_tree').arch
         self.assertIn('name="processing_time"', arch)
 
-    def test_automation_rules_action_includes_archived_by_default(self):
-        """Automation Rules list must default to 'Include Archived'."""
+    def test_automation_rules_action_shows_all_rules_by_default(self):
+        """Automation Rules list must show every X-related rule — active and
+        inactive (no default filter that hides active rules)."""
         action = self.env.ref('x_account.action_x_account_automation_rules')
-        self.assertIn("'search_default_inactive': 1", action.context or '')
+        self.assertNotIn("'search_default_inactive': 1", action.context or '')
         arch = self._search_arch('base.automation')
         self._assert_arch_has(arch, ['inactive', 'archived'])

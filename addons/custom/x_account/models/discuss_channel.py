@@ -778,6 +778,9 @@ class DiscussChannel(models.Model):
             raise ValueError(
                 'Send DM is only available on X conversations, got %r'
                 % self.channel_type)
+        if not self.active:
+            raise ValueError(
+                'This conversation is archived and can no longer send DMs.')
         text = (text or '').strip()
         if not text:
             text = ('Thanks for your message!' if self.channel_type == 'x'

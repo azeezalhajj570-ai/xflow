@@ -44,5 +44,15 @@
             <field name="interval_type">minutes</field>
             <field name="active">True</field>
         </record>
+
+        <record id="cron_daily_archive_flagged_accounts" model="ir.cron">
+            <field name="name">X: Daily Auto-Archive Flagged Accounts</field>
+            <field name="model_id" ref="model_social_account"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_archive_flagged_accounts()</field>
+            <field name="interval_number">5</field>
+            <field name="interval_type">minutes</field>
+            <field name="active">True</field>
+        </record>
     </data>
 </odoo>

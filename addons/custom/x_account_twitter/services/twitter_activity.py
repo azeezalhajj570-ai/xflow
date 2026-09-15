@@ -86,14 +86,28 @@ class TwitterActivity:
             return {'status': 'ignored', 'reason': 'missing_ids',
                     'event_type': event_type}
 
-        account = self.env['social.account'].sudo().search([
-            ('twitter_user_id', '=', str(user_id)),
-        ], limit=1)
-        if not account or account.media_type != 'twitter':
+        account = self.env['social.account'].sudo().with_context(
+            active_test=False).search([
+                ('media_type', '=', 'twitter'),
+                ('twitter_user_id', '=', str(user_id)),
+            ], limit=1)
+        if not account:
             _logger.warning(
                 'x_account_twitter: no X account for event user_id=%s', user_id)
             return {'status': 'ignored', 'reason': 'no_account',
                     'event_type': event_type}
+        if not account.active:
+            # The account was archived but its XAA subscription is still live
+            # on X's side, so X keeps delivering events for it. Resolving the
+            # archived account (active_test=False) lets us skip quietly here —
+            # no event row, no queue task — while the self-heal cron prunes the
+            # dead subscription (archiving alone does not delete it).
+            _logger.info(
+                'x_account_twitter: event user_id=%s belongs to archived X '
+                'account %s (%s); ignoring and not enqueuing',
+                user_id, account.id, account.name)
+            return {'status': 'ignored', 'reason': 'account_archived',
+                    'event_type': event_type, 'account_id': account.id}
         configured_events = account.x_subscription_event_ids.mapped('name')
         if not configured_events:
             configured_events = ['dm.received', 'chat.received']
@@ -731,9 +745,11 @@ class TwitterActivity:
     def _handle_revoke(self, user_id):
         if not user_id:
             return
-        account = self.env['social.account'].sudo().search([
-            ('twitter_user_id', '=', str(user_id)),
-        ], limit=1)
+        account = self.env['social.account'].sudo().with_context(
+            active_test=False).search([
+                ('media_type', '=', 'twitter'),
+                ('twitter_user_id', '=', str(user_id)),
+            ], limit=1)
         if account:
             account.write({'x_connection_status': 'disconnected'})
             _logger.info('x_account_twitter: user %s revoked app access', user_id)

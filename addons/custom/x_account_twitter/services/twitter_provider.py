@@ -375,6 +375,7 @@ class TwitterProvider:
         than the app-only bearer.
         """
         accounts = self.env['social.account'].sudo().search([
+            ('active', '=', True),
             ('media_type', '=', 'twitter'),
             ('twitter_user_id', '!=', False),
             ('x_connection_status', 'in', ('active', 'reauth_required',

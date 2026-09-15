@@ -116,3 +116,21 @@ class TestXGroupAutomation(XAccountTestBase):
             self.env['x.account.task']._process_queue()
         task.invalidate_recordset()
         self.assertEqual(task.status, 'success')
+
+    def test_archived_group_enqueues_nothing(self):
+        acc = self._make_account('user_i')
+        group = self._make_group(acc, active=False)
+        group._enqueue_group_operation(target_id='1')
+        tasks = self.env['x.account.task'].search([('group_id', '=', group.id)])
+        self.assertFalse(tasks)
+
+    def test_archive_group_cancels_pending_tasks(self):
+        acc = self._make_account('user_j')
+        group = self._make_group(acc)
+        group._enqueue_group_operation(target_id='123')
+        task = self.env['x.account.task'].search([('group_id', '=', group.id)], limit=1)
+        self.assertEqual(task.status, 'pending')
+        group.write({'active': False})
+        task.invalidate_recordset()
+        self.assertEqual(task.status, 'cancelled')
+        self.assertIn('group archived', task.error)

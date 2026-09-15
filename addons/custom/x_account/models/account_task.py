@@ -90,11 +90,11 @@ class XAccountTask(models.Model):
         index=True,
         help='Where the task came from (e.g. channel_automation, group, webhook).',
     )
-    processing_time = fields.Float(
-        string='Period of Processing (min)',
+    processing_time = fields.Integer(
+        string='Period of Processing (sec)',
         compute='_compute_processing_time',
         readonly=True,
-        help='Minutes between task creation and completion (done_at - create_date).',
+        help='Seconds between task creation and completion (done_at - create_date).',
     )
     company_id = fields.Many2one(
         'res.company',
@@ -131,10 +131,10 @@ class XAccountTask(models.Model):
     def _compute_processing_time(self):
         for task in self:
             if task.create_date and task.done_at:
-                task.processing_time = (
-                    (task.done_at - task.create_date).total_seconds() / 60.0)
+                task.processing_time = int(
+                    (task.done_at - task.create_date).total_seconds())
             else:
-                task.processing_time = 0.0
+                task.processing_time = 0
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -234,7 +234,7 @@ class XAccountTask(models.Model):
         accounts = self.env['social.account'].sudo().browse(account_ids).exists()
         account_ids = [
             account.id for account in accounts
-            if not account._x_action_blocked_reason()]
+            if account.active and not account._x_action_blocked_reason()]
         if shards > 1:
             account_ids = [
                 account_id for account_id in account_ids
@@ -338,6 +338,33 @@ class XAccountTask(models.Model):
         # so later reads (e.g. the caller inspecting task.status) re-fetch.
         self.env.invalidate_all(flush=False)
 
+    def _scope_inactive_reason(self):
+        """Why this task must not run, or False when it may run.
+
+        An archived scope — the linked account, the automation group
+        (``x.account.group``) or the linking ``discuss.channel`` — must never
+        execute paid/action work. The queue cancels such tasks instead of
+        running them (like/repost/comment/bookmark/DM/...), so archiving an
+        account or a group stops all work for it.
+        """
+        self.ensure_one()
+        account = self.account_id
+        if not account or not account.active:
+            return 'account archived'
+        if self.group_id and not self.group_id.active:
+            return 'group archived'
+        ctx = self._task_context()
+        channel_id = ctx.get('channel_id')
+        if channel_id:
+            try:
+                channel = self.env['discuss.channel'].with_context(
+                    active_test=False).browse(int(channel_id))
+            except (TypeError, ValueError):
+                return False
+            if not channel.exists() or not channel.active:
+                return 'channel archived'
+        return False
+
     def _execute_operation_batch(self, tasks, operation=None, **extra_ctx):
         """Execute multiple tasks' operations in batch when supported.
 
@@ -347,9 +374,18 @@ class XAccountTask(models.Model):
         """
         if not tasks:
             return
+        sub = self.env['x.account.task']
+        for task in tasks:
+            reason = task._scope_inactive_reason()
+            if reason:
+                task.write({'status': 'cancelled', 'error': 'Skipped: %s' % reason})
+            else:
+                sub |= task
+        if not sub:
+            return
         import json as _json
         grouped = {}
-        for task in tasks:
+        for task in sub:
             key = (task.account_id.id, operation or task.operation)
             if key not in grouped:
                 grouped[key] = self.env['x.account.task']
@@ -395,6 +431,12 @@ class XAccountTask(models.Model):
         self.ensure_one()
         import json as _json
         if self.status == 'cancelled':
+            return None
+        reason = self._scope_inactive_reason()
+        if reason:
+            # An archived account/group/channel must never run: cancel the task
+            # instead of paying for a doomed call.
+            self.write({'status': 'cancelled', 'error': 'Skipped: %s' % reason})
             return None
         account = self.account_id
         if not account:

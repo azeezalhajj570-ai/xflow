@@ -69,11 +69,11 @@ class XAccountOperationReport(models.Model):
     create_date = fields.Datetime(string='Task Created', readonly=True)
     received_at = fields.Datetime(string='Received At', readonly=True)
     done_at = fields.Datetime(string='Processed At', readonly=True)
-    processing_time = fields.Float(
-        string='Period of Processing (min)',
+    processing_time = fields.Integer(
+        string='Period of Processing (sec)',
         readonly=True,
         group_operator='avg',
-        help='Minutes between the received post and the processed task.',
+        help='Seconds between the received post and the processed task.',
     )
     operation_count = fields.Integer(
         string='Operations', readonly=True, group_operator='sum')
@@ -163,7 +163,7 @@ class XAccountOperationReport(models.Model):
                         EXTRACT(EPOCH FROM (
                             sub.done_at
                             - COALESCE(sub.received_at, sub.create_date)
-                        )) / 60.0
+                        ))
                 END AS processing_time,
                 1 AS operation_count
             FROM (

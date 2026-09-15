@@ -44,6 +44,7 @@ class XAccountGroup(models.Model):
         help='Minimum interval between automated actions per account.',
     )
     paused = fields.Boolean(string='Paused')
+    active = fields.Boolean(string='Active', default=True)
     last_executed_at = fields.Datetime(string='Last Executed At', readonly=True)
 
     def _enqueue_group_operation(self, target_id=None, operation=None, **ctx):
@@ -57,7 +58,7 @@ class XAccountGroup(models.Model):
         operation that ran within cooldown_sec, it is skipped.
         """
         for group in self:
-            if group.paused or not group.auto_execute:
+            if not group.active or group.paused or not group.auto_execute:
                 continue
             op = operation or group.actions
             if not op:
@@ -99,3 +100,21 @@ class XAccountGroup(models.Model):
     def _stringify_task_context(self, ctx):
         import json as _json
         return _json.dumps(ctx)
+
+    def write(self, vals):
+        """Cancel pending tasks when a group is archived.
+
+        Archiving turns the group off: its queued like/repost/comment/... tasks
+        are cancelled so nothing runs for the group anymore. The task queue's
+        execution guard also refuses to run tasks whose group is archived (race
+        safety), and ``_enqueue_group_operation`` stops enqueuing.
+        """
+        if vals.get('active') in (False, 0):
+            self.env['x.account.task'].sudo().search([
+                ('group_id', 'in', self.ids),
+                ('status', 'in', ('pending', 'running')),
+            ]).write({
+                'status': 'cancelled',
+                'error': 'Skipped: group archived',
+            })
+        return super().write(vals)

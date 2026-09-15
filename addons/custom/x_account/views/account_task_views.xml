@@ -10,10 +10,11 @@
                 <field name="status"/>
                 <field name="priority"/>
                 <field name="retry_count"/>
-                <field name="claimed_at"/>
-                <field name="done_at" optional="show"/>
+                <field name="create_date" optional="show"/>
                 <field name="processing_time" optional="show"/>
-                <field name="next_retry_at"/>
+                <field name="claimed_at" optional="hide"/>
+                <field name="done_at" optional="hide"/>
+                <field name="next_retry_at" optional="hide"/>
                 <field name="source" optional="hide"/>
                 <control>
                     <button name="action_process_queue"

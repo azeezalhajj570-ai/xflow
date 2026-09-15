@@ -201,7 +201,7 @@ class TestXAccountOperationReport(XAccountTestBase):
             'like', {'post_id': '555', 'channel_id': self.channel.id})
         task.write({'status': 'success', 'done_at': '2026-09-13 20:30:00'})
         row = self._row(task)
-        self.assertAlmostEqual(row.processing_time, 30.0)
+        self.assertAlmostEqual(row.processing_time, 1800.0)
 
     def test_received_at_falls_back_to_task_create(self):
         task = self._task(
