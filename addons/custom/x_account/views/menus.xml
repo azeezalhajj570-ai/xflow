@@ -4,14 +4,16 @@
         <field name="name">Automation Rules</field>
         <field name="res_model">base.automation</field>
         <field name="view_mode">list,form</field>
-        <field name="context">{'default_active': False, 'search_default_inactive': 1}</field>
-        <field name="domain">[('model_id.model', 'in', ['x.message', 'x.account.task', 'x.account.group', 'discuss.channel'])]</field>
+        <field name="context">{'default_active': False}</field>
+        <field name="domain">['|', ('model_id.model', 'ilike', 'x.%'), ('model_id.model', '=', 'discuss.channel')]</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
                 Create automation rules for X Account operations
             </p>
             <p>
-                Automate retweets, likes, comments, and follows based on messages or events.
+                All automation rules from the X Account modules (message/channel
+                automation, group automation, DM/task rules, webhook/twitter
+                rules) are listed here — active and inactive.
             </p>
         </field>
     </record>
@@ -21,7 +23,7 @@
         <field name="res_model">ir.actions.server</field>
         <field name="view_mode">list,form</field>
         <field name="context">{'default_active': False}</field>
-        <field name="domain">[('model_id.model', 'in', ['x.message', 'x.account.task', 'x.account.group', 'discuss.channel'])]</field>
+        <field name="domain">['|', ('model_id.model', 'ilike', 'x.%'), ('model_id.model', '=', 'discuss.channel')]</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
                 Create server actions for X Account operations

@@ -2,10 +2,13 @@
 
 import logging
 
+from markupsafe import escape
+
 from odoo import _, api, fields, models
-from odoo.exceptions import UserError
+from odoo.exceptions import UserError, ValidationError
 
 _logger = logging.getLogger(__name__)
+
 
 _EVENT_PROVIDER_REGISTRY_MAP = {
     'official': 'twitter',
@@ -55,6 +58,23 @@ class SocialAccount(models.Model):
         string='Last Error',
         readonly=True,
         help='Last classified error. Never contains credentials.',
+    )
+    x_auto_archive = fields.Boolean(
+        string='Archive Daily',
+        help='When enabled, the scheduled action archives (deactivates) this '
+             'account inside the window below. Archiving prunes the account\'s '
+             'X Activity API subscriptions and cancels its queued tasks, so '
+             'none of its automation runs anymore.',
+    )
+    x_auto_archive_start = fields.Datetime(
+        string='Archive From',
+        help='Start of this account\'s archive window (displayed in your '
+             'timezone). Required when "Archive Daily" is enabled.',
+    )
+    x_auto_archive_end = fields.Datetime(
+        string='Archive Until',
+        help='End of this account\'s archive window (displayed in your '
+             'timezone). Required when "Archive Daily" is enabled.',
     )
     x_provider = fields.Selection(
         [
@@ -578,6 +598,18 @@ class SocialAccount(models.Model):
                 lambda a: a.x_chat_pin_locked and a.x_encryption_code != new_pin)
             if to_unlock:
                 super(SocialAccount, to_unlock).write({'x_chat_pin_locked': False})
+        if vals.get('active') in (False, 0):
+            # Archiving an account turns its task queue off: cancel queued work
+            # so nothing (like/repost/comment/bookmark/DM/webhook ...) runs for
+            # it anymore. The claim path and the execution guard also refuse
+            # archived accounts (race safety).
+            self.env['x.account.task'].sudo().search([
+                ('account_id', 'in', self.ids),
+                ('status', 'in', ('pending', 'running')),
+            ]).write({
+                'status': 'cancelled',
+                'error': 'Skipped: account archived',
+            })
         return super().write(vals)
 
     def _transition(self, status):
@@ -593,13 +625,86 @@ class SocialAccount(models.Model):
         mail.message record explicitly.
         """
         self.ensure_one()
-        self.env['mail.message'].sudo().create({
+        return self.env['mail.message'].sudo().create({
             'model': self._name,
             'res_id': self.id,
             'body': body,
             'message_type': 'comment',
             'subtype_id': self.env['ir.model.data']._xmlid_to_res_id('mail.mt_comment'),
         })
+
+    def _notify_reauth_required(self, message):
+        """Push a system notification when the account needs reauthentication.
+
+        social.account is a plain model (not a mail.thread), so an inbox
+        notification is generated explicitly from the recorded mail.message for
+        every internal user who manages X accounts in the account's company.
+        The bell badge in Odoo shows it immediately.
+        """
+        self.ensure_one()
+        body = (
+            'This X account requires reauthentication. Open it and complete the '
+            'OAuth 2.0 flow before its automation (webhooks, likes, reposts, '
+            'DMs...) can run again.<br/><br/><pre>%s</pre>'
+            % escape(message)
+        )
+        message = self._post_lifecycle_message(body)
+        group = self.env.ref('social.group_social_user')
+        users = self.env['res.users'].sudo().search([
+            ('group_ids', 'in', group.id),
+            ('company_ids', 'in', self.company_id.id),
+        ])
+        for user in users:
+            if user.partner_id:
+                self.env['mail.notification'].sudo().create({
+                    'mail_message_id': message.id,
+                    'res_partner_id': user.partner_id.id,
+                    'author_id': user.partner_id.id,
+                    'notification_type': 'inbox',
+                    'notification_status': 'ready',
+                })
+        return message
+
+    @api.constrains('x_auto_archive', 'x_auto_archive_start', 'x_auto_archive_end')
+    def _check_auto_archive_window(self):
+        """A flagged account must carry an explicit archive window."""
+        for account in self.filtered('x_auto_archive'):
+            if not account.x_auto_archive_start or not account.x_auto_archive_end:
+                raise ValidationError(_(
+                    'Set the archive window (Archive From / Archive Until) on '
+                    '"%s" before enabling "Archive Daily".', account.display_name))
+
+    @api.model
+    def _cron_archive_flagged_accounts(self):
+        """Archive accounts flagged "Archive Daily" inside their window.
+
+        Runs from ir.cron every few minutes and archives each flagged account
+        while the current time falls inside the window set on the account.
+        Only X accounts (twitter media) that are still active and flagged
+        ``x_auto_archive`` are archived; archiving prunes their X Activity API
+        subscriptions and cancels their queued tasks. Accounts left flagged
+        without a window (e.g. flagged before this field existed) are skipped,
+        and each account is isolated so one failure cannot stop the rest.
+        """
+        now = fields.Datetime.now()
+        flagged = self.sudo().search([
+            ('media_type', '=', 'twitter'),
+            ('active', '=', True),
+            ('x_auto_archive', '=', True),
+        ])
+        archived = 0
+        for account in flagged:
+            if not account.x_auto_archive_start or not account.x_auto_archive_end:
+                continue
+            if not account.x_auto_archive_start <= now <= account.x_auto_archive_end:
+                continue
+            try:
+                account.write({'active': False})
+                archived += 1
+            except Exception:
+                _logger.exception(
+                    'Daily auto-archive failed for account %s', account.id)
+        return archived
 
     @api.model
     def _cron_validate_x_sessions(self):

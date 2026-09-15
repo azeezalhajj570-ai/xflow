@@ -296,6 +296,27 @@ class TestTwitterActivityIngest(XAccountTwitterTestBase):
         self.assertEqual(result['status'], 'ignored')
         self.assertEqual(result['reason'], 'no_account')
 
+    def test_ingest_archived_account_ignored_without_enqueue(self):
+        """An event for an archived account resolves (active_test=False) but is
+        never enqueued: archiving leaves the X-side subscription live, so X
+        keeps delivering until the self-heal cron prunes it. Before the fix the
+        archived account could not be matched and every delivery logged a
+        misleading 'no X account' and skipped."""
+        self.account.with_context(
+            x_skip_subscription_sync=True).write({'active': False})
+        result = self._activity().ingest_webhook(_envelope(
+            'dm.received', 'uuid-archived',
+            payload=_dm_payload('111', OWNER_ID, 'dm-arch-1', 'hi')))
+        self.assertEqual(result['status'], 'ignored')
+        self.assertEqual(result['reason'], 'account_archived')
+        self.assertEqual(result['account_id'], self.account.id)
+        self.assertFalse(self.env['x.twitter.event'].sudo().search_count(
+            [('event_uuid', '=', 'uuid-archived')]))
+        self.assertFalse(self.env['x.account.task'].sudo().search_count([
+            ('account_id', '=', self.account.id),
+            ('operation', '=', 'process_webhook_event'),
+        ]))
+
     def test_ingest_missing_ids_ignored(self):
         result = self._activity().ingest_webhook({'data': {
             'event_type': 'dm.received', 'payload': {}}})

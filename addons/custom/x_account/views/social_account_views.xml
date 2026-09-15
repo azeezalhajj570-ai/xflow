@@ -16,6 +16,9 @@
                         <field name="x_event_provider" invisible="1"/>
                         <field name="x_action_provider" invisible="1"/>
                         <field name="twitter_user_id" readonly="1"/>
+                        <field name="x_auto_archive" help="Archive this account automatically once a day inside the window below."/>
+                        <field name="x_auto_archive_start" required="x_auto_archive" invisible="not x_auto_archive"/>
+                        <field name="x_auto_archive_end" required="x_auto_archive" invisible="not x_auto_archive"/>
                     </group>
                     <group string="X Chat Encryption" groups="social.group_social_user">
                         <field name="x_chat_key_mode" widget="radio"/>
@@ -83,6 +86,9 @@
                                 decoration-success="x_connection_status == 'active'"
                                 decoration-warning="x_connection_status == 'reauth_required'"
                                 decoration-danger="x_connection_status in ('disconnected', 'error', 'invalid')"/>
+                            <field name="x_auto_archive" help="Archive this account automatically once a day inside the window below."/>
+                            <field name="x_auto_archive_start" required="x_auto_archive" invisible="not x_auto_archive"/>
+                            <field name="x_auto_archive_end" required="x_auto_archive" invisible="not x_auto_archive"/>
                         </group>
                         <group string="X Chat Encryption" groups="social.group_social_user">
                             <field name="x_chat_key_mode" widget="radio"/>

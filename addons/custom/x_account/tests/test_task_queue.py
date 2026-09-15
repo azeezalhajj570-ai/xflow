@@ -188,16 +188,102 @@ class TestXTaskQueue(XAccountTestBase):
         self.assertEqual(task.retry_count, 1)
         self.assertFalse(task.done_at)
 
-    def test_processing_time_is_minutes_between_created_and_done(self):
-        """Processing time mirrors the operations report: minutes between
+    def test_processing_time_is_seconds_between_created_and_done(self):
+        """Processing time mirrors the operations report: whole seconds between
         creation and completion, 0 for tasks still in flight."""
         task = self._make_task(self.account_a)
-        self.assertEqual(task.processing_time, 0.0)
-        task.write({'status': 'success'})
+        self.assertEqual(task.processing_time, 0)
+        task.write({
+            'status': 'success',
+            'done_at': task.create_date + timedelta(seconds=50),
+        })
         task.invalidate_recordset()
-        expected = (task.done_at - task.create_date).total_seconds() / 60.0
-        self.assertAlmostEqual(task.processing_time, expected, places=0)
-        self.assertGreater(task.processing_time, 0.0)
+        self.assertEqual(task.processing_time, 50)
+
+    # ---------------------------------------------- archived account/group/channel
+
+    def _archived_account(self):
+        account = self.account_b
+        account.write({'active': False})
+        account.invalidate_recordset()
+        return account
+
+    def test_process_queue_skips_archived_account(self):
+        """Archived accounts are never swept: their tasks stay pending and no
+        provider call happens for them."""
+        account = self._archived_account()
+        task = self._make_task(account)
+        with patch('odoo.addons.x_account.services.providers.session_web.SessionWebProvider.get_conversations') as mock_run:
+            claimed = self.env['x.account.task']._process_queue()
+        self.assertEqual(claimed, 0)
+        mock_run.assert_not_called()
+        task.invalidate_recordset()
+        self.assertEqual(task.status, 'pending')
+
+    def test_execute_operation_cancels_archived_account(self):
+        """An archived account cancels a task instead of running it."""
+        account = self._archived_account()
+        task = self._make_task(account)
+        with patch('odoo.addons.x_account.services.providers.session_web.SessionWebProvider.get_conversations') as mock_run:
+            task._execute_operation()
+        mock_run.assert_not_called()
+        task.invalidate_recordset()
+        self.assertEqual(task.status, 'cancelled')
+        self.assertIn('account archived', task.error)
+
+    def test_execute_operation_cancels_archived_group(self):
+        """A task bound to an archived x.account.group is cancelled."""
+        group = self.env['x.account.group'].create({
+            'name': 'Archived Group',
+            'active': False,
+        })
+        task = self._make_task(self.account_a, group_id=group.id)
+        with patch('odoo.addons.x_account.services.providers.session_web.SessionWebProvider.get_conversations') as mock_run:
+            task._execute_operation()
+        mock_run.assert_not_called()
+        task.invalidate_recordset()
+        self.assertEqual(task.status, 'cancelled')
+        self.assertIn('group archived', task.error)
+
+    def test_process_queue_cancels_task_for_archived_group(self):
+        """Claiming still happens (account is active) but the execution guard
+        cancels the task before any provider call."""
+        group = self.env['x.account.group'].create({
+            'name': 'Archived Group',
+            'active': False,
+        })
+        task = self._make_task(self.account_a, group_id=group.id)
+        with patch('odoo.addons.x_account.services.providers.session_web.SessionWebProvider.get_conversations') as mock_run:
+            claimed = self.env['x.account.task']._process_queue()
+        self.assertEqual(claimed, 1)
+        mock_run.assert_not_called()
+        task.invalidate_recordset()
+        self.assertEqual(task.status, 'cancelled')
+        self.assertIn('group archived', task.error)
+
+    def test_execute_operation_cancels_archived_channel(self):
+        """A channel_automation task for an archived discuss.channel is
+        cancelled instead of running the operation."""
+        channel = self.env['discuss.channel'].create({'name': 'X chat'})
+        channel.write({'active': False})
+        task = self._make_task(
+            self.account_a, operation='repost',
+            task_context='{"post_id": "123", "channel_id": %d, '
+                         '"source": "channel_automation"}' % channel.id)
+        with patch('odoo.addons.x_account.services.providers.session_web.SessionWebProvider.repost') as mock_run:
+            task._execute_operation()
+        mock_run.assert_not_called()
+        task.invalidate_recordset()
+        self.assertEqual(task.status, 'cancelled')
+        self.assertIn('channel archived', task.error)
+
+    def test_archive_account_cancels_pending_tasks(self):
+        """Archiving an account cancels its queued tasks immediately."""
+        task = self._make_task(self.account_a)
+        self.account_a.write({'active': False})
+        task.invalidate_recordset()
+        self.assertEqual(task.status, 'cancelled')
+        self.assertIn('account archived', task.error)
 
     def test_task_targets_parsed_from_context(self):
         task = self._make_task(

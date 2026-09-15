@@ -180,8 +180,24 @@ class XMessage(models.Model):
             )
             return
 
+        channel = self.channel_id
+        if channel and not channel.active:
+            _logger.info(
+                'Channel automation skipped (operation=%s): channel id=%s is archived',
+                operation, channel.id,
+            )
+            return
+
         account = self.account_id.sudo()
-        if not account or not account.active or account.x_connection_status in ('disabled', 'new'):
+        if account and not account.active:
+            # The operator archived the account: stop the automation entirely
+            # instead of silently rerouting it to another company account.
+            _logger.info(
+                'Channel automation skipped (operation=%s): account id=%s is archived',
+                operation, account.id,
+            )
+            return
+        if not account or account.x_connection_status in ('disabled', 'new'):
             account = self._get_company_x_account()
         if not account:
             _logger.info(
@@ -275,6 +291,14 @@ class XMessage(models.Model):
 
         Routes to the 1:1 user conversation (``x``) or the group conversation
         (``x_group``) automatically via ``discuss.channel._enqueue_send_dm``.
+        An archived conversation is skipped so no DM task is created.
         """
         self.ensure_one()
-        return self.channel_id._enqueue_send_dm(text=text)
+        channel = self.channel_id
+        if channel and not channel.active:
+            _logger.info(
+                'Channel automation skipped (send_dm): channel id=%s is archived',
+                channel.id,
+            )
+            return False
+        return channel._enqueue_send_dm(text=text)

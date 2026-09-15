@@ -222,6 +222,38 @@ class TestTwitterOAuth2Account(XAccountTwitterTestBase):
         self.assertEqual(account.x_connection_status, 'reauth_required')
         self.assertEqual(account.last_error, 'Invalid or expired refresh token')
 
+    def test_reauth_pushes_system_notification_to_social_users(self):
+        """A dead refresh token must not only flip the status but also push an
+        inbox (system) notification to the users who manage X accounts."""
+        account = self._make_account()
+        notif_user = self.env['res.users'].with_context(
+            no_reset_password=True).create({
+                'name': 'X Reviewer',
+                'login': 'x_reauth_reviewer',
+                'group_ids': [(6, 0, [self.env.ref('social.group_social_user').id])],
+                'company_ids': [(6, 0, account.company_id.ids)],
+            })
+        account.write({
+            'x_oauth2_token_expires_at': fields.Datetime.now() - timedelta(minutes=5)})
+        with patch.object(
+                TwitterOAuth2Client, 'refresh',
+                side_effect=twitter_errors.TwitterError('http_400', 'Invalid or expired refresh token')):
+            token = account._x_oauth2_ensure_access_token()
+        self.assertIsNone(token)
+        self.assertEqual(account.x_connection_status, 'reauth_required')
+        msg = self.env['mail.message'].search([
+            ('model', '=', 'social.account'),
+            ('res_id', '=', account.id),
+        ], order='id desc', limit=1)
+        self.assertTrue(msg)
+        self.assertIn('reauthentication', msg.body)
+        notifications = self.env['mail.notification'].search([
+            ('mail_message_id', '=', msg.id),
+            ('res_partner_id', '=', notif_user.partner_id.id),
+        ])
+        self.assertTrue(notifications)
+        self.assertEqual(notifications.notification_type, 'inbox')
+
     def test_invalid_token_marks_reauth_with_clear_message(self):
         """An invalid_grant/invalid_request response surfaces a UI-friendly
         're-authorization required' reason instead of a generic HTTP 400."""

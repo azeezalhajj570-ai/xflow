@@ -136,7 +136,8 @@ class SocialAccount(models.Model):
         return records
 
     def write(self, vals):
-        """Sync subscriptions when subscription events are changed.
+        """Sync subscriptions when subscription events change, and prune the
+        XAA subscriptions when an account is archived.
 
         Also re-aligns the linked utm.medium before base social renames it to
         the canonical '[media] account' form. Renaming a suffixed medium
@@ -145,13 +146,21 @@ class SocialAccount(models.Model):
         (left behind by a previously deleted/archived account). Realigning to
         the existing canonical medium avoids the collision (see
         ``_x_align_account_medium``).
+
+        Archiving must also delete the account's X-side subscriptions: X keeps
+        the XAA subscription alive when only the Odoo account is archived, so
+        it keeps delivering undeliverable ``chat.received`` events to the
+        webhook every day. The prune is best-effort (never blocks the archive
+        on an API error); the self-heal cron retries what failed here.
         """
         if vals.get('name'):
             for account in self:
                 if account.media_type == 'twitter':
                     self._x_align_account_medium(account, vals['name'])
         res = super().write(vals)
-        if 'x_subscription_event_ids' in vals and not self.env.context.get('x_skip_subscription_sync'):
+        if self.env.context.get('x_skip_subscription_sync'):
+            return res
+        if 'x_subscription_event_ids' in vals:
             for account in self:
                 if account.media_type == 'twitter' and account.twitter_user_id:
                     try:
@@ -160,6 +169,15 @@ class SocialAccount(models.Model):
                         _logger.exception(
                             'x_account_twitter: subscription sync failed for account %s',
                             account.id)
+        if vals.get('active') in (False, 0):
+            for account in self:
+                if account.media_type == 'twitter' and account.twitter_user_id:
+                    try:
+                        account._prune_x_subscriptions()
+                    except Exception:
+                        _logger.exception(
+                            'x_account_twitter: failed to prune X subscriptions '
+                            'on archive for account %s', account.id)
         return res
 
     @api.model
@@ -288,6 +306,93 @@ class SocialAccount(models.Model):
                     _logger.exception(
                         'x_account_twitter: failed to create subscription for '
                         'account %s event_type %s', self.id, event_type)
+        return result
+
+    def _prune_x_subscriptions(self):
+        """Delete this account's XAA subscriptions (X-side + local rows).
+
+        Used when an account is archived so X stops delivering its DM/chat
+        events to our webhook — archiving only flips ``active`` on the Odoo
+        record and does not remove the X-side subscription, so X keeps sending
+        undeliverable ``chat.received`` events that the receiver ignores.
+
+        Deletes both the local ``x.twitter.subscription`` rows and any X-side
+        subscriptions for this ``twitter_user_id`` that are no longer tracked
+        locally (drift left behind by accounts archived before this fix).
+        Best-effort: an X API failure is counted and logged, never raised, so
+        archiving cannot be blocked by a transient network error — the
+        self-heal cron retries.
+        """
+        self.ensure_one()
+        if self.media_type != 'twitter' or not self.twitter_user_id:
+            return {'deleted': 0, 'failed': 0, 'skipped': True}
+        service = TwitterWebhook(self.env)
+        result = {'deleted': 0, 'failed': 0}
+        seen = set()
+        subs_model = self.env['x.twitter.subscription'].sudo()
+        for sub in subs_model.search([('account_id', '=', self.id)]):
+            if sub.subscription_id:
+                seen.add(str(sub.subscription_id))
+                try:
+                    service.delete_subscription(sub.subscription_id)
+                except Exception:
+                    result['failed'] += 1
+                    _logger.warning(
+                        'x_account_twitter: failed to delete X subscription %s '
+                        'for account %s', sub.subscription_id, self.id)
+            sub.unlink()
+            result['deleted'] += 1
+        try:
+            listing = service.list_subscriptions()
+        except Exception as exc:
+            _logger.warning(
+                'x_account_twitter: could not list X subscriptions to prune '
+                'archived account %s: %s', self.id, exc)
+            listing = {}
+        for item in (listing or {}).get('data') or []:
+            flt = item.get('filter') or {}
+            if str(flt.get('user_id') or '') != str(self.twitter_user_id):
+                continue
+            sub_id = item.get('id') or item.get('subscription_id')
+            if not sub_id or str(sub_id) in seen:
+                continue
+            seen.add(str(sub_id))
+            try:
+                service.delete_subscription(str(sub_id))
+                result['deleted'] += 1
+            except Exception:
+                result['failed'] += 1
+                _logger.warning(
+                    'x_account_twitter: failed to delete X-side subscription %s '
+                    'for archived account %s', sub_id, self.id)
+        return result
+
+    @api.model
+    def _prune_archived_x_subscriptions(self):
+        """Delete XAA subscriptions for every archived X account.
+
+        Self-heal pass (see ``_ensure_x_webhook_subscriptions``): an account
+        archived before this fix, or whose archive-time prune failed, can still
+        hold live X-side subscriptions — often with no local rows left behind —
+        so X keeps delivering undeliverable events. Listing the X-side
+        subscriptions and matching ``filter.user_id`` finds those stragglers.
+        """
+        accounts = self.sudo().with_context(active_test=False).search([
+            ('active', '=', False),
+            ('media_type', '=', 'twitter'),
+            ('twitter_user_id', '!=', False),
+        ])
+        result = {'deleted': 0, 'failed': 0}
+        for account in accounts:
+            try:
+                per_account = account._prune_x_subscriptions()
+            except Exception:
+                _logger.exception(
+                    'x_account_twitter: archival subscription prune failed for '
+                    'account %s', account.id)
+                continue
+            result['deleted'] += per_account.get('deleted', 0)
+            result['failed'] += per_account.get('failed', 0)
         return result
 
     def _skip_oauth_stats(self):
@@ -421,6 +526,7 @@ class SocialAccount(models.Model):
         _logger.warning(
             'x_account_twitter: account %s requires reauthentication: %s',
             self.id, message)
+        self._notify_reauth_required(message)
 
     def _get_twitter_oauth_header(self, url, headers={}, params={}, method='POST'):
         """Return an Authorization header for an X API call.
@@ -643,33 +749,49 @@ class SocialAccount(models.Model):
     # -------------------------------------------------------------- webhooks
     @api.model
     def _ensure_x_webhook_subscriptions(self):
-        """Self-heal: ensure the app webhook + XAA subscriptions exist.
+        """Self-heal: ensure the app webhook + XAA subscriptions exist, and
+        prune archived accounts' dead X-side subscriptions.
 
         Called by ``cron_x_twitter_ensure_webhook_subscriptions``. Idempotent —
         safe to run on every cron tick. Does nothing when webhooks are disabled
         via ``x_account_twitter.webhook_enabled``.
+
+        Archiving an account does not remove its X-side XAA subscriptions, so
+        X keeps delivering undeliverable events for it. The archived-account
+        prune (listing X's subscriptions and matching ``filter.user_id``)
+        removes those dead subscriptions — covering accounts archived before
+        this fix and retrying archive-time prune failures.
         """
         icp = self.env['ir.config_parameter'].sudo()
         if icp.get_param('x_account_twitter.webhook_enabled', 'False') not in (
                 'True', 'true', '1'):
             return {'enabled': False}
+        service = TwitterWebhook(self.env)
+        if service.has_app_bearer:
+            pruned = self._prune_archived_x_subscriptions()
+        else:
+            pruned = {'deleted': 0, 'failed': 0, 'skipped': 'manual'}
         first = self.sudo().search([
             ('media_type', '=', 'twitter'),
             ('twitter_user_id', '!=', False),
         ], limit=1)
         if not first:
-            return {'enabled': True, 'accounts': 0}
+            return {'enabled': True, 'accounts': 0, 'archived_pruned': pruned}
         provider = first.get_provider_for_operation('register_webhook')
         if not hasattr(provider, 'has_app_bearer'):
             # Provider doesn't support app bearer token (e.g. GetXAPI provider)
             # Webhook management is handled differently for this provider
-            return {'enabled': True, 'managed': 'provider_specific'}
+            return {'enabled': True, 'managed': 'provider_specific',
+                    'archived_pruned': pruned}
         if not provider.has_app_bearer():
             # App-Only Bearer Token not configured: the webhook + subscriptions
             # are being managed manually in the X Developer Portal, so there is
             # nothing to self-heal via the API. Skip quietly instead of failing.
-            return {'enabled': True, 'managed': 'manual'}
-        return provider.register_webhook(safe=True)
+            return {'enabled': True, 'managed': 'manual',
+                    'archived_pruned': pruned}
+        result = provider.register_webhook(safe=True)
+        result['archived_pruned'] = pruned
+        return result
 
     def _ensure_x_account_subscriptions(self):
         """Programmatically create the XAA subscriptions for this account.
