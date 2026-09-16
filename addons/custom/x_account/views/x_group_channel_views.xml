@@ -33,6 +33,9 @@
                     <div class="oe_title">
                         <h1><field name="name" placeholder="Chat name (editable)"/></h1>
                     </div>
+                    <group>
+                        <field name="active" widget="boolean_toggle"/>
+                    </group>
                     <notebook>
                         <page string="Information" name="information">
                             <group>
@@ -60,6 +63,7 @@
                         </page>
                     </notebook>
                 </sheet>
+                <chatter/>
             </form>
         </field>
     </record>

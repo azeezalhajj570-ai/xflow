@@ -209,3 +209,32 @@ class TestPruneXSubscriptionsOnArchive(XAccountTwitterTestBase):
         self.assertIn('sub-cron', {call.args[0] for call in delete.call_args_list})
         self.assertTrue(register.called)
         self.assertEqual(result['archived_pruned']['deleted'], 1)
+
+
+@tagged('post_install', '-at_install', 'x_account_twitter')
+class TestSubscriptionEventTracking(XAccountTwitterTestBase):
+    """Which events an account subscribes to is tracked in the chatter, so the
+    subscription history stays auditable."""
+
+    def _flush_tracking(self):
+        self.env.flush_all()
+        self.env.cr.precommit.run()
+
+    def test_subscription_events_are_tracked(self):
+        media = self.env.ref('social_twitter.social_media_twitter')
+        event_type = self.env['x.subscription.event.type'].search([], limit=1)
+        self.assertTrue(event_type, 'no subscription event types loaded')
+        account = self.env['social.account'].create({
+            'name': 'Tracked Subs',
+            'media_id': media.id,
+            'social_account_handle': 'tracked_subs',
+        })
+        self.assertTrue(getattr(
+            account._fields['x_subscription_event_ids'], 'tracking', None))
+        self._flush_tracking()
+        account.write({'x_subscription_event_ids': [(4, event_type.id)]})
+        self._flush_tracking()
+        account.invalidate_recordset()
+        values = account.message_ids.tracking_value_ids.filtered(
+            lambda v: v.field_id.name == 'x_subscription_event_ids')
+        self.assertTrue(values, 'subscription events change was not logged')

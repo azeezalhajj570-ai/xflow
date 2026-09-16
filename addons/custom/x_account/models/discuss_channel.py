@@ -25,16 +25,19 @@ class DiscussChannel(models.Model):
         string='X Account',
         index=True,
         ondelete='cascade',
+        tracking=True,
     )
     x_partner_id = fields.Many2one(
         'res.partner',
         string='X Partner',
         index='btree_not_null',
         ondelete='set null',
+        tracking=True,
     )
     x_conversation_id = fields.Char(
         string='X Conversation ID',
         index=True,
+        tracking=True,
         help='External X conversation id.',
     )
     last_x_mail_message_id = fields.Many2one(
@@ -50,6 +53,7 @@ class DiscussChannel(models.Model):
             ('failed', 'Synchronization Failed'),
         ],
         string='X Sync Status',
+        tracking=True,
         help='Message synchronization state for this X conversation.',
     )
     x_group_member_ids = fields.Many2many(
