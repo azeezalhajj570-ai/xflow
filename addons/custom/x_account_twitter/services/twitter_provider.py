@@ -341,19 +341,68 @@ class TwitterProvider:
         return {'validated': True, 'webhook_id': wid}
 
     def unsubscribe_all_events(self, account=None):
-        """Delete every XAA subscription (optionally scoped to ``account``)."""
+        """Delete every XAA subscription (optionally scoped to ``account``).
+
+        Subscriptions are deleted by their ``subscription_id``; the accounts'
+        live subscriptions are additionally read back from X's listing (matched
+        on ``filter.user_id``) because a create X rejected as a duplicate used
+        to be recorded locally without an id. Without that fallback the delete
+        only dropped the local rows, leaving X delivering to subscriptions the
+        app could no longer see — and the next resubscribe failed forever with
+        ``DuplicateSubscription``.
+        """
         service = TwitterWebhook(self.env)
         subs = self.env['x.twitter.subscription'].sudo()
-        domain = [('account_id', '=', account.id)] if account else []
-        result = {'deleted': 0}
+        if account:
+            accounts = account
+            domain = [('account_id', '=', account.id)]
+        else:
+            accounts = self.env['social.account'].sudo().search([
+                ('media_type', '=', 'twitter'),
+                ('twitter_user_id', '!=', False),
+            ])
+            domain = []
+        result = {'deleted': 0, 'failed': 0}
+        seen = set()
         for sub in subs.search(domain):
             if sub.subscription_id:
+                seen.add(str(sub.subscription_id))
                 try:
                     service.delete_subscription(sub.subscription_id)
                 except Exception:
-                    pass
-            result['deleted'] += 1
+                    result['failed'] += 1
+                    _LOGGER.warning(
+                        'x_account_twitter: failed to delete X subscription %s '
+                        'for account %s', sub.subscription_id,
+                        sub.account_id.id)
             sub.unlink()
+            result['deleted'] += 1
+        user_ids = {str(uid) for uid in accounts.mapped('twitter_user_id') if uid}
+        if not user_ids:
+            return result
+        try:
+            listing = service.list_subscriptions()
+        except Exception as exc:
+            _LOGGER.warning(
+                'x_account_twitter: could not list X subscriptions to delete '
+                'for account users %s: %s', sorted(user_ids), exc)
+            return result
+        for item in (listing or {}).get('data') or []:
+            flt = item.get('filter') or {}
+            if str(flt.get('user_id') or '') not in user_ids:
+                continue
+            sub_id = item.get('subscription_id') or item.get('id')
+            if not sub_id or str(sub_id) in seen:
+                continue
+            seen.add(str(sub_id))
+            try:
+                service.delete_subscription(str(sub_id))
+                result['deleted'] += 1
+            except Exception:
+                result['failed'] += 1
+                _LOGGER.warning(
+                    'x_account_twitter: failed to delete X-side subscription '
+                    '%s of account user %s', sub_id, flt.get('user_id'))
         return result
 
     def delete_webhook_registration(self):
@@ -387,6 +436,32 @@ class TwitterProvider:
             if not event_types:
                 event_types = ['dm.received', 'chat.received']
             self._subscribe_account(service, hook, acc, subs_model, event_types)
+
+    def _find_x_subscription_id(self, service, account, event_type):
+        """Recover X's ``subscription_id`` for (account, event_type), else ''.
+
+        X answers ``DuplicateSubscription`` when the subscription already
+        exists, and that rejection carries no id — so the live id has to be
+        read back from the listing. Without it the local row cannot be deleted
+        on X later (``unsubscribe_all_events`` deletes by id), which leaves an
+        orphaned X-side subscription that can never be resubscribed.
+        """
+        try:
+            listing = service.list_subscriptions()
+        except Exception as exc:
+            _LOGGER.warning(
+                'x_account_twitter: could not list X subscriptions to recover '
+                'the %s id for account %s: %s', event_type, account.id, exc)
+            return ''
+        user_id = str(account.twitter_user_id or '')
+        for item in (listing or {}).get('data') or []:
+            if item.get('event_type') != event_type:
+                continue
+            flt = item.get('filter') or {}
+            if str(flt.get('user_id') or '') != user_id:
+                continue
+            return str(item.get('subscription_id') or item.get('id') or '')
+        return ''
 
     def _subscribe_account(self, service, hook, acc, subs_model=None,
                            event_types=None):
@@ -429,6 +504,13 @@ class TwitterProvider:
                     access_token=access_token)
                 sub_id = (data or {}).get('subscription_id') or (
                     data or {}).get('id')
+                if not sub_id:
+                    # X does not always echo the new id back on create, and a
+                    # row without it cannot be deleted later, so read it back
+                    # from the listing instead of storing an active row without
+                    # an id.
+                    sub_id = self._find_x_subscription_id(
+                        service, acc, event_type)
                 subs_model.create({
                     'account_id': acc.id,
                     'webhook_id': hook.id if hook else False,
@@ -457,6 +539,8 @@ class TwitterProvider:
                         'account_id': acc.id,
                         'webhook_id': hook.id if hook else False,
                         'event_type': event_type,
+                        'subscription_id': self._find_x_subscription_id(
+                            service, acc, event_type),
                         'state': 'active',
                         'created_at': self.env.cr.now(),
                     })
