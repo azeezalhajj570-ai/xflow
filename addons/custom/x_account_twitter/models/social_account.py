@@ -152,11 +152,20 @@ class SocialAccount(models.Model):
         it keeps delivering undeliverable ``chat.received`` events to the
         webhook every day. The prune is best-effort (never blocks the archive
         on an API error); the self-heal cron retries what failed here.
+
+        Unarchiving mirrors it: the subscriptions pruned on archive are
+        re-created, otherwise the account comes back silent (no DM/chat events
+        until the next self-heal sweep). Only a real False -> True transition
+        resubscribes, so unrelated writes that carry ``active: True`` do not
+        hit the X API.
         """
         if vals.get('name'):
             for account in self:
                 if account.media_type == 'twitter':
                     self._x_align_account_medium(account, vals['name'])
+        to_resubscribe = self.browse()
+        if vals.get('active') in (True, 1):
+            to_resubscribe = self.filtered(lambda a: not a.active)
         res = super().write(vals)
         if self.env.context.get('x_skip_subscription_sync'):
             return res
@@ -178,6 +187,9 @@ class SocialAccount(models.Model):
                         _logger.exception(
                             'x_account_twitter: failed to prune X subscriptions '
                             'on archive for account %s', account.id)
+        for account in to_resubscribe:
+            if account.media_type == 'twitter' and account.twitter_user_id:
+                account._ensure_x_account_subscriptions()
         return res
 
     @api.model
