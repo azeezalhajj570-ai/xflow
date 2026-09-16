@@ -39,6 +39,7 @@ class SocialAccount(models.Model):
         'account_id',
         'event_type_id',
         string='Subscription Events',
+        tracking=True,
         help='Event types to subscribe to for this account. '
              'Changes will sync subscriptions on next save.',
     )

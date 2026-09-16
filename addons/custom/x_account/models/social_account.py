@@ -70,8 +70,17 @@ _ACTION_OPERATIONS = frozenset({
 
 
 class SocialAccount(models.Model):
-    _inherit = 'social.account'
+    _name = 'social.account'
+    _inherit = ['social.account', 'mail.thread', 'mail.activity.mixin']
 
+    active = fields.Boolean(
+        string='Active',
+        default=True,
+        tracking=True,
+        help='Unchecking archives the account: its X subscriptions are pruned, '
+             'its queued tasks are cancelled and no automation runs for it '
+             'until it is unarchived.',
+    )
     x_connection_status = fields.Selection(
         [
             ('new', 'New'),
@@ -85,6 +94,7 @@ class SocialAccount(models.Model):
         ],
         string='X Connection Status',
         default='new',
+        tracking=True,
         help='Lifecycle state of the X account connection.',
     )
     last_connected = fields.Datetime(string='Last Connected', readonly=True)
@@ -96,6 +106,7 @@ class SocialAccount(models.Model):
     )
     x_auto_archive = fields.Boolean(
         string='Archive Daily',
+        tracking=True,
         help='When enabled, the scheduled action archives (deactivates) this '
              'account inside the window below. Archiving prunes the account\'s '
              'X Activity API subscriptions and cancels its queued tasks, so '
@@ -103,12 +114,14 @@ class SocialAccount(models.Model):
     )
     x_auto_archive_start = fields.Float(
         string='Archive From',
+        tracking=True,
         help='Start of this account\'s daily archive window, read on the '
              'timezone of the account\'s company (e.g. 22:30). Required when '
              '"Archive Daily" is enabled.',
     )
     x_auto_archive_end = fields.Float(
         string='Archive Until',
+        tracking=True,
         help='End of this account\'s daily archive window, read on the '
              'timezone of the account\'s company. If earlier than "Archive '
              'From" the window wraps past midnight (e.g. 23:00 -> 01:00). '
@@ -154,12 +167,14 @@ class SocialAccount(models.Model):
         ],
         string='X Auth Method',
         default='session_cookie',
+        tracking=True,
         help='Authentication method. Independent of the provider.',
     )
     x_session_store_id = fields.Many2one(
         'x.session.store',
         string='X Session Store',
         ondelete='set null',
+        tracking=True,
         help='Encrypted session credentials vault record.',
     )
     x_encryption_code = fields.Char(
@@ -192,6 +207,7 @@ class SocialAccount(models.Model):
         string='X Chat Key Source',
         default='juicebox',
         groups='social.group_social_user',
+        tracking=True,
         help='Where the account\'s XChat private keys come from. "Imported Key '
              'Blob" stores the native export_keys() blob on the account; '
              '"Secure Backup / PIN" recovers keys from X\'s secure key backup '
@@ -210,6 +226,7 @@ class SocialAccount(models.Model):
     x_chat_initialized = fields.Boolean(
         string='X Chat Encryption Initialized',
         groups='social.group_social_user',
+        tracking=True,
         help='True once the Chat XDK has successfully imported/recovered the '
              'account\'s keys (via the configured key source) and set the '
              'identity. Cleared whenever the PIN/blob changes.',
@@ -219,6 +236,7 @@ class SocialAccount(models.Model):
         groups='social.group_social_user',
         copy=False,
         readonly=True,
+        tracking=True,
         help='Set when X rejected the configured X Chat PIN. Unlock attempts '
              'are paused until a different PIN is entered — each wrong attempt '
              'consumes one of the limited guesses X allows before locking the '
@@ -232,6 +250,7 @@ class SocialAccount(models.Model):
             ('failed', 'Failed'),
         ],
         string='X Migration Status',
+        tracking=True,
         help='Status of migration from XAction.',
     )
     source_account_id = fields.Char(string='Source Account ID', help='XAction Account.id')
