@@ -2,6 +2,7 @@ from unittest.mock import Mock, patch
 
 from odoo.tests import tagged
 
+from odoo.addons.x_account_twitter.services import twitter_errors
 from odoo.addons.x_account_twitter.services.twitter_provider import TwitterProvider
 from odoo.addons.x_account_twitter.services.twitter_webhook import TwitterWebhook
 
@@ -54,6 +55,35 @@ class TestDeleteXSubscriptions(XAccountTwitterTestBase):
             action = self.account.action_delete_x_subscriptions()
         self.assertEqual(action['params']['type'], 'danger')
         self.assertIn('boom', action['params']['message'])
+
+    def test_delete_clears_x_side_subscriptions_without_a_stored_id(self):
+        """Rows recorded from a ``DuplicateSubscription`` carry no id, so the
+        delete must reconcile with X's listing instead of unlinking locally
+        only — otherwise the X-side subscription survives and the following
+        resubscribe keeps failing with DuplicateSubscription."""
+        self.env['x.twitter.subscription'].sudo().create({
+            'account_id': self.account.id,
+            'event_type': 'chat.received',
+            'state': 'active',
+        })
+        listing = {'data': [
+            {'event_type': 'chat.received', 'subscription_id': 'sub-live',
+             'filter': {'user_id': self.account.twitter_user_id}},
+            {'event_type': 'dm.received', 'subscription_id': 'sub-other',
+             'filter': {'user_id': '999000999000999000'}},
+        ]}
+        with patch.object(
+                TwitterWebhook, 'list_subscriptions',
+                return_value=listing), patch.object(
+                TwitterWebhook, 'delete_subscription',
+                return_value={}) as delete:
+            action = self.account.action_delete_x_subscriptions()
+        deleted = {call.args[0] for call in delete.call_args_list}
+        self.assertIn('sub-live', deleted)
+        self.assertNotIn('sub-other', deleted)
+        self.assertEqual(action['params']['type'], 'success')
+        self.assertFalse(self.env['x.twitter.subscription'].sudo().search_count(
+            [('account_id', '=', self.account.id)]))
 
 
 @tagged('post_install', '-at_install', 'x_account_twitter')
@@ -327,3 +357,78 @@ class TestResubscribeOnUnarchive(XAccountTwitterTestBase):
                 return_value={'created': 1}) as subscribe:
             account.write({'active': True})
         subscribe.assert_called_once()
+
+
+@tagged('post_install', '-at_install', 'x_account_twitter')
+class TestSubscribeRecordsXSubscriptionId(XAccountTwitterTestBase):
+    """A create X rejects as ``DuplicateSubscription`` must still record X's
+    subscription id: the rejection carries none, and everything downstream
+    (unsubscribe, resubscribe) keys on ``subscription_id``."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.media = cls.env.ref('social_twitter.social_media_twitter')
+
+    def _account(self):
+        return self.env['social.account'].create({
+            'name': 'Duplicate Subscription Account',
+            'media_id': self.media.id,
+            'social_account_handle': 'dup_sub_acc',
+            'twitter_user_id': '666000666000666000',
+            'x_connection_status': 'active',
+            'x_oauth2_access_token': 'fake-at',
+        })
+
+    def test_duplicate_subscription_records_the_x_id(self):
+        account = self._account()
+        hook = self.env['x.twitter.webhook'].sudo().create({
+            'name': 'https://x.example.com/x_account/twitter/webhook',
+            'webhook_id': 'wh-dup',
+        })
+        service = Mock()
+        service.create_subscription.side_effect = twitter_errors.TwitterError(
+            'http_400',
+            "DuplicateSubscription: A subscription already exists for event "
+            "type 'chat.received' with the same filters")
+        service.list_subscriptions.return_value = {'data': [
+            {'event_type': 'chat.received', 'subscription_id': 'sub-chat',
+             'filter': {'user_id': account.twitter_user_id}},
+            {'event_type': 'dm.received', 'subscription_id': 'sub-other',
+             'filter': {'user_id': '999000999000999000'}},
+        ]}
+        with patch.object(type(account), '_x_oauth2_ensure_access_token',
+                          return_value='fake-at'):
+            summary = TwitterProvider(self.env, account)._subscribe_account(
+                service, hook, account, event_types=['chat.received'])
+        self.assertEqual(summary['existing'], 1)
+        sub = self.env['x.twitter.subscription'].sudo().search([
+            ('account_id', '=', account.id),
+            ('event_type', '=', 'chat.received')], limit=1)
+        self.assertTrue(sub)
+        self.assertEqual(sub.subscription_id, 'sub-chat')
+
+    def test_create_without_an_echoed_id_records_the_x_id(self):
+        """A create that does not echo the new id must still record it, or the
+        row is active locally but undeletable on X."""
+        account = self._account()
+        hook = self.env['x.twitter.webhook'].sudo().create({
+            'name': 'https://x.example.com/x_account/twitter/webhook',
+            'webhook_id': 'wh-created',
+        })
+        service = Mock()
+        service.create_subscription.return_value = {}
+        service.list_subscriptions.return_value = {'data': [
+            {'event_type': 'dm.received', 'subscription_id': 'sub-new',
+             'filter': {'user_id': account.twitter_user_id}},
+        ]}
+        with patch.object(type(account), '_x_oauth2_ensure_access_token',
+                          return_value='fake-at'):
+            summary = TwitterProvider(self.env, account)._subscribe_account(
+                service, hook, account, event_types=['dm.received'])
+        self.assertEqual(summary['created'], 1)
+        sub = self.env['x.twitter.subscription'].sudo().search([
+            ('account_id', '=', account.id),
+            ('event_type', '=', 'dm.received')], limit=1)
+        self.assertTrue(sub)
+        self.assertEqual(sub.subscription_id, 'sub-new')
