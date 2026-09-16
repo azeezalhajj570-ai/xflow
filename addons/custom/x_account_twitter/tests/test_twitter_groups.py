@@ -84,6 +84,13 @@ class TestTwitterGroups(XAccountTwitterTestBase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
+        # `x_provider` is a computed field driven by a config parameter, so a
+        # per-record `x_provider='twitter'` only sticks while the create cache
+        # holds it — a later cache clear silently resolves these accounts back
+        # to session_web. Pin the official event provider so group reads always
+        # dispatch to TwitterProvider (the official Chat API).
+        cls.env['ir.config_parameter'].sudo().set_param(
+            'x_account.event_provider', 'official')
         cls.twitter_media = cls.env.ref('social_twitter.social_media_twitter')
 
     def _make_account(self):

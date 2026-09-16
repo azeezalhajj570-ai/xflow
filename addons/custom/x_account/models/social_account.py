@@ -355,6 +355,26 @@ class SocialAccount(models.Model):
         from odoo.addons.x_account.services.x_service import XService
         return XService.get_provider(self)
 
+    def _x_group_read_provider(self, method):
+        """Provider used for XChat/group-conversation reads (``method``).
+
+        XChat (``g``-prefixed) groups are only enumerated by the official X
+        Chat API, which is the event provider's API family. GetXAPI's DM
+        endpoints never return them, so routing group reads through the action
+        provider silently yields zero groups. Prefer the event provider when it
+        implements ``method``; otherwise fall back to the action provider (and
+        to its own error when that provider is misconfigured) — the same
+        event-then-action order used for conversation info and members.
+        """
+        self.ensure_one()
+        try:
+            event_provider = self.get_event_provider()
+        except Exception:
+            event_provider = None
+        if getattr(event_provider, method, None):
+            return event_provider
+        return self.get_action_provider()
+
     def _x_action_blocked_reason(self):
         """Reason the account's paid action queue is halted, or False.
 
@@ -419,13 +439,21 @@ class SocialAccount(models.Model):
         self.ensure_one()
         if not self._filter_x_accounts():
             raise ValueError('Fetch groups is only available on X accounts.')
-        provider = self.get_action_provider()
+        provider = self._x_group_read_provider('fetch_groups')
         fetch = getattr(provider, 'fetch_groups', None)
         if not fetch:
             return self._groups_not_supported(
                 'Fetch Groups',
                 'Provider %s does not support fetching groups' % self.x_provider)
-        result = fetch(self, limit=100)
+        try:
+            result = fetch(self, limit=100)
+        except Exception as exc:
+            _logger.exception(
+                'action_fetch_groups failed for account %s', self.id)
+            if not self.env.context.get('dialog'):
+                raise
+            return self._display_notification(
+                'Fetch Groups', 'Fetch failed: %s' % exc, kind='danger')
         if self.env.context.get('dialog'):
             return {
                 'type': 'ir.actions.client',
@@ -446,7 +474,7 @@ class SocialAccount(models.Model):
         self.ensure_one()
         if not self._filter_x_accounts():
             raise ValueError('Fetch group messages is only available on X accounts.')
-        provider = self.get_action_provider()
+        provider = self._x_group_read_provider('fetch_group_messages')
         if getattr(provider, '_needs_encryption_code', True) and not self.x_encryption_code:
             raise ValueError(
                 'Set the XChat Encryption Code on this account first — it is '
@@ -456,7 +484,16 @@ class SocialAccount(models.Model):
             return self._groups_not_supported(
                 'Fetch Group Messages',
                 'Provider %s does not support fetching group messages' % self.x_provider)
-        result = fetch(self, limit=100)
+        try:
+            result = fetch(self, limit=100)
+        except Exception as exc:
+            _logger.exception(
+                'action_fetch_group_messages failed for account %s', self.id)
+            if not self.env.context.get('dialog'):
+                raise
+            return self._display_notification(
+                'Fetch Group Messages', 'Fetch failed: %s' % exc,
+                kind='danger')
         if self.env.context.get('dialog'):
             parts = ['Groups: %s, messages: %s, failures: %s' % (
                 result.get('groups', 0), result.get('messages', 0),
