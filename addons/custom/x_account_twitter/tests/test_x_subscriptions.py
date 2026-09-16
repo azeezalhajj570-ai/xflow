@@ -238,3 +238,92 @@ class TestSubscriptionEventTracking(XAccountTwitterTestBase):
         values = account.message_ids.tracking_value_ids.filtered(
             lambda v: v.field_id.name == 'x_subscription_event_ids')
         self.assertTrue(values, 'subscription events change was not logged')
+
+
+@tagged('post_install', '-at_install', 'x_account_twitter')
+class TestResubscribeOnUnarchive(XAccountTwitterTestBase):
+    """Unarchiving an X account must re-create the XAA subscriptions that
+    archiving pruned, otherwise the account comes back silent: X no longer
+    delivers its DM/chat events and nothing re-subscribes it until the next
+    self-heal sweep."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        icp = cls.env['ir.config_parameter'].sudo()
+        icp.set_param('x_account.event_provider', 'official')
+        icp.set_param('x_account.action_provider', 'getxapi')
+        cls.media = cls.env.ref('social_twitter.social_media_twitter')
+
+    def _account(self, handle, user_id):
+        """Create the account with subscription side effects muted, but return
+        it in the plain context so the writes under test run the real paths."""
+        account = self.env['social.account'].with_context(
+            x_skip_subscription_sync=True).create({
+                'name': handle,
+                'media_id': self.media.id,
+                'social_account_handle': handle,
+                'twitter_user_id': user_id,
+                'x_connection_status': 'active',
+                'x_oauth2_access_token': 'fake-at',
+            })
+        return self.env['social.account'].browse(account.id)
+
+    def _archived_account(self, handle, user_id):
+        account = self._account(handle, user_id)
+        account.with_context(x_skip_subscription_sync=True).write(
+            {'active': False})
+        return account
+
+    def test_unarchive_resubscribes(self):
+        account = self._archived_account('resub_acc', '420000420000420000')
+        self.assertFalse(account.active)
+        with patch.object(
+                TwitterProvider, 'subscribe_account',
+                return_value={'created': 2}) as subscribe:
+            account.write({'active': True})
+        self.assertTrue(account.active)
+        subscribe.assert_called_once()
+        self.assertEqual(subscribe.call_args.args[0].id, account.id)
+
+    def test_write_active_on_an_active_account_does_not_resubscribe(self):
+        """Only a real False -> True transition resubscribes; other writes that
+        carry active must not hit the X API."""
+        account = self._account('already_on', '430000430000430000')
+        with patch.object(
+                TwitterProvider, 'subscribe_account',
+                return_value={}) as subscribe:
+            account.write({'active': True})
+            account.write({'name': 'already_on renamed'})
+        subscribe.assert_not_called()
+
+    def test_unarchive_is_not_blocked_by_a_subscribe_failure(self):
+        """A failing X API call must not leave the account archived."""
+        account = self._archived_account('resub_boom', '440000440000440000')
+        with patch.object(
+                TwitterProvider, 'subscribe_account',
+                side_effect=Exception('boom')):
+            account.write({'active': True})
+        self.assertTrue(account.active)
+
+    def test_archive_then_unarchive_round_trip(self):
+        """Archive prunes the local rows, unarchive re-creates them."""
+        account = self._account('round_trip', '450000450000450000')
+        subs = self.env['x.twitter.subscription'].sudo()
+        subs.create({
+            'account_id': account.id,
+            'event_type': 'dm.received',
+            'subscription_id': 'sub-rt',
+            'state': 'active',
+        })
+        with patch.object(
+                TwitterWebhook, 'list_subscriptions',
+                return_value={'data': []}), patch.object(
+                TwitterWebhook, 'delete_subscription', return_value={}):
+            account.write({'active': False})
+        self.assertFalse(subs.search_count([('account_id', '=', account.id)]))
+        with patch.object(
+                TwitterProvider, 'subscribe_account',
+                return_value={'created': 1}) as subscribe:
+            account.write({'active': True})
+        subscribe.assert_called_once()
