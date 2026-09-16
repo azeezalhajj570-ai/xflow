@@ -3,7 +3,9 @@
 import json
 import logging
 
-from odoo import api, fields, models
+from markupsafe import Markup
+
+from odoo import _, api, fields, models
 
 from ..services.x_provider import x_conversation_is_group
 
@@ -82,6 +84,79 @@ class DiscussChannel(models.Model):
         store=True,
         index=True,
     )
+
+    X_TRACKED_FIELDS = (
+        'active',
+        'x_account_id',
+        'x_partner_id',
+        'x_conversation_id',
+        'x_sync_status',
+    )
+
+    def write(self, vals):
+        """Spell out an X field change in the tracking message body.
+
+        The client renders a ``message_type = 'notification'`` message on a
+        discuss.channel as a system line built from the message *body*; the
+        tracking values, which every other model's chatter renders, are dropped
+        on channels. Odoo logs tracking with an empty body, so a chat change
+        would show up as a bare "Author" line and look like nothing was
+        tracked. Logging a body keeps the message a notification — a real chat
+        message is a 'comment' (see ``_save_x_message``), so it stays out of
+        the conversation itself.
+        """
+        if not (self.env.context.get('tracking_disable')
+                or self.env.context.get('mail_notrack')):
+            for record in self:
+                changes = record._x_track_changes(vals)
+                if changes:
+                    record._track_set_log_message(
+                        record._x_track_log_message(changes))
+        return super().write(vals)
+
+    def _x_track_changes(self, vals):
+        """``{field: (old, new)}`` for the tracked X fields actually changed."""
+        changes = {}
+        for name in self.X_TRACKED_FIELDS:
+            if name not in vals:
+                continue
+            old = self._x_track_value(self[name])
+            new = self._x_track_value(vals[name])
+            if old == new:
+                continue
+            changes[name] = (old, new)
+        return changes
+
+    @staticmethod
+    def _x_track_value(value):
+        """Compare/format ids: a read m2o is a recordset, its write is an id."""
+        return value.id if isinstance(value, models.BaseModel) else value
+
+    def _x_track_log_message(self, changes):
+        """Render the change as "Label: old &rarr; new" lines."""
+        info = self.fields_get(
+            list(changes),
+            attributes=('string', 'type', 'selection', 'relation'))
+        lines = [
+            '%s: %s → %s' % (
+                info[name]['string'],
+                self._x_track_label(info[name], old),
+                self._x_track_label(info[name], new),
+            )
+            for name, (old, new) in changes.items()
+        ]
+        return Markup('<br>').join(lines)
+
+    def _x_track_label(self, info, value):
+        if not value:
+            return _('None')
+        if info['type'] == 'selection':
+            return dict(info['selection']).get(value, value)
+        if info['type'] == 'boolean':
+            return _('Yes') if value else _('No')
+        if info['type'] == 'many2one':
+            return self.env[info['relation']].browse(value).display_name
+        return value
 
     @api.depends('channel_member_ids', 'channel_member_ids.partner_id')
     def _compute_x_group_members(self):

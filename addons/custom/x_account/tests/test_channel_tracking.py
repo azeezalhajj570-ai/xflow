@@ -73,6 +73,26 @@ class TestChannelTracking(XAccountTestBase):
         self.assertTrue(value, 'x_partner_id change was not logged')
         self.assertEqual(value.new_value_char, 'X User')
 
+    def test_change_body_spells_out_the_new_value(self):
+        """The client renders a channel notification from its body, not from
+        the tracking values, so the body has to carry the change."""
+        channel = self._channel(x_conversation_id='conv-body')
+        channel.write({'x_sync_status': 'failed'})
+        value = self._tracking_value(channel, 'x_sync_status')
+        self.assertTrue(value)
+        body = str(value.mail_message_id.body)
+        self.assertIn('X Sync Status', body)
+        self.assertIn('Synchronization Failed', body)
+
+    def test_change_body_labels_a_partner_and_a_boolean(self):
+        channel = self._channel(x_conversation_id='conv-label')
+        partner = self.env['res.partner'].create({'name': 'Labeled User'})
+        channel.write({'x_partner_id': partner.id, 'active': False})
+        partner_body = str(self._tracking_value(
+            channel, 'x_partner_id').mail_message_id.body)
+        self.assertIn('Labeled User', partner_body)
+        self.assertIn('X Partner', partner_body)
+
     def test_archiving_a_chat_is_logged(self):
         """The X fields of a conversation are written when it is created, and
         Odoo drops tracking for the creating transaction — so the chatter's
