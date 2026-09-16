@@ -1,0 +1,421 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+# 	* x_account_getxapi
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 19.0+e-20260402\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-09-16 00:55+0000\n"
+"PO-Revision-Date: 2026-09-16 00:55+0000\n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: \n"
+"Plural-Forms: \n"
+
+#. module: x_account_getxapi
+#: model:ir.model.fields,help:x_account_getxapi.field_getxapi_api_usage__error_type
+msgid ""
+"Classified error code when the request failed (e.g. rate_limit, "
+"authentication_failure, daily_dm_limit)."
+msgstr "رمز خطأ مصنّف عند فشل الطلب (مثل rate_limit و authentication_failure "
+"و daily_dm_limit)."
+
+#. module: x_account_getxapi
+#: model_terms:ir.ui.view,arch_db:x_account_getxapi.getxapi_usage_view_search
+msgid "Client Error (4xx)"
+msgstr "خطأ من العميل (4xx)"
+
+#. module: x_account_getxapi
+#: model:ir.model.fields,field_description:x_account_getxapi.field_getxapi_api_usage__company_id
+#: model_terms:ir.ui.view,arch_db:x_account_getxapi.getxapi_usage_view_search
+msgid "Company"
+msgstr "الشركة"
+
+#. module: x_account_getxapi
+#: model:ir.model,name:x_account_getxapi.model_res_config_settings
+msgid "Config Settings"
+msgstr "تهيئة الإعدادات"
+
+#. module: x_account_getxapi
+#: model:ir.model.fields,field_description:x_account_getxapi.field_getxapi_api_usage__create_uid
+msgid "Created by"
+msgstr "أنشأه"
+
+#. module: x_account_getxapi
+#: model:ir.model.fields,field_description:x_account_getxapi.field_getxapi_api_usage__create_date
+msgid "Created on"
+msgstr "تاريخ الإنشاء"
+
+#. module: x_account_getxapi
+#: model_terms:ir.ui.view,arch_db:x_account_getxapi.getxapi_usage_view_search
+msgid "Creation Date"
+msgstr "تاريخ الإنشاء"
+
+#. module: x_account_getxapi
+#: model:ir.model.fields,field_description:x_account_getxapi.field_social_account__x_getxapi_credit_blocked_at
+msgid "Credit Blocked At"
+msgstr "تاريخ حجب الرصيد"
+
+#. module: x_account_getxapi
+#: model:ir.model.fields,field_description:x_account_getxapi.field_social_account__x_getxapi_credit_error
+msgid "Credit Error"
+msgstr "خطأ الرصيد"
+
+#. module: x_account_getxapi
+#: model_terms:ir.ui.view,arch_db:x_account_getxapi.getxapi_usage_view_search
+msgid "Daily DM Limit"
+msgstr "حد الرسائل المباشرة اليومي"
+
+#. module: x_account_getxapi
+#: model:ir.model.fields,field_description:x_account_getxapi.field_getxapi_api_usage__display_name
+#: model:ir.model.fields,field_description:x_account_getxapi.field_res_config_settings__display_name
+#: model:ir.model.fields,field_description:x_account_getxapi.field_social_account__display_name
+#: model:ir.model.fields,field_description:x_account_getxapi.field_social_live_post__display_name
+#: model:ir.model.fields,field_description:x_account_getxapi.field_social_media__display_name
+#: model:ir.model.fields,field_description:x_account_getxapi.field_x_import_session__display_name
+msgid "Display Name"
+msgstr "اسم العرض"
+
+#. module: x_account_getxapi
+#: model:ir.model.fields,field_description:x_account_getxapi.field_getxapi_api_usage__request_duration
+#: model_terms:ir.ui.view,arch_db:x_account_getxapi.getxapi_usage_view_list
+msgid "Duration (ms)"
+msgstr "المدة (مللي ثانية)"
+
+#. module: x_account_getxapi
+#: model:ir.model.fields,field_description:x_account_getxapi.field_getxapi_api_usage__endpoint
+#: model_terms:ir.ui.view,arch_db:x_account_getxapi.getxapi_usage_view_search
+msgid "Endpoint"
+msgstr "نقطة النهاية"
+
+#. module: x_account_getxapi
+#: model_terms:ir.ui.view,arch_db:x_account_getxapi.getxapi_usage_view_form
+msgid "Error Details"
+msgstr "تفاصيل الخطأ"
+
+#. module: x_account_getxapi
+#: model:ir.model.fields,field_description:x_account_getxapi.field_getxapi_api_usage__error_message
+msgid "Error Message"
+msgstr "رسالة الخطأ"
+
+#. module: x_account_getxapi
+#: model:ir.model.fields,field_description:x_account_getxapi.field_getxapi_api_usage__error_type
+#: model_terms:ir.ui.view,arch_db:x_account_getxapi.getxapi_usage_view_search
+msgid "Error Type"
+msgstr "نوع الخطأ"
+
+#. module: x_account_getxapi
+#: model:ir.model.fields,field_description:x_account_getxapi.field_getxapi_api_usage__estimated_cost
+msgid "Estimated Cost (USD)"
+msgstr "التكلفة التقديرية (دولار)"
+
+#. module: x_account_getxapi
+#: model:ir.model.fields,help:x_account_getxapi.field_getxapi_api_usage__estimated_cost
+msgid "Estimated USD cost for this API call based on the pricing table."
+msgstr "التكلفة التقديرية بالدولار لهذا الاستدعاء بناءً على جدول الأسعار."
+
+#. module: x_account_getxapi
+#: model_terms:ir.ui.view,arch_db:x_account_getxapi.getxapi_usage_view_search
+msgid "Failed"
+msgstr "فشل"
+
+#. module: x_account_getxapi
+#: model:ir.model.fields.selection,name:x_account_getxapi.selection__getxapi_api_usage__method__get
+#: model_terms:ir.ui.view,arch_db:x_account_getxapi.getxapi_usage_view_search
+msgid "GET"
+msgstr "GET"
+
+#. module: x_account_getxapi
+#: model:ir.model.fields,field_description:x_account_getxapi.field_res_config_settings__x_getxapi_api_key
+#: model_terms:ir.ui.view,arch_db:x_account_getxapi.x_account_getxapi_res_config_settings_view_form
+msgid "GetXAPI API Key"
+msgstr "مفتاح GetXAPI API"
+
+#. module: x_account_getxapi
+#: model:ir.model,name:x_account_getxapi.model_getxapi_api_usage
+msgid "GetXAPI API Usage"
+msgstr "استخدام GetXAPI API"
+
+#. module: x_account_getxapi
+#: model_terms:ir.actions.act_window,help:x_account_getxapi.getxapi_usage_action
+msgid ""
+"GetXAPI API calls will appear here automatically when the GetXAPI provider "
+"is used."
+msgstr "ستظهر استدعاءات GetXAPI API هنا تلقائيًا عند استخدام مزوّد GetXAPI."
+
+#. module: x_account_getxapi
+#: model:ir.model.fields,help:x_account_getxapi.field_res_config_settings__x_getxapi_api_key
+msgid ""
+"GetXAPI API key (Authorization: Bearer). Used only by the optional GetXAPI "
+"provider; never stored in x.session.store."
+msgstr "مفتاح GetXAPI API (ترويسة Authorization: Bearer). يستخدمه مزوّد "
+"GetXAPI الاختياري فقط؛ ولا يُخزَّن أبدًا في x.session.store."
+
+#. module: x_account_getxapi
+#: model:ir.model.fields,field_description:x_account_getxapi.field_social_account__x_getxapi_auth_token
+msgid "GetXAPI Auth Token"
+msgstr "رمز مصادقة GetXAPI"
+
+#. module: x_account_getxapi
+#: model:ir.model.fields,field_description:x_account_getxapi.field_social_account__x_getxapi_credit_blocked
+msgid "GetXAPI Credit Exhausted"
+msgstr "نفاد رصيد GetXAPI"
+
+#. module: x_account_getxapi
+#: model_terms:ir.ui.view,arch_db:x_account_getxapi.x_account_getxapi_res_config_settings_view_form
+msgid "GetXAPI Provider"
+msgstr "مزوّد GetXAPI"
+
+#. module: x_account_getxapi
+#: model:ir.model.fields.selection,name:x_account_getxapi.selection__res_config_settings__x_provider__getxapi
+#: model:ir.model.fields.selection,name:x_account_getxapi.selection__social_account__x_provider__getxapi
+#: model:ir.model.fields.selection,name:x_account_getxapi.selection__x_import_session__provider__getxapi
+msgid "GetXAPI REST API"
+msgstr "GetXAPI REST API"
+
+#. module: x_account_getxapi
+#: model:ir.actions.act_window,name:x_account_getxapi.getxapi_usage_action
+#: model:ir.ui.menu,name:x_account_getxapi.menu_getxapi_usage
+#: model_terms:ir.ui.view,arch_db:x_account_getxapi.getxapi_usage_view_form
+#: model_terms:ir.ui.view,arch_db:x_account_getxapi.getxapi_usage_view_list
+#: model_terms:ir.ui.view,arch_db:x_account_getxapi.getxapi_usage_view_pivot
+#: model_terms:ir.ui.view,arch_db:x_account_getxapi.getxapi_usage_view_search
+msgid "GetXAPI Usage"
+msgstr "استخدام GetXAPI"
+
+#. module: x_account_getxapi
+#: model:ir.actions.server,name:x_account_getxapi.cron_archive_getxapi_usage_ir_actions_server
+msgid "GetXAPI: Archive Old Usage Records"
+msgstr "GetXAPI: أرشفة سجلات الاستخدام القديمة"
+
+#. module: x_account_getxapi
+#: model:ir.model.fields,help:x_account_getxapi.field_getxapi_api_usage__method
+msgid "HTTP method used for the request."
+msgstr "طريقة HTTP المستخدمة في الطلب."
+
+#. module: x_account_getxapi
+#: model:ir.model.fields,help:x_account_getxapi.field_getxapi_api_usage__status_code
+msgid "HTTP status code returned by GetXAPI."
+msgstr "رمز حالة HTTP الذي يعيده GetXAPI."
+
+#. module: x_account_getxapi
+#: model:ir.model.fields,field_description:x_account_getxapi.field_getxapi_api_usage__id
+#: model:ir.model.fields,field_description:x_account_getxapi.field_res_config_settings__id
+#: model:ir.model.fields,field_description:x_account_getxapi.field_social_account__id
+#: model:ir.model.fields,field_description:x_account_getxapi.field_social_live_post__id
+#: model:ir.model.fields,field_description:x_account_getxapi.field_social_media__id
+#: model:ir.model.fields,field_description:x_account_getxapi.field_x_import_session__id
+msgid "ID"
+msgstr "المُعرف"
+
+#. module: x_account_getxapi
+#: model:ir.model,name:x_account_getxapi.model_x_import_session
+msgid "Import X Session"
+msgstr "استيراد جلسة X"
+
+#. module: x_account_getxapi
+#: model:ir.model.fields,field_description:x_account_getxapi.field_getxapi_api_usage__write_uid
+msgid "Last Updated by"
+msgstr "آخر تحديث بواسطة"
+
+#. module: x_account_getxapi
+#: model:ir.model.fields,field_description:x_account_getxapi.field_getxapi_api_usage__write_date
+msgid "Last Updated on"
+msgstr "تاريخ آخر تحديث"
+
+#. module: x_account_getxapi
+#: model:ir.model.fields,help:x_account_getxapi.field_social_account__x_getxapi_credit_error
+msgid "Last credit-exhaustion error reported by GetXAPI."
+msgstr "آخر خطأ نفاد رصيد أبلغ عنه GetXAPI."
+
+#. module: x_account_getxapi
+#: model:ir.model.fields,help:x_account_getxapi.field_getxapi_api_usage__company_id
+msgid ""
+"Link an account to a company to restrict its usage or keep empty to let all "
+"companies use it."
+msgstr "اربط الحساب بشركة لتقييد استخدامه، أو اتركه فارغًا لتستخدمه جميع "
+"الشركات."
+
+#. module: x_account_getxapi
+#: model:ir.model.fields,field_description:x_account_getxapi.field_getxapi_api_usage__method
+#: model_terms:ir.ui.view,arch_db:x_account_getxapi.getxapi_usage_view_search
+msgid "Method"
+msgstr "الطريقة"
+
+#. module: x_account_getxapi
+#: model_terms:ir.actions.act_window,help:x_account_getxapi.getxapi_usage_action
+msgid "No API usage recorded yet."
+msgstr "لم يُسجَّل أي استخدام لـ API بعد."
+
+#. module: x_account_getxapi
+#: model:ir.model.fields.selection,name:x_account_getxapi.selection__getxapi_api_usage__method__post
+#: model_terms:ir.ui.view,arch_db:x_account_getxapi.getxapi_usage_view_search
+msgid "POST"
+msgstr "POST"
+
+#. module: x_account_getxapi
+#: model:ir.model.fields,field_description:x_account_getxapi.field_x_import_session__provider
+msgid "Provider"
+msgstr "المزوّد"
+
+#. module: x_account_getxapi
+#: model:ir.model.fields,help:x_account_getxapi.field_res_config_settings__x_provider
+msgid "Provider implementation used for X HTTP operations."
+msgstr "تنفيذ المزوّد المستخدم لعمليات X عبر HTTP."
+
+#. module: x_account_getxapi
+#: model:ir.model.fields,help:x_account_getxapi.field_social_account__x_provider
+msgid ""
+"Provider implementation used for this account. Additional providers (e.g. "
+"OmniX REST API) are provided by optional modules that register themselves "
+"with XProviderRegistry."
+msgstr ""
+"تنفيذ المزوّد المستخدم لهذا الحساب. المزوّدون الإضافيون (مثل OmniX REST API)"
+" توفّرهم وحدات اختيارية تسجّل نفسها في XProviderRegistry."
+
+#. module: x_account_getxapi
+#: model_terms:ir.ui.view,arch_db:x_account_getxapi.getxapi_usage_view_search
+msgid "Rate Limited"
+msgstr "تجاوز حد المعدل"
+
+#. module: x_account_getxapi
+#: model:ir.model.fields,help:x_account_getxapi.field_getxapi_api_usage__request_duration
+msgid "Request duration in milliseconds."
+msgstr "مدة الطلب بالمللي ثانية."
+
+#. module: x_account_getxapi
+#: model_terms:ir.ui.view,arch_db:x_account_getxapi.x_account_getxapi_social_account_view_form
+msgid "Resume GetXAPI"
+msgstr "استئناف GetXAPI"
+
+#. module: x_account_getxapi
+#: model:ir.model.fields,field_description:x_account_getxapi.field_getxapi_api_usage__retry_after
+msgid "Retry After (s)"
+msgstr "إعادة المحاولة بعد (ثانية)"
+
+#. module: x_account_getxapi
+#: model:ir.model.fields,help:x_account_getxapi.field_getxapi_api_usage__error_message
+msgid "Sanitized error detail returned in the GetXAPI response body."
+msgstr "تفاصيل الخطأ المُنقّاة كما وردت في جسم استجابة GetXAPI."
+
+#. module: x_account_getxapi
+#: model:ir.model.fields,help:x_account_getxapi.field_getxapi_api_usage__retry_after
+msgid "Seconds X/GetXAPI said to wait before retrying, when disclosed."
+msgstr "عدد الثواني التي طلب X/GetXAPI الانتظار قبل إعادة المحاولة، إن ذُكرت."
+
+#. module: x_account_getxapi
+#: model_terms:ir.ui.view,arch_db:x_account_getxapi.getxapi_usage_view_search
+msgid "Server Error (5xx)"
+msgstr "خطأ من الخادم (5xx)"
+
+#. module: x_account_getxapi
+#. odoo-python
+#: code:addons/x_account_getxapi/models/import_session.py:0
+msgid "Session validation failed: %s"
+msgstr "فشل التحقق من الجلسة: %s"
+
+#. module: x_account_getxapi
+#: model:ir.model.fields,help:x_account_getxapi.field_social_account__x_getxapi_credit_blocked
+msgid ""
+"Set automatically when GetXAPI reports the account has no credit (HTTP 402 "
+"or a credit-related 429). While set, the paid task queue for this account is"
+" halted and no paid GetXAPI call is sent, so the balance is not burned on "
+"doomed requests. Add credit, then use \"Resume GetXAPI\" to lift the block."
+msgstr "يُضبط تلقائيًا عندما يُبلغ GetXAPI بأن الحساب لا يملك رصيدًا (HTTP "
+"402 أو 429 متعلق بالرصيد). وأثناء ضبطه تتوقف قائمة المهام المدفوعة "
+"لهذا الحساب ولا يُرسَل أي استدعاء مدفوع إلى GetXAPI، حتى لا يُستهلك "
+"الرصيد في طلبات محكوم عليها بالفشل. أضف رصيدًا ثم استخدم \"استئناف "
+"GetXAPI\" لرفع الحجب."
+
+#. module: x_account_getxapi
+#: model:ir.model,name:x_account_getxapi.model_social_account
+msgid "Social Account"
+msgstr "الحساب الاجتماعي"
+
+#. module: x_account_getxapi
+#: model:ir.model,name:x_account_getxapi.model_social_live_post
+msgid "Social Live Post"
+msgstr "منشور اجتماعي حي"
+
+#. module: x_account_getxapi
+#: model:ir.model,name:x_account_getxapi.model_social_media
+msgid "Social Media"
+msgstr "مواقع التواصل الاجتماعي"
+
+#. module: x_account_getxapi
+#: model:ir.model.fields,field_description:x_account_getxapi.field_getxapi_api_usage__status_code
+#: model_terms:ir.ui.view,arch_db:x_account_getxapi.getxapi_usage_view_search
+msgid "Status Code"
+msgstr "رمز الحالة"
+
+#. module: x_account_getxapi
+#: model:ir.model.fields,field_description:x_account_getxapi.field_getxapi_api_usage__success
+#: model_terms:ir.ui.view,arch_db:x_account_getxapi.getxapi_usage_view_search
+msgid "Success"
+msgstr "نجاح"
+
+#. module: x_account_getxapi
+#: model_terms:ir.ui.view,arch_db:x_account_getxapi.getxapi_usage_view_search
+msgid "Successful"
+msgstr "ناجح"
+
+#. module: x_account_getxapi
+#: model:ir.model.fields,help:x_account_getxapi.field_getxapi_api_usage__endpoint
+msgid "The GetXAPI endpoint path (e.g. twitter/tweet/retweet)."
+msgstr "مسار نقطة نهاية GetXAPI (مثل twitter/tweet/retweet)."
+
+#. module: x_account_getxapi
+#: model:ir.model.fields,help:x_account_getxapi.field_getxapi_api_usage__account_id
+msgid ""
+"The X account that triggered this API call. The account cannot be deleted "
+"while usage records reference it, so spend history never loses its "
+"attribution; archive the account instead."
+msgstr "حساب X الذي أطلق هذا الاستدعاء. لا يمكن حذف الحساب ما دامت سجلات "
+"الاستخدام تشير إليه، حتى لا يفقد سجل الإنفاق مصدره؛ أرشف الحساب بدلًا "
+"من ذلك."
+
+#. module: x_account_getxapi
+#: model:ir.model.fields,field_description:x_account_getxapi.field_getxapi_api_usage__timestamp
+#: model_terms:ir.ui.view,arch_db:x_account_getxapi.getxapi_usage_view_search
+msgid "Timestamp"
+msgstr "الطابع الزمني"
+
+#. module: x_account_getxapi
+#: model:ir.model.fields,field_description:x_account_getxapi.field_getxapi_api_usage__twitter_error_code
+msgid "Twitter Error Code"
+msgstr "رمز خطأ تويتر"
+
+#. module: x_account_getxapi
+#: model:ir.model.fields,help:x_account_getxapi.field_social_account__x_getxapi_auth_token
+msgid "Twitter session auth_token for GetXAPI write operations."
+msgstr "رمز الجلسة auth_token الخاص بتويتر لعمليات الكتابة في GetXAPI."
+
+#. module: x_account_getxapi
+#: model:ir.model.fields,help:x_account_getxapi.field_getxapi_api_usage__twitter_error_code
+msgid ""
+"Upstream X error code embedded in the GetXAPI body (e.g. 502 = X daily "
+"DM/message-request limit)."
+msgstr "رمز خطأ X من المصدر الأعلى كما ورد في جسم GetXAPI (مثل 502 = تجاوز "
+"الحد اليومي لرسائل X المباشرة/طلبات الرسائل)."
+
+#. module: x_account_getxapi
+#. odoo-python
+#: code:addons/x_account_getxapi/models/import_session.py:0
+msgid "Username / Handle is required for GetXAPI."
+msgstr "اسم المستخدم / المعرّف مطلوب لـ GetXAPI."
+
+#. module: x_account_getxapi
+#: model:ir.model.fields,field_description:x_account_getxapi.field_getxapi_api_usage__account_id
+#: model_terms:ir.ui.view,arch_db:x_account_getxapi.getxapi_usage_view_search
+msgid "X Account"
+msgstr "حساب X"
+
+#. module: x_account_getxapi
+#: model:ir.model.fields,field_description:x_account_getxapi.field_res_config_settings__x_provider
+#: model:ir.model.fields,field_description:x_account_getxapi.field_social_account__x_provider
+msgid "X Provider"
+msgstr "مزود X"
+
