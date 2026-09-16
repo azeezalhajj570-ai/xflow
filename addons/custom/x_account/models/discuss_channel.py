@@ -13,6 +13,15 @@ _logger = logging.getLogger(__name__)
 class DiscussChannel(models.Model):
     _inherit = 'discuss.channel'
 
+    active = fields.Boolean(
+        string='Active',
+        default=True,
+        tracking=True,
+        help='Unchecking archives this conversation. Odoo drops tracking for '
+             'the transaction that creates a record, and an X conversation is '
+             'created with all its X fields already set — so the chatter only '
+             'logs changes made after the conversation exists.',
+    )
     channel_type = fields.Selection(
         selection_add=[
             ('x', 'X Conversation'),

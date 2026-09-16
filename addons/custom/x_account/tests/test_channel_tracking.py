@@ -8,7 +8,7 @@ class TestChannelTracking(XAccountTestBase):
     """The X fields of a conversation carry mail.thread tracking, so a chat's
     X account / partner / sync state changes are auditable in its chatter."""
 
-    TRACKED = ['x_account_id', 'x_partner_id', 'x_conversation_id',
+    TRACKED = ['active', 'x_account_id', 'x_partner_id', 'x_conversation_id',
                'x_sync_status']
 
     @classmethod
@@ -72,6 +72,23 @@ class TestChannelTracking(XAccountTestBase):
         value = self._tracking_value(channel, 'x_partner_id')
         self.assertTrue(value, 'x_partner_id change was not logged')
         self.assertEqual(value.new_value_char, 'X User')
+
+    def test_archiving_a_chat_is_logged(self):
+        """The X fields of a conversation are written when it is created, and
+        Odoo drops tracking for the creating transaction — so the chatter's
+        first entry is normally the archive done from the form."""
+        channel = self._channel(x_conversation_id='conv-3')
+        self.assertTrue(channel.active)
+        channel.write({'active': False})
+        value = self._tracking_value(channel, 'active')
+        self.assertTrue(value, 'archiving the chat was not logged')
+        self.assertEqual(value.new_value_integer, 0)
+
+    def test_creation_of_an_x_chat_logs_no_tracking(self):
+        """Documents the limitation: a conversation is created with its X
+        fields already set, so nothing is tracked at creation time."""
+        channel = self._channel(x_conversation_id='conv-4')
+        self.assertFalse(channel.message_ids.tracking_value_ids)
 
     def test_plain_channels_are_not_touched(self):
         """A Discuss channel with no X fields logs no X tracking value."""
