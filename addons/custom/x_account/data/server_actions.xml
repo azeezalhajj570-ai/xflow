@@ -13,10 +13,10 @@ for rec in records:
         <record id="action_server_fetch_group_messages" model="ir.actions.server">
             <field name="name">Fetch Group Messages</field>
             <field name="model_id" ref="mail.model_discuss_channel"/>
+            <field name="binding_model_id" ref="mail.model_discuss_channel"/>
+            <field name="binding_type">action</field>
             <field name="state">code</field>
-            <field name="code">action = False
-for rec in records:
-    action = rec.with_context(dialog=True).action_fetch_group_messages()</field>
+            <field name="code">action = records.action_fetch_group_messages_bulk()</field>
         </record>
 
         <record id="action_server_fetch_group_members" model="ir.actions.server">

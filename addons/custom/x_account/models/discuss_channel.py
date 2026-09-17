@@ -158,6 +158,10 @@ class DiscussChannel(models.Model):
         # filters these out before they reach here; this guard keeps every
         # provider honest.
         if not (body or '').strip():
+            _logger.info(
+                'x.message not stored: empty body (channel=%s external_id=%s '
+                'direction=%s account=%s)',
+                self.id, external_id, direction, self.x_account_id.id)
             return self.env['x.message']
         # OmniX delivers timestamps in several shapes: ISO-8601 strings
         # ("2026-08-31T12:00:00Z") or Unix epoch milliseconds (ints). Odoo
@@ -220,7 +224,7 @@ class DiscussChannel(models.Model):
         account = self.x_account_id
         if not account:
             raise ValueError('This group has no linked X account.')
-        provider = account.get_action_provider()
+        provider = account._x_group_read_provider('fetch_group_messages')
         if getattr(provider, '_needs_encryption_code', True) and not account.x_encryption_code:
             raise ValueError(
                 'Set the XChat Encryption Code on the account first — it is '
@@ -266,21 +270,31 @@ class DiscussChannel(models.Model):
                     }
             raise
         count = 0
+        dropped_empty = 0
         for msg in result['messages']:
             author_partner = False
             sender_id = msg.get('sender_id')
             if sender_id:
                 author_partner = self.env['res.partner'].sudo().search(
                     [('x_user_id', '=', str(sender_id))], limit=1)
-            if self._save_x_message(
+            stored = self._save_x_message(
                 direction='outbound' if msg.get('from_me') else 'inbound',
                 external_id=msg['id'],
                 body=msg.get('text', ''),
                 external_created_at=msg.get('created_at'),
                 author_partner=author_partner,
                 author_x_id=sender_id,
-            ):
+            )
+            if stored:
                 count += 1
+            else:
+                dropped_empty += 1
+        _logger.info(
+            'action_fetch_group_messages channel=%s conversation=%s: provider '
+            'returned %s message(s), %s usable (new or already present), %s '
+            'dropped for empty body, %s event(s) still encrypted',
+            self.id, conv_id, len(result['messages']), count, dropped_empty,
+            len(result.get('encrypted') or []))
         if self.env.context.get('dialog'):
             return {
                 'type': 'ir.actions.client',
@@ -293,6 +307,65 @@ class DiscussChannel(models.Model):
                 },
             }
         return {'messages': count}
+
+    def action_fetch_group_messages_bulk(self):
+        """Fetch messages for several X conversations at once.
+
+        Server-action entry point for the Chat list/view: iterates the selected
+        records, skips the ones that cannot host a conversation lookup (non-X
+        chats, missing account or conversation id), reuses the
+        single-conversation logic for the rest, and returns one aggregated
+        notification while continuing on any per-conversation failure.
+        """
+        records = self.filtered(
+            lambda ch: ch.channel_type in ('x', 'x_group')
+            and ch.x_account_id and ch.x_conversation_id)
+        skipped = len(self) - len(records)
+        processed = stored = 0
+        failures = []
+        for channel in records:
+            try:
+                # Dropped dialog context: the single-conversation method returns
+                # its plain result instead of one notification per chat, which
+                # is what lets the aggregate below count the messages.
+                result = channel.with_context(dialog=False) \
+                    .action_fetch_group_messages()
+            except Exception as exc:
+                failures.append((channel.name or str(channel.id), str(exc)))
+                continue
+            processed += 1
+            stored += result.get('messages', 0)
+        parts = []
+        if processed:
+            parts.append('%s chat(s)' % processed)
+            parts.append('%s message(s) stored' % stored)
+        if skipped:
+            parts.append('%s skipped' % skipped)
+        if failures:
+            parts.append('%s failed' % len(failures))
+        message = ', '.join(parts) if parts else 'No X conversations selected.'
+        if failures:
+            preview = '; '.join('%s: %s' % (name, error)
+                                for name, error in failures[:5])
+            if len(failures) > 5:
+                preview += '; and %s more' % (len(failures) - 5)
+            message += ' | ' + preview
+        if not processed:
+            ntype = 'danger' if failures else 'info'
+        elif failures:
+            ntype = 'warning'
+        else:
+            ntype = 'success'
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': 'Fetch Group Messages',
+                'message': message,
+                'type': ntype,
+                'sticky': True,
+            },
+        }
 
     def action_fetch_group_info(self):
         """Fetch this conversation's info from X (official Chat API) and update
