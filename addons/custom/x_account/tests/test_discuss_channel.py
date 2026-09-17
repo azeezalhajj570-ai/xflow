@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from odoo.tests import tagged
 
 from odoo.addons.x_account.tests.common import XAccountTestBase
@@ -202,3 +204,40 @@ class TestXSaveXMessage(XAccountTestBase):
         self.assertFalse(
             self.env['discuss.channel'].sudo().browse(channel_id).exists())
         self.assertFalse(xm.exists())
+
+    def test_fetch_group_messages_action_is_bound_to_the_chat_model(self):
+        """The action has to be reachable from a chat's Action menu.
+
+        It shipped with a NULL ``binding_model_id`` inside a ``noupdate``
+        block, so it existed but no menu ever offered it.
+        """
+        action = self.env.ref('x_account.action_server_fetch_group_messages')
+        self.assertEqual(action.model_id.model, 'discuss.channel')
+        self.assertEqual(action.binding_model_id.model, 'discuss.channel')
+        self.assertEqual(action.binding_type, 'action')
+        self.assertIn('action_fetch_group_messages_bulk', action.code)
+
+    def test_fetch_group_messages_bulk_skips_non_x_chats(self):
+        """A model-wide action must tolerate ordinary chats being selected."""
+        plain = self.env['discuss.channel'].create({'name': 'Plain chat'})
+        x_group = self._channel('g-test-bulk')
+        channel_model = type(self.env['discuss.channel'])
+        with patch.object(channel_model, 'action_fetch_group_messages',
+                          return_value={'messages': 3}):
+            action = (plain + x_group).action_fetch_group_messages_bulk()
+        self.assertEqual(action['tag'], 'display_notification')
+        self.assertEqual(action['params']['type'], 'success')
+        self.assertIn('1 chat(s)', action['params']['message'])
+        self.assertIn('3 message(s) stored', action['params']['message'])
+        self.assertIn('1 skipped', action['params']['message'])
+
+    def test_fetch_group_messages_bulk_reports_failure_without_raising(self):
+        """One failing conversation must not abort the others."""
+        x_group = self._channel('g-test-bulk-fail')
+        channel_model = type(self.env['discuss.channel'])
+        with patch.object(channel_model, 'action_fetch_group_messages',
+                          side_effect=ValueError('boom')):
+            action = x_group.action_fetch_group_messages_bulk()
+        self.assertEqual(action['params']['type'], 'danger')
+        self.assertIn('1 failed', action['params']['message'])
+        self.assertIn('boom', action['params']['message'])

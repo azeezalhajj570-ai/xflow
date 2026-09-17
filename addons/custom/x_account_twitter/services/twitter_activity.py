@@ -63,10 +63,13 @@ class TwitterActivity:
             # Known X control/status envelopes (e.g. replay job notifications)
             # carry no processable activity; acknowledge silently.
             if isinstance(envelope, dict) and 'replay_job_status' in envelope:
-                _logger.info('x_account_twitter: ignoring webhook control '
-                             'notification (replay_job_status)')
+                _logger.info('x_account_twitter: webhook control notification '
+                             '(replay_job_status) payload=%s',
+                             json.dumps(envelope, default=str))
                 return {'status': 'ignored', 'reason': 'control_notification'}
-            _logger.warning('x_account_twitter: webhook payload has no data object')
+            _logger.warning(
+                'x_account_twitter: webhook payload has no data object keys=%s',
+                list(envelope) if isinstance(envelope, dict) else type(envelope))
             return {'status': 'ignored', 'reason': 'no_data'}
         event_uuid = data.get('event_uuid')
         event_type = data.get('event_type')
