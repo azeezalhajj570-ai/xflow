@@ -219,6 +219,18 @@ class XMessage(models.Model):
                 return
 
             for tweet_id in tweet_ids:
+                if self.env['x.account.task'].sudo()._has_blocking_task(
+                        account.id, operation, target_post_id=tweet_id):
+                    # Recurring links re-post the same tweet every hour. X
+                    # rejects a repeat retweet, so a second task would burn all
+                    # its attempts and end ``failed`` for work already done.
+                    _logger.info(
+                        'Channel automation skipped duplicate (operation=%s) for '
+                        'x.message id=%s, tweet_id=%s, account_id=%s: an existing '
+                        'task is pending, running or already succeeded',
+                        operation, self.id, tweet_id, account.id,
+                    )
+                    continue
                 task_ctx = {
                     'post': {'post_id': tweet_id},
                     'channel_id': self.channel_id.id,
@@ -242,6 +254,16 @@ class XMessage(models.Model):
                     'Channel automation skipped (operation=%s): missing author_x_username '
                     'for x.message id=%s, author_x_id=%s',
                     operation, self.id, self.author_x_id,
+                )
+                return
+            if self.env['x.account.task'].sudo()._has_blocking_task(
+                    account.id, 'follow',
+                    target_screen_name=self.author_x_username):
+                _logger.info(
+                    'Channel automation skipped duplicate (operation=follow) for '
+                    'x.message id=%s, screen_name=%s, account_id=%s: an existing '
+                    'task is pending, running or already succeeded',
+                    self.id, self.author_x_username, account.id,
                 )
                 return
             task_ctx = {
