@@ -118,12 +118,49 @@ class XAccountTask(models.Model):
     _QUEUE_MAX_AGE_MINUTES = 60
     _WEBHOOK_OPERATION = 'process_webhook_event'
     _TERMINAL_STATUSES = ('success', 'failed', 'cancelled')
+    # A task in one of these states means the operation is already done, or in
+    # flight, for its target: an equivalent task must not be created for it.
+    # ``failed``/``cancelled`` are deliberately absent so a genuine retry still
+    # gets its one task.
+    _DUPLICATE_BLOCKING_STATUSES = ('pending', 'running', 'success')
+    # Engagement operations that are idempotent per target: repeating one is
+    # either a no-op X rejects or a duplicate the operator never wanted.
+    _DUPLICATE_CLEANUP_OPERATIONS = (
+        'like', 'repost', 'comment', 'follow', 'bookmark', 'unbookmark')
+
+    @staticmethod
+    def _target_post_id_from_context(ctx):
+        """Normalize the target post id out of a task context.
+
+        Channel automation stores ``{'post': {'post_id': ...}}`` while group
+        automation stores a top-level ``target_id``. Reading only the top-level
+        ``post_id`` left ``target_post_id`` empty for every channel task, which
+        made the dedup index unusable and let each re-post of the same link
+        spawn another task.
+        """
+        nested = ctx.get('post')
+        if not isinstance(nested, dict):
+            nested = {}
+        for value in (ctx.get('post_id'), nested.get('post_id'),
+                      ctx.get('target_id')):
+            if value:
+                return str(value)
+        return False
+
+    @staticmethod
+    def _dedup_target(target_post_id, target_screen_name):
+        """The per-target key an operation is idempotent on.
+
+        Tweet operations key on the post id; ``follow`` has no post id and keys
+        on the screen name instead.
+        """
+        return str(target_post_id or '').strip() or (target_screen_name or False)
 
     @api.depends('task_context')
     def _compute_task_targets(self):
         for task in self:
             ctx = task._task_context()
-            task.target_post_id = str(ctx.get('post_id') or '') or False
+            task.target_post_id = task._target_post_id_from_context(ctx)
             task.target_screen_name = ctx.get('screen_name') or False
             task.source = ctx.get('source') or False
 
@@ -498,6 +535,30 @@ class XAccountTask(models.Model):
         except ValueError:
             return {}
 
+    @api.model
+    def _has_blocking_task(self, account_id, operation, target_post_id=None,
+                           target_screen_name=None):
+        """Whether an equivalent task already exists for this target.
+
+        Pending means the work is queued, running means it is happening and
+        success means it is done — in all three cases another task would either
+        duplicate the work or fail deterministically (X rejects a repeat
+        retweet). ``failed`` and ``cancelled`` deliberately do not block, so a
+        genuine retry still gets exactly one task.
+        """
+        domain = [
+            ('account_id', '=', account_id),
+            ('operation', '=', operation),
+            ('status', 'in', self._DUPLICATE_BLOCKING_STATUSES),
+        ]
+        if target_post_id:
+            domain.append(('target_post_id', '=', str(target_post_id)))
+        elif target_screen_name:
+            domain.append(('target_screen_name', '=', target_screen_name))
+        else:
+            return False
+        return bool(self.sudo().search_count(domain))
+
     @staticmethod
     def _follow_succeeded(result):
         """Whether a follow operation result signals success.
@@ -551,6 +612,69 @@ class XAccountTask(models.Model):
         if not partner:
             return
         account.sudo().write({'x_following_ids': [(4, partner.id)]})
+
+    def action_cancel_duplicate_tasks(self, operations=None):
+        """Cancel failed tasks whose operation already succeeded for the target.
+
+        A recurring link (the same tweet re-posted every hour) used to create a
+        fresh task each time. X rejects the repeat, so the queue burned every
+        attempt and the task ended ``failed`` — a duplicate of work that had
+        already succeeded, not a real failure. Marking them ``cancelled`` keeps
+        the failed list meaningful: what remains is targets that genuinely never
+        succeeded.
+
+        Defaults to the idempotent engagement operations; pass ``operations`` to
+        narrow it.
+        """
+        ops = list(operations or self._DUPLICATE_CLEANUP_OPERATIONS)
+        if not ops:
+            return self._duplicate_cleanup_notification(0)
+        Task = self.sudo()
+        succeeded = Task.search_read(
+            [('status', '=', 'success'), ('operation', 'in', ops)],
+            ['account_id', 'operation', 'target_post_id', 'target_screen_name'])
+        done_keys = set()
+        for row in succeeded:
+            target = self._dedup_target(
+                row['target_post_id'], row['target_screen_name'])
+            if target:
+                done_keys.add((row['account_id'][0], row['operation'], target))
+        duplicates = Task.browse()
+        if done_keys:
+            failed = Task.search([
+                ('status', '=', 'failed'),
+                ('operation', 'in', ops),
+            ])
+            for task in failed:
+                target = self._dedup_target(
+                    task.target_post_id, task.target_screen_name)
+                if target and (task.account_id.id, task.operation,
+                               target) in done_keys:
+                    duplicates |= task
+        for operation in ops:
+            subset = duplicates.filtered(lambda t, op=operation:
+                                         t.operation == op)
+            if subset:
+                subset.write({
+                    'status': 'cancelled',
+                    'error': 'Duplicate: %s already performed for this target'
+                             % operation,
+                })
+        return self._duplicate_cleanup_notification(len(duplicates))
+
+    @staticmethod
+    def _duplicate_cleanup_notification(count):
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': 'Cancel Duplicate Failed Tasks',
+                'message': ('%s duplicate task(s) cancelled.' % count if count
+                            else 'No duplicate failed tasks found.'),
+                'type': 'success' if count else 'info',
+                'sticky': False,
+            },
+        }
 
     def action_ignore_stale(self, age_minutes=None):
         """Mark pending tasks older than the given age as failed.

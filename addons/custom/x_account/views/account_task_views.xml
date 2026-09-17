@@ -23,6 +23,11 @@
                             class="btn-primary"
                             icon="fa-play"
                             title="Run the pending task queue now"/>
+                    <button name="action_cancel_duplicate_tasks"
+                            string="Cancel Duplicate Failed Tasks"
+                            type="object"
+                            icon="fa-ban"
+                            title="Cancel failed tasks whose operation already succeeded for the same target"/>
                 </control>
             </list>
         </field>
@@ -40,6 +45,11 @@
                             class="btn-primary"
                             title="Run the pending task queue now"/>
                     <button name="action_cancel" string="Cancel" type="object" class="btn-secondary"/>
+                    <button name="action_cancel_duplicate_tasks"
+                            string="Cancel Duplicate Failed Tasks"
+                            type="object"
+                            class="btn-secondary"
+                            title="Cancel failed tasks whose operation already succeeded for the same target"/>
                 </header>
                 <sheet>
                     <group>

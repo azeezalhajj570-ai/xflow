@@ -1,4 +1,5 @@
 from datetime import timedelta
+import json
 from unittest.mock import patch
 import time
 
@@ -416,3 +417,88 @@ class TestXTaskQueue(XAccountTestBase):
         for task in tasks:
             task.invalidate_recordset()
             self.assertEqual(task.status, 'success')
+
+
+@tagged('post_install', '-at_install', 'x_account')
+class TestTaskTargetsAndDuplicateCleanup(XAccountTestBase):
+    """Target normalization plus the duplicate-failure cleanup action."""
+
+    POST_ID = '123456789'
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.twitter_media = cls.env.ref('social_twitter.social_media_twitter')
+        cls.account = cls.env['social.account'].create({
+            'name': 'Dedup Account',
+            'media_id': cls.twitter_media.id,
+        })
+
+    def _make_task(self, operation='repost', context=None, status='pending',
+                   account=None):
+        return self.env['x.account.task'].create({
+            'account_id': (account or self.account).id,
+            'operation': operation,
+            'status': status,
+            'task_context': json.dumps(context or {}),
+        })
+
+    def test_nested_post_id_is_normalized(self):
+        """Channel automation stores the tweet id under ``post.post_id``."""
+        task = self._make_task(context={'post': {'post_id': self.POST_ID}})
+        self.assertEqual(task.target_post_id, self.POST_ID)
+
+    def test_top_level_post_id_is_normalized(self):
+        task = self._make_task(context={'post_id': self.POST_ID})
+        self.assertEqual(task.target_post_id, self.POST_ID)
+
+    def test_target_id_is_normalized(self):
+        """Group automation stores a top-level ``target_id``."""
+        task = self._make_task(context={'target_id': self.POST_ID})
+        self.assertEqual(task.target_post_id, self.POST_ID)
+
+    def test_screen_name_is_normalized(self):
+        task = self._make_task(operation='follow',
+                               context={'screen_name': 'azeez'})
+        self.assertEqual(task.target_screen_name, 'azeez')
+
+    def test_cleanup_cancels_failed_duplicates_of_a_success(self):
+        context = {'post': {'post_id': self.POST_ID}}
+        self._make_task(context=context, status='success')
+        first = self._make_task(context=context, status='failed')
+        second = self._make_task(context=context, status='failed')
+        action = self.env['x.account.task'].action_cancel_duplicate_tasks()
+        for task in (first, second):
+            task.invalidate_recordset()
+            self.assertEqual(task.status, 'cancelled')
+            self.assertIn('Duplicate: repost already performed',
+                          task.error)
+            self.assertTrue(task.done_at)
+        self.assertIn('2 duplicate task(s) cancelled',
+                      action['params']['message'])
+
+    def test_cleanup_keeps_unique_failures(self):
+        """A target that never succeeded is a real failure, not a duplicate."""
+        self._make_task(context={'post': {'post_id': self.POST_ID}},
+                        status='success')
+        orphan = self._make_task(context={'post': {'post_id': '999999'}},
+                                 status='failed')
+        self.env['x.account.task'].action_cancel_duplicate_tasks()
+        orphan.invalidate_recordset()
+        self.assertEqual(orphan.status, 'failed')
+
+    def test_cleanup_is_a_noop_when_nothing_matches(self):
+        action = self.env['x.account.task'].action_cancel_duplicate_tasks()
+        self.assertEqual(action['params']['type'], 'info')
+        self.assertIn('No duplicate failed tasks found',
+                      action['params']['message'])
+
+    def test_cleanup_respects_the_operation_filter(self):
+        context = {'post': {'post_id': self.POST_ID}}
+        self._make_task(operation='repost', context=context, status='success')
+        failed_like = self._make_task(operation='like', context=context,
+                                      status='failed')
+        self.env['x.account.task'].action_cancel_duplicate_tasks(
+            operations=['repost'])
+        failed_like.invalidate_recordset()
+        self.assertEqual(failed_like.status, 'failed')
