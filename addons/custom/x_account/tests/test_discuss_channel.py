@@ -241,3 +241,48 @@ class TestXSaveXMessage(XAccountTestBase):
         self.assertEqual(action['params']['type'], 'danger')
         self.assertIn('1 failed', action['params']['message'])
         self.assertIn('boom', action['params']['message'])
+
+    def test_archived_channel_is_reused_not_duplicated(self):
+        """A hidden channel still owns its conversation id.
+
+        ``UNIQUE(x_account_id, x_conversation_id)`` ignores ``active``, so the
+        lookup has to see archived rows: otherwise the caller inserts a
+        duplicate, the constraint rejects it, and the recovery lookup misses the
+        row for the same reason — failing the batch and dropping the message.
+        """
+        channel = self._channel('g-test-archived')
+        channel.write({'active': False})
+        resolved = self.env['discuss.channel'].sudo()._get_x_channel(
+            self.account,
+            conversation_id='g-test-archived',
+            channel_type='x_group',
+            create_if_not_found=True,
+        )
+        self.assertEqual(resolved.id, channel.id)
+        self.assertFalse(resolved.active)
+        self.assertEqual(
+            self.env['discuss.channel'].sudo().with_context(
+                active_test=False).search_count([
+                    ('x_account_id', '=', self.account.id),
+                    ('x_conversation_id', '=', 'g-test-archived'),
+                ]), 1)
+
+    def test_message_is_still_stored_for_an_archived_channel(self):
+        """Stopping the crash is not enough: the message must be recorded."""
+        channel = self._channel('g-test-archived-msg')
+        channel.write({'active': False})
+        resolved = self.env['discuss.channel'].sudo()._get_x_channel(
+            self.account,
+            conversation_id='g-test-archived-msg',
+            channel_type='x_group',
+            create_if_not_found=True,
+        )
+        xm = resolved._save_x_message(
+            direction='inbound',
+            external_id='99999999-9999-9999-9999-999999999999',
+            body='stored while hidden',
+            external_created_at=False,
+            no_mail=True,
+        )
+        self.assertTrue(xm)
+        self.assertEqual(xm.body_plain, 'stored while hidden')

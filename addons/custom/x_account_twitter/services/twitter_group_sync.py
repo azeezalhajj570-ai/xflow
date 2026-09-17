@@ -588,6 +588,7 @@ class TwitterGroupSync:
         messages = []
         encrypted = []
         raw_blobs = []
+        plaintext_count = 0
         key_change_blobs = []
         pagination_token = None
         while True:
@@ -619,6 +620,7 @@ class TwitterGroupSync:
                     })
                     continue
                 if event_type == 'MessageCreate' or text:
+                    plaintext_count += 1
                     messages.append({
                         'id': event.get('id'),
                         'sender_id': sender_id,
@@ -639,11 +641,24 @@ class TwitterGroupSync:
         decryptor = self._xchat_decryptor()
         if raw_blobs and decryptor.available:
             try:
+                # Pass the senders so a different-user sender in group chats can
+                # be signature-verified (same contract as the webhook path in
+                # twitter_activity); the conversation id persists freshly
+                # recovered keys for later deliveries.
+                sender_ids = list({
+                    str(enc.get('sender_id')) for enc in encrypted
+                    if enc.get('sender_id')})
                 result = decryptor.decrypt_events(
-                    raw_blobs, key_change_events=key_change_blobs)
+                    raw_blobs, key_change_events=key_change_blobs,
+                    sender_ids=sender_ids or None,
+                    conversation_id=conversation_id)
                 by_id = {}
                 for dm in result.get('messages') or []:
-                    ev = dm.get('event') or {}
+                    # The XDK returns the event itself, not nested under 'event'
+                    # (same shape twitter_activity handles); accept the wrapped
+                    # form too. Reading only 'event' silently matched nothing,
+                    # so every decrypted event was dropped as unusable.
+                    ev = dm if 'type' in dm else (dm.get('event') or {})
                     eid = ev.get('id') or ev.get('message_id')
                     if eid:
                         by_id[str(eid)] = ev
@@ -683,13 +698,30 @@ class TwitterGroupSync:
                                 self.client.account.twitter_user_id),
                             'encrypted': False,
                         })
+                    elif ev:
+                        _LOGGER.info(
+                            'XChat fetch %s: event %s decrypted to type=%s, '
+                            'not Message — not stored',
+                            conversation_id, enc['id'], ev.get('type'))
+                        still_encrypted.append(enc)
                     else:
+                        _LOGGER.info(
+                            'XChat fetch %s: event %s produced no usable '
+                            'entry when decrypted (signature/decryption '
+                            'failure) — not stored',
+                            conversation_id, enc['id'])
                         still_encrypted.append(enc)
                 encrypted = still_encrypted
             except Exception as exc:
                 _LOGGER.warning(
                     'Chat XDK decryption failed for conversation %s (%s); '
                     'keeping encrypted markers', conversation_id, exc)
+        _LOGGER.info(
+            'XChat fetch %s: %s plaintext event(s) + %s encoded blob(s) -> '
+            '%s message(s) to store, %s event(s) not stored (still encrypted '
+            'or not a Message)',
+            conversation_id, plaintext_count, len(raw_blobs), len(messages),
+            len(encrypted))
         return {'messages': messages, 'encrypted': encrypted}
 
     def _xchat_decryptor(self):
