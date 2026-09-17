@@ -139,7 +139,14 @@ class DiscussChannel(models.Model):
             domain.append(('x_conversation_id', '=', conversation_id))
         elif partner:
             domain.append(('x_partner_id', '=', partner.id))
-        return self.search(domain, limit=1)
+        # Archived channels must be found too: the UNIQUE(x_account_id,
+        # x_conversation_id) constraint ignores ``active``, so a hidden channel
+        # still owns its conversation id. Looking only at active records made
+        # ``_get_x_channel`` insert a duplicate, which the constraint rejected,
+        # and its recovery lookup missed the row for the same reason — so every
+        # delivery for an archived conversation failed its batch and the
+        # message was dropped.
+        return self.with_context(active_test=False).search(domain, limit=1)
 
     def _save_x_message(self, direction, external_id, body, external_created_at,
                         author_partner=None, **kw):
