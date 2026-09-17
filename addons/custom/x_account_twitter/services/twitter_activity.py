@@ -25,6 +25,7 @@ import psycopg2
 from odoo import fields
 
 from . import twitter_errors
+from .twitter_group_sync import canonical_chat_conversation_id
 
 _logger = logging.getLogger(__name__)
 
@@ -49,6 +50,10 @@ class TwitterActivity:
         # every single event, which is what made a batch outrun
         # ``limit_time_real`` and get killed mid-sweep.
         self._chat_decryptors = {}
+        # (account_id, conversation_id) pairs whose key chain was already
+        # pulled from the Chat API in this batch, so an unrecoverable
+        # conversation cannot turn every event of the batch into an API call.
+        self._key_seed_attempted = set()
 
     # ---------------------------------------------------------------- ingress
     def ingest_webhook(self, envelope):
@@ -499,6 +504,71 @@ class TwitterActivity:
                 blobs.append(blob)
         return blobs
 
+    @staticmethod
+    def _cached_conversation_keys(account, conversation_id):
+        """Conversation keys cached on the account for one conversation.
+
+        The webhook names a 1:1 conversation with the colon-separated id while
+        the Chat API and the channel-based fetch use the canonical hyphen id,
+        so both cache entries are read — either name may hold the keys.
+        """
+        cache = account.x_chat_conversation_keys or {}
+        keys = dict(cache.get(str(conversation_id)) or {})
+        canonical = canonical_chat_conversation_id(conversation_id)
+        if canonical != str(conversation_id):
+            keys.update(cache.get(canonical) or {})
+        return keys
+
+    def _seed_conversation_keys_from_chat_api(self, decryptor, account,
+                                              conversation_id):
+        """Recover a conversation's key chain from the Chat events feed.
+
+        A webhook delivery for a 1:1 XChat conversation carries no
+        ``conversation_key_change_event`` (only group deliveries do), so a
+        message whose conversation key was created before this account's
+        subscription has no key anywhere local: not in the delivery, not in
+        ``x_chat_conversation_keys`` and not in any stored event. ``GET
+        /2/chat/conversations/{id}/events`` returns the conversation's whole
+        key-change chain in ``meta.conversation_key_events`` and is the only
+        remaining source. The request goes out with the canonical id (X's Chat
+        API rejects the colon form) while the recovered keys are cached under
+        the id this delivery used, which is the id the next lookup reads.
+
+        Returns the conversation's ``{version: base64 key}`` cache; ``{}`` when
+        the API exposes no key-change event, the fetch fails, or this
+        conversation was already attempted in this batch.
+        """
+        if not decryptor.client:
+            return {}
+        attempt_key = (account.id, str(conversation_id))
+        if attempt_key in self._key_seed_attempted:
+            return {}
+        self._key_seed_attempted.add(attempt_key)
+        api_id = canonical_chat_conversation_id(conversation_id)
+        try:
+            data = decryptor.client.request(
+                'GET', '/2/chat/conversations/%s/events' % api_id,
+                params={'chat_event.fields': 'id', 'max_results': 100})
+        except Exception as exc:
+            _logger.warning(
+                'x_account_twitter: could not read the chat key-change chain '
+                'for conversation %s (account_id=%s): %s: %s',
+                api_id, account.id, type(exc).__name__, str(exc)[:200])
+            return {}
+        key_events = ((data or {}).get('meta') or {}).get(
+            'conversation_key_events') or []
+        if not key_events:
+            _logger.info(
+                'x_account_twitter: conversation %s exposes no key-change '
+                'event (account_id=%s); its key cannot be recovered from the '
+                'Chat API either', api_id, account.id)
+            return {}
+        _logger.info(
+            'x_account_twitter: seeding %d chat key-change event(s) for '
+            'conversation %s from the Chat API (account_id=%s)',
+            len(key_events), api_id, account.id)
+        return decryptor.collect_conversation_keys(conversation_id, key_events)
+
     def _chat_decryptor_for(self, account):
         """Return this account's Chat decryptor, building it at most once.
 
@@ -545,12 +615,7 @@ class TwitterActivity:
             # Conversation keys recovered on earlier deliveries (persisted on
             # the account) so a message whose key rotated before this delivery
             # can still be decrypted.
-            cached_keys = {}
-            try:
-                cached_keys = (account.x_chat_conversation_keys or {}).get(
-                    str(conversation_id)) or {}
-            except Exception:
-                cached_keys = {}
+            cached_keys = self._cached_conversation_keys(account, conversation_id)
             # Feed any key-change event first so the conversation key is
             # recoverable, then decrypt the message blob. Pass the sender so a
             # different-user sender in group chats can be signature-verified.
@@ -577,6 +642,22 @@ class TwitterActivity:
                         key_change_events=wider,
                         sender_ids=[sender_id],
                         cached_keys=cached_keys,
+                        conversation_id=conversation_id)
+                    errors = result.get('errors') or {}
+            if errors and conversation_id and self._missing_key_error(errors):
+                # Still no key: the conversation key predates this account's
+                # subscription, so no delivery ever carried its key-change
+                # event and no stored event holds one either. Pull the
+                # conversation's key chain from the Chat API and retry once.
+                seeded = self._seed_conversation_keys_from_chat_api(
+                    decryptor, account, conversation_id)
+                if seeded:
+                    retry_keys = dict(cached_keys or {})
+                    retry_keys.update(seeded)
+                    result = decryptor.decrypt_events(
+                        [encoded],
+                        sender_ids=[sender_id],
+                        cached_keys=retry_keys,
                         conversation_id=conversation_id)
                     errors = result.get('errors') or {}
             if errors:

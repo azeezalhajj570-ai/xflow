@@ -6,7 +6,8 @@ from odoo.addons.x_account_twitter.services.twitter_api_client import TwitterApi
 from odoo.addons.x_account_twitter.services.twitter_errors import (
     TwitterAuthenticationError, TwitterPermissionError, TwitterNotFoundError,
     TwitterRateLimitError, TwitterTemporaryError)
-from odoo.addons.x_account_twitter.services.twitter_group_sync import TwitterGroupSync
+from odoo.addons.x_account_twitter.services.twitter_group_sync import (
+    TwitterGroupSync, canonical_chat_conversation_id)
 from odoo.addons.x_account_twitter.services.twitter_provider import TwitterProvider
 
 from .common import XAccountTwitterTestBase
@@ -873,6 +874,41 @@ class TestTwitterGroups(XAccountTwitterTestBase):
         self.assertFalse(by_text['inbound']['from_me'])
         self.assertTrue(by_text['outbound']['from_me'])
         self.assertEqual(by_text['inbound']['sender_id'], '111')
+
+    def test_canonical_chat_conversation_id_rewrites_the_webhook_1to1_form(self):
+        """X's Chat API only accepts ``<id>``, ``<lo>-<hi>`` or ``g<id>``, so
+        the colon-separated 1:1 id a webhook delivers must be rewritten to the
+        canonical hyphen form — and every other id left untouched."""
+        self.assertEqual(canonical_chat_conversation_id('222:111'), '111-222')
+        self.assertEqual(
+            canonical_chat_conversation_id('%s:222' % OWNER_ID),
+            '222-%s' % OWNER_ID)
+        for conv in ('111-222', CHAT_GROUP_ID, GROUP_ID, '111',
+                     '111:222:333', 'abc:def', ''):
+            self.assertEqual(canonical_chat_conversation_id(conv), conv)
+        self.assertEqual(canonical_chat_conversation_id(None), '')
+
+    def test_get_dms_canonicalizes_colon_id_before_the_chat_api(self):
+        """A colon 1:1 id matched neither gate and fell through to the legacy
+        DM endpoint, which rejects the same grammar and answers 402 as well;
+        canonicalized, it must reach the Chat events API instead."""
+        account = self._make_account()
+        provider = TwitterProvider(self.env, account)
+        page = {
+            'data': [
+                {'id': 'cm1', 'event_type': 'MessageCreate', 'sender_id': '111',
+                 'text': 'from the chat api',
+                 'created_at': '2026-09-01T11:00:00Z'},
+            ],
+            'meta': {},
+        }
+        with patch.object(TwitterApiClient, 'request',
+                          return_value=page) as request:
+            result = provider.get_dms('222:111', limit=100)
+        self.assertEqual([m['text'] for m in result['messages']],
+                         ['from the chat api'])
+        self.assertEqual([call.args[1] for call in request.call_args_list],
+                         ['/2/chat/conversations/111-222/events'])
 
     def test_fetch_group_messages_does_not_require_encryption_code(self):
         """The XChat PIN gate only applies to providers that need it."""
