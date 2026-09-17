@@ -1000,6 +1000,91 @@ class TestXChatDecryption(XAccountTwitterTestBase):
         self.assertFalse(xmsg.encrypted)
         self.assertEqual(xmsg.body_plain, 'hello decrypted')
 
+    def test_group_sync_passes_sender_ids_for_signature_verification(self):
+        """The fetch path must hand the decryptor the event senders, otherwise
+        messages from a different user in a group chat can't be
+        signature-verified and are dropped as "no usable entry" (the webhook
+        path already passes sender_ids)."""
+        account = self._make_account(with_blob=True)
+        channel = self.env['discuss.channel'].sudo()._get_x_channel(
+            account, conversation_id=CHAT_GROUP_ID, channel_type='x_group',
+            create_if_not_found=True)
+        page = {
+            'data': [
+                {'id': 'cm1', 'event_type': 'MessageCreate', 'sender_id': '111',
+                 'encoded_event': 'blob-1', 'created_at': '2026-09-01T11:00:00Z'},
+                {'id': 'cm2', 'event_type': 'MessageCreate', 'sender_id': '222',
+                 'encoded_event': 'blob-2', 'created_at': '2026-09-01T11:01:00Z'},
+                {'id': 'cm3', 'event_type': 'MessageCreate',
+                 'sender_id': '111',
+                 'encoded_event': 'blob-3', 'created_at': '2026-09-01T11:02:00Z'},
+            ],
+            'meta': {'conversation_key_events': ['kc-blob']},
+        }
+        fake_decryptor = MagicMock()
+        fake_decryptor.available = True
+        fake_decryptor.decrypt_events.return_value = {
+            'messages': [
+                {'id': 'cm1', 'type': 'Message', 'sender_id': '111',
+                 'content': {'text': 'from alice'}},
+                {'id': 'cm2', 'type': 'Message', 'sender_id': '222',
+                 'content': {'text': 'from bob'}},
+                {'id': 'cm3', 'type': 'Message', 'sender_id': '111',
+                 'content': {'text': 'from alice 2'}},
+            ],
+            'errors': {},
+        }
+        with patch.object(TwitterApiClient, 'request', return_value=page), \
+             patch.object(TwitterGroupSync, '_xchat_decryptor',
+                          return_value=fake_decryptor):
+            result = channel.action_fetch_group_messages()
+        self.assertEqual(result['messages'], 3)
+        self.assertEqual(sorted(fake_decryptor.decrypt_events.call_args.kwargs[
+            'sender_ids']), ['111', '222'])
+        self.assertEqual(fake_decryptor.decrypt_events.call_args.kwargs[
+            'conversation_id'], CHAT_GROUP_ID)
+        xmsgs = self.env['x.message'].sudo().search([
+            ('channel_id', '=', channel.id),
+        ])
+        self.assertEqual(len(xmsgs), 3)
+
+    def test_unwrapped_decrypt_result_is_stored(self):
+        """The XDK returns the event itself, not nested under 'event'.
+
+        The fetch path read only the wrapped form, so it matched none of the
+        decrypted events and reported 0 stored no matter how many decrypted
+        (the webhook path already gates on ``'type' in msg`` for this reason).
+        """
+        account = self._make_account(with_blob=True)
+        channel = self.env['discuss.channel'].sudo()._get_x_channel(
+            account, conversation_id=CHAT_GROUP_ID, channel_type='x_group',
+            create_if_not_found=True)
+        page = {
+            'data': [
+                {'id': 'cm1', 'event_type': 'MessageCreate', 'sender_id': '111',
+                 'encoded_event': 'blob-1', 'created_at': '2026-09-01T11:00:00Z'},
+            ],
+            'meta': {'conversation_key_events': ['kc-blob']},
+        }
+        fake_decryptor = MagicMock()
+        fake_decryptor.available = True
+        fake_decryptor.decrypt_events.return_value = {
+            'messages': [
+                {'id': 'cm1', 'type': 'Message', 'sender_id': '111',
+                 'content': {'text': 'hello decrypted'}},
+            ],
+            'errors': {},
+        }
+        with patch.object(TwitterApiClient, 'request', return_value=page), \
+             patch.object(TwitterGroupSync, '_xchat_decryptor',
+                          return_value=fake_decryptor):
+            result = channel.action_fetch_group_messages()
+        self.assertEqual(result['messages'], 1)
+        xmsg = self.env['x.message'].sudo().search([
+            ('channel_id', '=', channel.id), ('external_id', '=', 'cm1')], limit=1)
+        self.assertTrue(xmsg)
+        self.assertEqual(xmsg.body_plain, 'hello decrypted')
+
     def test_decrypt_failure_stores_nothing(self):
         """XDK decrypt raises -> nothing stored, encrypted state on the channel."""
         account = self._make_account(with_blob=True)
