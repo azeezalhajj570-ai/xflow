@@ -42,6 +42,8 @@ _GROUP_CONVERSATION_RE = re.compile(r'^[0-9]{15,19}$')
 _CHAT_GROUP_ID_RE = re.compile(r'^g[0-9]+$')
 # 1:1 chat conversations look like "<user_id>-<user_id>".
 _DIRECT_CONVERSATION_RE = re.compile(r'^\d{1,19}-\d{1,19}$')
+# 1:1 XChat *webhook* deliveries use "<user_id>:<user_id>" instead.
+_DIRECT_WEBHOOK_CONVERSATION_RE = re.compile(r'^\d{1,19}:\d{1,19}$')
 
 _DM_EVENT_FIELDS = (
     'created_at,dm_conversation_id,id,event_type,participant_ids,'
@@ -53,6 +55,25 @@ _CHAT_EVENT_FIELDS = (
 )
 # A base64 blob long enough to be real key material (32 bytes + tag).
 _BASE64_BLOB_RE = re.compile(r'^[A-Za-z0-9+/]+={0,2}$')
+
+
+def canonical_chat_conversation_id(conversation_id):
+    """Return the conversation id form X's Chat API accepts.
+
+    XChat webhook deliveries identify a 1:1 conversation with a
+    colon-separated ``<id>:<id>`` id, but ``GET /2/chat/conversations/{id}/…``
+    only accepts ``<id>``, ``<lo>-<hi>`` or ``g<id>`` and answers the colon
+    form with HTTP 400 (``does not match
+    ^([0-9]{1,19}|[0-9]{1,19}-[0-9]{1,19}|g[0-9]{1,19})$``). Rewrite that form
+    to the canonical numerically-sorted hyphen id — X itself returns the colon
+    form in the response body, so both name the same conversation — and return
+    every other id (``g…`` groups, single ids, existing hyphen ids) unchanged.
+    """
+    conv = str(conversation_id or '')
+    if _DIRECT_WEBHOOK_CONVERSATION_RE.match(conv):
+        low, high = sorted(int(part) for part in conv.split(':'))
+        return '%s-%s' % (low, high)
+    return conv
 
 
 class TwitterGroupSync:
@@ -560,10 +581,15 @@ class TwitterGroupSync:
         numeric/1:1 conversations or when the Chat events endpoint is
         temporarily unavailable.
 
+        The id is canonicalized to the form the Chat API accepts first: the
+        colon-separated 1:1 id a webhook delivery uses matches neither of the
+        gates below, so it used to fall through to the legacy endpoint — which
+        has the same id grammar problem and answers 402 anyway.
+
         Messages are normalized to ``{id, sender_id, text, created_at,
         from_me, encrypted}`` for the shared ``_save_x_message`` contract.
         """
-        conv_id = str(conversation_id)
+        conv_id = canonical_chat_conversation_id(conversation_id)
         if not (_CHAT_GROUP_ID_RE.match(conv_id) or _DIRECT_CONVERSATION_RE.match(conv_id)):
             return self._get_dms_legacy(conv_id, limit)
         try:

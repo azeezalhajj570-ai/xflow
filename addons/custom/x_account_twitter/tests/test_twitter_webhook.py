@@ -502,6 +502,110 @@ class TestTwitterActivityProcess(XAccountTwitterTestBase):
             self.account.write({'x_chat_key_blob': False,
                                 'x_chat_signing_key_version': False})
 
+    def test_process_chat_event_seeds_conversation_key_from_chat_api(self):
+        """A 1:1 delivery carries no key-change event and no stored event holds
+        one either, so the conversation's key chain must be pulled from the
+        Chat events feed and the decrypt retried with the recovered key."""
+        self.account.write({'x_chat_key_blob': 'fake-blob',
+                            'x_chat_signing_key_version': '1'})
+        conv = '%s:%s' % (OWNER_ID, '222333444555666777')
+        payload = _chat_payload(conv, '222333444555666777', 'chat-seed-1')
+        missing = {'no matching key': (
+            'Crypto error: Decryption failed: Message encrypted with key '
+            "version '42' but no matching key found. Available versions: []")}
+        fake_decryptor = Mock()
+        fake_decryptor.available = True
+        fake_decryptor.client = Mock()
+        fake_decryptor.client.request.return_value = {
+            'meta': {'conversation_key_events': ['kc-blob']}}
+        fake_decryptor.collect_conversation_keys.return_value = {'42': 'a2V5'}
+        fake_decryptor.decrypt_events.side_effect = [
+            {'messages': [], 'errors': missing},
+            {'messages': [{'type': 'Message', 'sender_id': '222333444555666777',
+                           'content': {'text': 'seeded hi'}}], 'errors': {}},
+        ]
+        with patch.object(TwitterActivity, '_chat_decryptor_for',
+                          return_value=fake_decryptor):
+            result = self._process('chat.received', 'uuid-seed', payload)
+        self.assertTrue(result['processed'])
+        self.assertFalse(result.get('encrypted'))
+        # The Chat API is asked with X's canonical id, but the recovered keys
+        # are cached under the id the delivery used (what later lookups read).
+        self.assertEqual(
+            [call.args[1] for call in fake_decryptor.client.request.call_args_list],
+            ['/2/chat/conversations/222333444555666777-%s/events' % OWNER_ID])
+        fake_decryptor.collect_conversation_keys.assert_called_once_with(
+            conv, ['kc-blob'])
+        self.assertIn('42', fake_decryptor.decrypt_events.call_args.kwargs[
+            'cached_keys'])
+        xm = self.env['x.message'].sudo().search(
+            [('external_id', '=', 'chat-seed-1')], limit=1)
+        self.assertTrue(xm)
+        self.assertEqual(xm.body_plain, 'seeded hi')
+
+    def test_chat_key_seed_is_fetched_once_per_conversation_batch(self):
+        """Every event of a batch that cannot be decrypted must not become an
+        API call of its own: the Chat API key look-up is per conversation."""
+        self.account.write({'x_chat_key_blob': 'fake-blob',
+                            'x_chat_signing_key_version': '1'})
+        conv = '%s:%s' % (OWNER_ID, '222333444555666777')
+        events = self.env['x.twitter.event'].sudo().create([
+            {
+                'event_uuid': 'uuid-seed-once-%s' % idx,
+                'account_id': self.account.id,
+                'event_type': 'chat.received',
+                'state': 'queued',
+                'payload': json.dumps({
+                    'event_uuid': 'uuid-seed-once-%s' % idx,
+                    'event_type': 'chat.received',
+                    'user_id': OWNER_ID,
+                    'payload': _chat_payload(
+                        conv, '222333444555666777', 'chat-seed-once-%s' % idx),
+                }),
+            }
+            for idx in (1, 2)
+        ])
+        fake_decryptor = Mock()
+        fake_decryptor.available = True
+        fake_decryptor.client = Mock()
+        fake_decryptor.client.request.return_value = {'meta': {}}
+        fake_decryptor.decrypt_events.return_value = {
+            'messages': [], 'errors': {'no matching key': 'no matching key'}}
+        with patch.object(TwitterActivity, '_chat_decryptor_for',
+                          return_value=fake_decryptor):
+            TwitterActivity(self.env).process_events_batch(events)
+        # Only the chat-events look-up counts: the failure path also queries
+        # /public_keys for its diagnostic log line.
+        chat_paths = [call.args[1] for call in
+                      fake_decryptor.client.request.call_args_list
+                      if '/2/chat/conversations/' in call.args[1]]
+        self.assertEqual(
+            chat_paths,
+            ['/2/chat/conversations/222333444555666777-%s/events' % OWNER_ID])
+        self.assertFalse(self.env['x.message'].sudo().search([
+            ('external_id', 'in', ['chat-seed-once-1', 'chat-seed-once-2'])],
+            limit=1))
+
+    def test_process_chat_event_survives_a_failing_key_fetch(self):
+        """A Chat API failure while seeding keys must keep the encrypted marker
+        and never surface as a processing error."""
+        self.account.write({'x_chat_key_blob': 'fake-blob',
+                            'x_chat_signing_key_version': '1'})
+        payload = _chat_payload('g111222333', '111', 'chat-seed-fail-1')
+        fake_decryptor = Mock()
+        fake_decryptor.available = True
+        fake_decryptor.client = Mock()
+        fake_decryptor.client.request.side_effect = twitter_errors.TwitterError(
+            'Service Unavailable')
+        fake_decryptor.decrypt_events.return_value = {
+            'messages': [], 'errors': {'no matching key': 'no matching key'}}
+        with patch.object(TwitterActivity, '_chat_decryptor_for',
+                          return_value=fake_decryptor):
+            result = self._process('chat.received', 'uuid-seed-fail', payload)
+        self.assertTrue(result['processed'])
+        self.assertTrue(result['encrypted'])
+        self.assertEqual(result['messages'], 0)
+
     def test_process_chat_event_uses_only_its_own_account_keys(self):
         """Key resolution must never borrow another X account's key material:
         an event routed to a key-less account stays encrypted even when a
