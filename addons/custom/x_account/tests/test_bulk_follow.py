@@ -1,6 +1,7 @@
 import json
 from unittest.mock import patch
 
+from odoo.exceptions import ValidationError
 from odoo.tests import tagged
 
 from odoo.addons.x_account.tests.common import XAccountTestBase
@@ -92,7 +93,8 @@ class TestXBulkFollow(XAccountTestBase):
         ).create({})
         self.assertEqual(wizard.channel_id.id, channel.id)
         self.assertEqual(wizard.member_ids, m1)
-        self.assertEqual(wizard.cooldown_sec, 10)
+        self.assertEqual(wizard.min_delay_sec, 60)
+        self.assertEqual(wizard.max_delay_sec, 300)
 
     def test_member_pool_excludes_self_no_username_and_followed(self):
         account = self._make_account('poolowner')
@@ -144,7 +146,7 @@ class TestXBulkFollow(XAccountTestBase):
         channel = self._make_group_channel(account, m1 | m2 | m3)
         wizard = self.env['x.follow.composer'].with_context(
             active_model='discuss.channel', active_id=channel.id
-        ).create({'cooldown_sec': 30})
+        ).create({'min_delay_sec': 30, 'max_delay_sec': 30})
 
         result = wizard.action_follow()
 
@@ -163,14 +165,14 @@ class TestXBulkFollow(XAccountTestBase):
         self.assertEqual(len(set(retries)), 3)
         self.assertEqual(retries[0] < retries[1] < retries[2], True)
 
-    def test_action_follow_unstaggered_when_cooldown_zero(self):
+    def test_action_follow_unstaggered_when_delay_zero(self):
         account = self._make_account('follow_zerocd')
         m1 = self._make_member('u1', username='user_one')
         m2 = self._make_member('u2', username='user_two')
         channel = self._make_group_channel(account, m1 | m2)
         wizard = self.env['x.follow.composer'].with_context(
             active_model='discuss.channel', active_id=channel.id
-        ).create({'cooldown_sec': 0})
+        ).create({'min_delay_sec': 0, 'max_delay_sec': 0})
 
         result = wizard.action_follow()
 
@@ -256,7 +258,7 @@ class TestXBulkFollow(XAccountTestBase):
         channel = self._make_group_channel(account, m1)
         wizard = self.env['x.follow.composer'].with_context(
             active_model='discuss.channel', active_id=channel.id
-        ).create({'cooldown_sec': 0})
+        ).create({'min_delay_sec': 0, 'max_delay_sec': 0})
         wizard.action_follow()
         task = self.env['x.account.task'].search([
             ('account_id', '=', account.id),
@@ -276,7 +278,7 @@ class TestXBulkFollow(XAccountTestBase):
         channel = self._make_group_channel(account, m1 | m2)
         wizard = self.env['x.follow.composer'].with_context(
             active_model='discuss.channel', active_id=channel.id
-        ).create({'cooldown_sec': 0})
+        ).create({'min_delay_sec': 0, 'max_delay_sec': 0})
         wizard.action_follow()
         tasks = self.env['x.account.task'].search([
             ('account_id', '=', account.id),
@@ -289,8 +291,120 @@ class TestXBulkFollow(XAccountTestBase):
             side_effect=lambda self_, screen_name=None, **kw: {
                 'screen_name': screen_name, 'followed': True},
         ):
-            self.env['x.account.task']._process_queue()
+            # One bulk follow per sweep: two sweeps drain the two tasks.
+            for _ in range(len(tasks)):
+                self.env['x.account.task']._process_queue()
         for task in tasks:
             task.invalidate_recordset()
             self.assertEqual(task.status, 'success')
         self.assertEqual(account.x_following_ids, m1 | m2)
+
+    def test_only_one_bulk_follow_per_sweep(self):
+        account = self._make_account('follow_sweep')
+        m1 = self._make_member('s1', username='sweep_one')
+        m2 = self._make_member('s2', username='sweep_two')
+        m3 = self._make_member('s3', username='sweep_three')
+        channel = self._make_group_channel(account, m1 | m2 | m3)
+        wizard = self.env['x.follow.composer'].with_context(
+            active_model='discuss.channel', active_id=channel.id
+        ).create({'min_delay_sec': 0, 'max_delay_sec': 0})
+        wizard.action_follow()
+        tasks = self.env['x.account.task'].search([
+            ('account_id', '=', account.id),
+            ('operation', '=', 'follow'),
+        ])
+        self.assertEqual(len(tasks), 3)
+
+        with patch.object(
+            SessionWebProvider, 'follow',
+            autospec=True,
+            side_effect=lambda self_, screen_name=None, **kw: {
+                'screen_name': screen_name, 'followed': True},
+        ):
+            for expected in (1, 2, 3):
+                claimed = self.env['x.account.task']._process_queue()
+                tasks.invalidate_recordset()
+                self.assertEqual(claimed, 1)
+                self.assertEqual(
+                    len(tasks.filtered(lambda t: t.status == 'success')),
+                    expected)
+                self.assertEqual(
+                    len(tasks.filtered(lambda t: t.status == 'pending')),
+                    3 - expected)
+
+    def test_random_gaps_within_range_and_monotonic(self):
+        account = self._make_account('follow_random')
+        members = self.env['res.partner']
+        for index in range(4):
+            members |= self._make_member(
+                'r%d' % index, username='rand_user_%d' % index)
+        channel = self._make_group_channel(account, members)
+        wizard = self.env['x.follow.composer'].with_context(
+            active_model='discuss.channel', active_id=channel.id
+        ).create({'min_delay_sec': 30, 'max_delay_sec': 90})
+
+        with patch(
+            'odoo.addons.x_account.wizards.x_follow_composer.random.sample',
+            side_effect=lambda population, k: list(population),
+        ), patch(
+            'odoo.addons.x_account.wizards.x_follow_composer.random.randint',
+            side_effect=[40, 75, 55],
+        ):
+            wizard.action_follow()
+
+        tasks = self.env['x.account.task'].search([
+            ('account_id', '=', account.id),
+            ('operation', '=', 'follow'),
+        ], order='next_retry_at asc')
+        self.assertEqual(len(tasks), 4)
+        contexts = [json.loads(t.task_context) for t in tasks]
+        self.assertEqual(
+            [c['scheduled_offset_sec'] for c in contexts], [0, 40, 115, 170])
+        for context in contexts:
+            self.assertEqual(context['min_delay_sec'], 30)
+            self.assertEqual(context['max_delay_sec'], 90)
+        offsets = [c['scheduled_offset_sec'] for c in contexts]
+        for gap in [b - a for a, b in zip(offsets, offsets[1:])]:
+            self.assertGreaterEqual(gap, 30)
+            self.assertLessEqual(gap, 90)
+        retries = tasks.mapped('next_retry_at')
+        self.assertEqual(retries, sorted(retries))
+
+    def test_gaps_are_not_constant(self):
+        account = self._make_account('follow_varied')
+        members = self.env['res.partner']
+        for index in range(4):
+            members |= self._make_member(
+                'v%d' % index, username='varied_user_%d' % index)
+        channel = self._make_group_channel(account, members)
+        wizard = self.env['x.follow.composer'].with_context(
+            active_model='discuss.channel', active_id=channel.id
+        ).create({'min_delay_sec': 5, 'max_delay_sec': 500})
+
+        with patch(
+            'odoo.addons.x_account.wizards.x_follow_composer.random.sample',
+            side_effect=lambda population, k: list(population),
+        ), patch(
+            'odoo.addons.x_account.wizards.x_follow_composer.random.randint',
+            side_effect=[10, 20, 30],
+        ):
+            wizard.action_follow()
+
+        tasks = self.env['x.account.task'].search([
+            ('account_id', '=', account.id),
+            ('operation', '=', 'follow'),
+        ], order='next_retry_at asc')
+        offsets = [
+            json.loads(t.task_context)['scheduled_offset_sec'] for t in tasks]
+        gaps = [b - a for a, b in zip(offsets, offsets[1:])]
+        self.assertEqual(gaps, [10, 20, 30])
+        self.assertGreater(len(set(gaps)), 1)
+
+    def test_min_greater_than_max_raises(self):
+        account = self._make_account('follow_badrange')
+        m1 = self._make_member('b1', username='bad_range_user')
+        channel = self._make_group_channel(account, m1)
+        with self.assertRaises(ValidationError):
+            self.env['x.follow.composer'].with_context(
+                active_model='discuss.channel', active_id=channel.id
+            ).create({'min_delay_sec': 100, 'max_delay_sec': 10})

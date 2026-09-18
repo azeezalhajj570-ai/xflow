@@ -14,10 +14,12 @@
                     <field name="member_ids" widget="many2many_tags"
                         domain="[('id', 'in', member_pool_ids)]"
                         options="{'create': false, 'no_create_edit': true}"/>
-                    <label for="cooldown_sec"/>
+                    <label for="min_delay_sec"/>
                     <div>
-                        <field name="cooldown_sec" class="oe_inline"/>
-                        <span>seconds between each follow request</span>
+                        <field name="min_delay_sec" class="oe_inline"/>
+                        <span> to </span>
+                        <field name="max_delay_sec" class="oe_inline"/>
+                        <span> seconds — random pause between each follow request</span>
                     </div>
                 </group>
                 <footer>
