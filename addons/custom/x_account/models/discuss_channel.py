@@ -92,6 +92,12 @@ class DiscussChannel(models.Model):
         string='Auto Follow',
         help='Automatically follow the author of new messages in this chat.',
     )
+    x_auto_comment_text = fields.Text(
+        string='Auto Comment Text',
+        help='Reply text posted on X posts linked in this chat when '
+             'Auto Comment is on. Auto Comment is skipped while this is '
+             'empty.',
+    )
 
     @api.depends('channel_member_ids', 'channel_member_ids.partner_id')
     def _compute_x_group_members(self):

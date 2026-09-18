@@ -55,6 +55,10 @@
                                 <field name="x_auto_bookmark" widget="boolean_toggle"/>
                                 <field name="x_auto_follow" widget="boolean_toggle"/>
                             </group>
+                            <group string="Comment Text" invisible="not x_auto_comment">
+                                <field name="x_auto_comment_text"
+                                    placeholder="Text posted as the reply on posts linked in this chat"/>
+                            </group>
                         </page>
                         <page string="Members" name="members"
                             invisible="channel_type not in ('x', 'x_group')">

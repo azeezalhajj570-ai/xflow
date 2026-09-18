@@ -1,3 +1,5 @@
+import json
+
 from odoo import fields
 from odoo.tests import tagged
 
@@ -86,6 +88,32 @@ class TestChannelActionToggles(XAccountTestBase):
                 passed = self._rule(operation)._filter_post(msg_on | msg_off)[0]
                 self.assertIn(msg_on, passed)
                 self.assertNotIn(msg_off, passed)
+
+    def test_comment_task_carries_channel_text(self):
+        """The per-chat Auto Comment Text is what the reply task posts."""
+        channel = self._channel(
+            'comment-text', x_auto_comment=True,
+            x_auto_comment_text='  Great point!  ')
+        msg = self._message(channel, 'evt-comment-text')
+        msg._run_channel_comment()
+        task = self.env['x.account.task'].search([
+            ('account_id', '=', self.account.id),
+            ('operation', '=', 'comment'),
+        ], limit=1)
+        self.assertTrue(task)
+        ctx = json.loads(task.task_context)
+        self.assertEqual(ctx.get('text'), 'Great point!')
+        self.assertEqual(ctx.get('tweet_id'), '123456789')
+
+    def test_comment_skipped_without_text(self):
+        """Auto Comment without text must not queue a doomed reply."""
+        channel = self._channel('comment-notext', x_auto_comment=True)
+        msg = self._message(channel, 'evt-comment-notext')
+        msg._run_channel_comment()
+        self.assertFalse(self.env['x.account.task'].search([
+            ('account_id', '=', self.account.id),
+            ('operation', '=', 'comment'),
+        ]))
 
     def test_form_shows_toggles(self):
         arch = self.env.ref('x_account.x_group_channel_view_form').arch
