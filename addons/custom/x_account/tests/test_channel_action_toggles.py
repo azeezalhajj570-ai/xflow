@@ -119,3 +119,8 @@ class TestChannelActionToggles(XAccountTestBase):
         arch = self.env.ref('x_account.x_group_channel_view_form').arch
         for field_name in self.TOGGLES.values():
             self.assertIn(field_name, arch)
+
+    def test_list_shows_toggles(self):
+        arch = self.env.ref('x_account.x_group_channel_view_tree').arch
+        for field_name in self.TOGGLES.values():
+            self.assertIn(field_name, arch)
