@@ -7,6 +7,11 @@
             <list string="Chat" create="false">
                 <field name="active" widget="boolean_toggle"/>
                 <field name="name"/>
+                <field name="x_auto_like" string="Like" widget="boolean_toggle"/>
+                <field name="x_auto_repost" string="Repost" widget="boolean_toggle"/>
+                <field name="x_auto_comment" string="Comment" widget="boolean_toggle"/>
+                <field name="x_auto_bookmark" string="Bookmark" widget="boolean_toggle"/>
+                <field name="x_auto_follow" string="Follow" widget="boolean_toggle"/>
                 <field name="channel_type" string="Type" readonly="1"/>
                 <field name="x_conversation_id" string="Conversation ID" readonly="1"/>
                 <field name="x_account_id" readonly="1"/>
@@ -44,6 +49,20 @@
                                 <field name="x_account_id" string="X Account" readonly="1"/>
                                 <field name="x_group_member_count" string="Members" readonly="1"
                                     invisible="channel_type != 'x_group'"/>
+                            </group>
+                        </page>
+                        <page string="Automation" name="automation"
+                            invisible="channel_type not in ('x', 'x_group')">
+                            <group>
+                                <field name="x_auto_like" widget="boolean_toggle"/>
+                                <field name="x_auto_repost" widget="boolean_toggle"/>
+                                <field name="x_auto_comment" widget="boolean_toggle"/>
+                                <field name="x_auto_bookmark" widget="boolean_toggle"/>
+                                <field name="x_auto_follow" widget="boolean_toggle"/>
+                            </group>
+                            <group string="Comment Text" invisible="not x_auto_comment">
+                                <field name="x_auto_comment_text"
+                                    placeholder="Text posted as the reply on posts linked in this chat"/>
                             </group>
                         </page>
                         <page string="Members" name="members"

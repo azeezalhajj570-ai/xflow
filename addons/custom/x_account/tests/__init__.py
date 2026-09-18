@@ -18,5 +18,6 @@ from . import test_bulk_follow
 from . import test_operation_report
 from . import test_message_age_filter
 from . import test_channel_automation
+from . import test_channel_action_toggles
 from . import test_daily_archive
 from . import test_account_tracking

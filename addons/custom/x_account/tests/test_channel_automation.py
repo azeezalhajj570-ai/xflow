@@ -119,6 +119,8 @@ class TestChannelAutomationDedup(XAccountTestBase):
             'x_account_id': account.id,
             'x_conversation_id': 'cv-%s-%s' % (account.id, suffix),
             'name': 'X chat',
+            # Comment automation needs text, otherwise it is skipped.
+            'x_auto_comment_text': 'Nice post!',
         })
 
     def _make_message(self, account, channel, external_id, body=None,
