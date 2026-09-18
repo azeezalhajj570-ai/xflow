@@ -46,6 +46,16 @@
                                     invisible="channel_type != 'x_group'"/>
                             </group>
                         </page>
+                        <page string="Automation" name="automation"
+                            invisible="channel_type not in ('x', 'x_group')">
+                            <group>
+                                <field name="x_auto_like" widget="boolean_toggle"/>
+                                <field name="x_auto_repost" widget="boolean_toggle"/>
+                                <field name="x_auto_comment" widget="boolean_toggle"/>
+                                <field name="x_auto_bookmark" widget="boolean_toggle"/>
+                                <field name="x_auto_follow" widget="boolean_toggle"/>
+                            </group>
+                        </page>
                         <page string="Members" name="members"
                             invisible="channel_type not in ('x', 'x_group')">
                             <field name="channel_member_ids" mode="list"
