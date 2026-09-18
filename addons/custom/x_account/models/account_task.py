@@ -117,6 +117,11 @@ class XAccountTask(models.Model):
     # processed.
     _QUEUE_MAX_AGE_MINUTES = 60
     _WEBHOOK_OPERATION = 'process_webhook_event'
+    # Source marker the bulk-follow wizard stamps on its tasks. The claim sweep
+    # runs at most one such follow per account per sweep so the per-task
+    # randomized spacing is not collapsed into a burst by the sweep draining
+    # several due follows back-to-back.
+    _BULK_FOLLOW_SOURCE = 'bulk_follow'
     _TERMINAL_STATUSES = ('success', 'failed', 'cancelled')
     # A task in one of these states means the operation is already done, or in
     # flight, for its target: an equivalent task must not be created for it.
@@ -298,24 +303,35 @@ class XAccountTask(models.Model):
         chunk = self._CLAIM_CHUNK_SIZE if commit else share
         claimed = self.env['x.account.task']
         remaining = share
+        # At most one bulk follow per sweep. The wizard already randomized each
+        # follow's ``next_retry_at``, but a sweep drains every due task for the
+        # account back-to-back, so several follows falling due at once would
+        # fire in one burst regardless. Once one is claimed the rest stay
+        # ``pending`` for a later sweep.
+        bulk_follow_claimed = False
         while remaining > 0:
             tasks = self._claim_account_tasks(
-                account_id, min(chunk, remaining), now)
+                account_id, min(chunk, remaining), now,
+                allow_bulk_follow=not bulk_follow_claimed)
             if not tasks:
                 break
             claimed |= tasks
+            bulk_follow_claimed = bulk_follow_claimed or any(
+                task.source == self._BULK_FOLLOW_SOURCE for task in tasks)
             self._execute_operation_batch(tasks)
             remaining -= len(tasks)
             if commit:
                 self._commit_queue_progress()
         return claimed
 
-    def _claim_account_tasks(self, account_id, share, now):
+    def _claim_account_tasks(self, account_id, share, now,
+                             allow_bulk_follow=True):
         """Atomically claim up to ``share`` due tasks for one account.
 
         Returns the claimed ``running`` tasks — empty when another worker owns
-        the account, when it already has a RUNNING task, or when nothing is
-        due.
+        the account, when it already has a RUNNING task, when nothing is due, or
+        when every due task is a bulk follow that ``allow_bulk_follow`` holds
+        back.
         """
         if share <= 0:
             return self.env['x.account.task']
@@ -344,6 +360,11 @@ class XAccountTask(models.Model):
                 account_id, share - len(ids), now, webhook=True)
         if not ids:
             return self.env['x.account.task']
+        tasks = self._cap_bulk_follow_claims(
+            self.browse(ids), allow_bulk_follow)
+        if not tasks:
+            return self.env['x.account.task']
+        ids = tasks.ids
         cr.execute(
             'UPDATE x_account_task SET status = %s, claimed_at = %s '
             'WHERE id = ANY(%s)',
@@ -351,6 +372,22 @@ class XAccountTask(models.Model):
         # The rows changed outside the ORM: drop the cached claim fields.
         self.invalidate_model(['status', 'claimed_at'])
         return self.browse(ids)
+
+    def _cap_bulk_follow_claims(self, tasks, allow_bulk_follow):
+        """Hold back bulk-follow tasks beyond the first one in a claim.
+
+        ``allow_bulk_follow`` is False once a bulk follow was already claimed in
+        this sweep: every bulk-follow task is then dropped from the claim while
+        the account's other work is left untouched. When allowed, the single
+        most due bulk follow is kept and the rest stay ``pending``.
+        """
+        bulk = tasks.filtered(
+            lambda task: task.source == self._BULK_FOLLOW_SOURCE)
+        if not bulk:
+            return tasks
+        kept = bulk.sorted('next_retry_at')[:1] if allow_bulk_follow \
+            else self.env['x.account.task']
+        return tasks - (bulk - kept)
 
     def _claim_account_rows(self, account_id, limit, now, webhook):
         """Select due task ids for one account with a non-blocking row lock."""

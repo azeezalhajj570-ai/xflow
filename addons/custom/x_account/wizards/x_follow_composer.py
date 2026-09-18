@@ -2,6 +2,7 @@
 
 import json
 import logging
+import random
 from datetime import timedelta
 
 from odoo import _, api, fields, models
@@ -14,8 +15,9 @@ class XFollowComposer(models.TransientModel):
     """Bulk-follow the members of an X group conversation.
 
     Opened from the group chat form via the "Follow Members" button. Enqueues
-    one ``x.account.task`` per selected member, staggered by the configured
-    cooldown so each follow call is spaced out on the account.
+    one ``x.account.task`` per selected member, each scheduled after a random
+    pause drawn from a min/max range so the follow calls never follow a fixed
+    interval pattern.
     """
 
     _name = 'x.follow.composer'
@@ -43,11 +45,29 @@ class XFollowComposer(models.TransientModel):
         compute='_compute_member_pool_ids',
         help='Channel group members available for selection.',
     )
-    cooldown_sec = fields.Integer(
-        string='Cooldown (seconds)',
-        default=10,
-        help='Time to wait between each follow request.',
+    min_delay_sec = fields.Integer(
+        string='Minimum Delay (seconds)',
+        default=60,
+        required=True,
+        help='Lower bound of the random pause between two follow requests.',
     )
+    max_delay_sec = fields.Integer(
+        string='Maximum Delay (seconds)',
+        default=300,
+        required=True,
+        help='Upper bound of the random pause between two follow requests.',
+    )
+
+    @api.constrains('min_delay_sec', 'max_delay_sec')
+    def _check_delay_range(self):
+        for wizard in self:
+            if wizard.min_delay_sec < 0:
+                raise ValidationError(
+                    _('Minimum delay cannot be negative.'))
+            if wizard.max_delay_sec < wizard.min_delay_sec:
+                raise ValidationError(_(
+                    'Maximum delay must be greater than or equal to the '
+                    'minimum delay.'))
 
     def _followable_members(self, channel=None):
         """Channel group members that can be bulk-followed.
@@ -116,30 +136,40 @@ class XFollowComposer(models.TransientModel):
             return self._follow_result(
                 _('Select at least one member with an X username.'),
                 kind='warning')
-        cooldown = max(self.cooldown_sec or 0, 0)
+        min_delay = max(self.min_delay_sec or 0, 0)
+        max_delay = max(self.max_delay_sec or min_delay, min_delay)
         now = fields.Datetime.now()
+        # Follow in a random order so the sequence never mirrors the member list.
+        ordered = self.env['res.partner'].browse(
+            random.sample(members.ids, len(members)))
         tasks = self.env['x.account.task'].sudo()
-        for index, member in enumerate(members):
+        offset = 0
+        for index, member in enumerate(ordered):
+            if index:
+                offset += random.randint(min_delay, max_delay)
             task_ctx = {
                 'screen_name': member.x_username,
                 'channel_id': channel.id,
                 'source': 'bulk_follow',
+                'sequence': index,
+                'min_delay_sec': min_delay,
+                'max_delay_sec': max_delay,
+                'scheduled_offset_sec': offset,
             }
             tasks |= self.env['x.account.task'].sudo().create({
                 'account_id': account.id,
                 'operation': 'follow',
                 'priority': 1,
                 'task_context': json.dumps(task_ctx),
-                'next_retry_at': now + timedelta(seconds=index * cooldown),
+                'next_retry_at': now + timedelta(seconds=offset),
             })
         _logger.info(
             'Bulk follow: enqueued %s task(s) for channel %s, account %s, '
-            'cooldown %ss', len(tasks), channel.id, account.id, cooldown)
-        if cooldown:
-            message = _('Enqueued %s follow request(s), one every %s seconds.')
-            message = message % (len(tasks), cooldown)
-        else:
-            message = _('Enqueued %s follow request(s).') % len(tasks)
+            'random delay %s-%ss', len(tasks), channel.id, account.id,
+            min_delay, max_delay)
+        message = _(
+            'Enqueued %s follow request(s), spaced randomly between %s and %s '
+            'seconds.') % (len(tasks), min_delay, max_delay)
         return self._follow_result(message, kind='success')
 
     @staticmethod
