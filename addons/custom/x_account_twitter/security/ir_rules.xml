@@ -13,6 +13,12 @@
         <field name="domain_force">[('account_id.company_id', 'in', company_ids)]</field>
     </record>
 
+    <record id="security_rule_x_twitter_key_change_company" model="ir.rule">
+        <field name="name">X Twitter Key Change: Multi-Company</field>
+        <field name="model_id" ref="model_x_twitter_key_change"/>
+        <field name="domain_force">[('account_id.company_id', 'in', company_ids)]</field>
+    </record>
+
     <record id="security_rule_x_twitter_webhook_company" model="ir.rule">
         <field name="name">X Twitter Webhook: Global</field>
         <field name="model_id" ref="model_x_twitter_webhook"/>

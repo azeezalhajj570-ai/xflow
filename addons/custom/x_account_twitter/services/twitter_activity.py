@@ -196,6 +196,20 @@ class TwitterActivity:
         return {'status': 'accepted', 'event_type': event_type,
                 'event_uuid': event_uuid, 'account_id': account.id}
 
+    @staticmethod
+    def _close_event(event, state, error=None):
+        """Move an event to a terminal state and drop its payload.
+
+        The payload is only needed while the delivery is queued (or retried
+        after a temporary failure). Once processed, the message lives in its
+        channel and any key-change blob in ``x.twitter.key.change``, so the
+        large payload is cleared to keep the table from growing without bound.
+        """
+        vals = {'state': state, 'payload': False}
+        if error:
+            vals['error'] = error
+        event.write(vals)
+
     def process_event(self, event):
         """Execute one queued x.twitter.event (called by the task worker).
 
@@ -211,10 +225,10 @@ class TwitterActivity:
             event_type = event.event_type
             account = event.account_id
             if not account:
-                event.write({'state': 'skipped', 'error': 'missing_account'})
+                self._close_event(event, 'skipped', 'missing_account')
                 return {'processed': False, 'reason': 'no_account'}
             result = self._handle(event_type, account, payload)
-            event.write({'state': 'done'})
+            self._close_event(event, 'done')
             return {'processed': True, 'event_type': event_type, **result}
         except twitter_errors.TwitterTemporaryError as exc:
             # Retryable: let the task queue back off and retry.
@@ -228,7 +242,7 @@ class TwitterActivity:
             _logger.exception('x_account_twitter: failed to process event %s', event_uuid)
             if self._is_fatal_db_error(exc):
                 raise
-            event.write({'state': 'done', 'error': str(exc)})
+            self._close_event(event, 'done', str(exc))
             return {'processed': False, 'error': str(exc)}
 
     def process_events_batch(self, events):
@@ -251,11 +265,11 @@ class TwitterActivity:
                 event_type = event.event_type
                 account = event.account_id
                 if not account:
-                    event.write({'state': 'skipped', 'error': 'missing_account'})
+                    self._close_event(event, 'skipped', 'missing_account')
                     skipped += 1
                     continue
                 result = self._handle(event_type, account, payload)
-                event.write({'state': 'done'})
+                self._close_event(event, 'done')
                 processed += 1
                 messages += result.get('messages', 0)
             except twitter_errors.TwitterTemporaryError as exc:
@@ -270,7 +284,7 @@ class TwitterActivity:
                     # transaction; unprocessed events stay queued for retry.
                     raise
                 try:
-                    event.write({'state': 'done', 'error': str(exc)})
+                    self._close_event(event, 'done', str(exc))
                 except Exception:
                     pass
                 processed += 1
@@ -477,31 +491,24 @@ class TwitterActivity:
 
     def _conversation_key_change_blobs(self, account, conversation_id,
                                        current=''):
-        """Key-change blobs for a conversation, from already-stored events.
+        """Key-change blobs for a conversation, from the deduplicated store.
 
         A webhook delivery carries only its own ``conversation_key_change_event``;
         a message whose key rotated earlier needs the conversation's whole
-        key-change chain, which we rebuild from the events we already stored.
+        key-change chain, which is rebuilt from the distinct blobs persisted in
+        ``x.twitter.key.change`` — one row per key, however many deliveries
+        repeated it.
         """
         blobs = [current] if current else []
         if not conversation_id:
             return blobs
-        events = self.env['x.twitter.event'].sudo().search([
+        changes = self.env['x.twitter.key.change'].sudo().search([
             ('account_id', '=', account.id),
             ('conversation_id', '=', str(conversation_id)),
-            ('has_key_change', '=', True),
         ], order='id desc', limit=100)
-        for event in events:
-            try:
-                data = json.loads(event.payload or '{}')
-            except ValueError:
-                continue
-            item = data.get('payload') or {}
-            if str(item.get('conversation_id')) != str(conversation_id):
-                continue
-            blob = item.get('conversation_key_change_event')
-            if blob and blob not in blobs:
-                blobs.append(blob)
+        for change in changes:
+            if change.blob not in blobs:
+                blobs.append(change.blob)
         return blobs
 
     @staticmethod
