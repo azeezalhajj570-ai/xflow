@@ -10,6 +10,16 @@ from ..services.x_provider import x_conversation_is_group
 _logger = logging.getLogger(__name__)
 
 
+def _x_failure_reason(exc):
+    """Coarse reason for a failed X provider call, for the bulk actions.
+
+    ``rate_limit`` means X refused the call because the endpoint's quota is
+    spent, so a bulk sweep can stop instead of spending the rest of that
+    quota on calls that cannot succeed.
+    """
+    return 'rate_limit' if getattr(exc, 'code', '') == 'rate_limit' else 'error'
+
+
 class DiscussChannel(models.Model):
     _inherit = 'discuss.channel'
 
@@ -482,6 +492,7 @@ class DiscussChannel(models.Model):
                 'ok': False,
                 'type': 'danger',
                 'message': 'Failed to fetch conversation info: %s' % exc,
+                'reason': _x_failure_reason(exc),
             }
         if not result or not result.get('conversation_id'):
             return {
@@ -510,6 +521,7 @@ class DiscussChannel(models.Model):
                     'message': 'X rate limit reached while looking up this '
                                'group\'s name key: %s. Wait for the limit to '
                                'reset and try again.' % (detail or 'HTTP 429'),
+                    'reason': 'rate_limit',
                 }
             return {
                 'ok': False,
@@ -531,18 +543,25 @@ class DiscussChannel(models.Model):
         lookup (non-X chats, missing account or conversation id), reuses the
         single-conversation logic for the rest, and returns one aggregated
         notification while continuing on any per-conversation failure.
+
+        The sweep stops as soon as a lookup fails because X's rate limit is
+        spent: the remaining channels need the same endpoint, so they would
+        only burn a quota that is already empty.
         """
         records = self.filtered(
             lambda ch: ch.channel_type in ('x', 'x_group')
             and ch.x_account_id and ch.x_conversation_id)
         skipped = len(self) - len(records)
-        processed = updated = 0
+        processed = updated = not_attempted = 0
         failures = []
-        for channel in records:
+        for index, channel in enumerate(records):
             data = channel._fetch_group_info_single()
             if not data.get('ok'):
                 failures.append((channel.name or str(channel.id),
                                  data['message']))
+                if data.get('reason') == 'rate_limit':
+                    not_attempted = len(records) - index - 1
+                    break
                 continue
             processed += 1
             if data.get('updated'):
@@ -566,6 +585,10 @@ class DiscussChannel(models.Model):
             if len(failures) > 5:
                 preview += '; and %s more' % (len(failures) - 5)
             message += ' | ' + preview
+        if not_attempted:
+            message += (' | Stopped early: X rate limit reached, %s chat(s) '
+                        'not attempted; run the fetch again once the limit '
+                        'resets.' % not_attempted)
         if processed == 0:
             ntype = 'danger' if failures else 'info'
         elif failures:
@@ -678,6 +701,7 @@ class DiscussChannel(models.Model):
                 'ok': False,
                 'type': 'danger',
                 'message': 'Failed to fetch conversation members: %s' % exc,
+                'reason': _x_failure_reason(exc),
             }
         if not result or not result.get('conversation_id'):
             return {
@@ -733,18 +757,25 @@ class DiscussChannel(models.Model):
         lookup (non-X chats, missing account or conversation id), reuses the
         single-conversation logic for the rest, and returns one aggregated
         notification while continuing on any per-conversation failure.
+
+        The sweep stops as soon as a lookup fails because X's rate limit is
+        spent: the remaining channels need the same endpoint, so they would
+        only burn a quota that is already empty.
         """
         records = self.filtered(
             lambda ch: ch.channel_type in ('x', 'x_group')
             and ch.x_account_id and ch.x_conversation_id)
         skipped = len(self) - len(records)
-        processed = member_count = created = updated = 0
+        processed = member_count = created = updated = not_attempted = 0
         failures = []
-        for channel in records:
+        for index, channel in enumerate(records):
             data = channel._fetch_group_members_single()
             if not data.get('ok'):
                 failures.append((channel.name or str(channel.id),
                                  data['message']))
+                if data.get('reason') == 'rate_limit':
+                    not_attempted = len(records) - index - 1
+                    break
                 continue
             processed += 1
             member_count += len(data['member_ids'])
@@ -769,6 +800,10 @@ class DiscussChannel(models.Model):
             if len(failures) > 5:
                 preview += '; and %s more' % (len(failures) - 5)
             message += ' | ' + preview
+        if not_attempted:
+            message += (' | Stopped early: X rate limit reached, %s chat(s) '
+                        'not attempted; run the fetch again once the limit '
+                        'resets.' % not_attempted)
         if processed == 0:
             ntype = 'danger' if failures else 'info'
         elif failures:

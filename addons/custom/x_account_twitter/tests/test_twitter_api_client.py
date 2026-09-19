@@ -252,3 +252,57 @@ class TestTwitterApiClient(XAccountTwitterTestBase):
                 self.client.request('GET', '/2/chat/conversations', retries=0)
         self.assertEqual(mocked.call_count, 1)
         sleep.assert_not_called()
+
+    def test_quota_exhausted_503_is_not_retried(self):
+        """X throttles with 503 as well as 429.
+
+        A 503 reporting ``x-rate-limit-remaining: 0`` is an exhausted quota,
+        not a transient failure: retrying it only spends more of a window that
+        has nothing left, and classifying it as temporary reported the
+        throttle as 'Service Unavailable' instead of the real cause.
+        """
+        from odoo.addons.social_twitter.models.social_account import SocialAccount
+        response = self._mock_response(503)
+        response.headers = {'x-rate-limit-limit': '50',
+                            'x-rate-limit-remaining': '0',
+                            'x-rate-limit-reset': '1790000000'}
+        with patch.object(SocialAccount, '_get_twitter_oauth_header',
+                          return_value={'Authorization': 'Bearer t'}), \
+             patch.object(TwitterApiClient, '_sleep') as sleep, \
+             patch('requests.request', return_value=response) as mocked:
+            with self.assertRaises(twitter_errors.TwitterRateLimitError) as caught:
+                self.client.request('GET', '/2/chat/conversations')
+        self.assertEqual(mocked.call_count, 1)
+        sleep.assert_not_called()
+        self.assertEqual(caught.exception.rate_limit_limit, 50)
+        self.assertEqual(caught.exception.rate_limit_remaining, 0)
+
+    def test_retries_429_with_short_retry_after(self):
+        """A 429 that names a short wait is worth sitting through."""
+        from odoo.addons.social_twitter.models.social_account import SocialAccount
+        response = self._mock_response(429)
+        response.headers = {'Retry-After': '2'}
+        with patch.object(SocialAccount, '_get_twitter_oauth_header',
+                          return_value={'Authorization': 'Bearer t'}), \
+             patch.object(TwitterApiClient, '_sleep') as sleep, \
+             patch('requests.request', side_effect=[
+                 response, self._mock_response(200, {'data': {}})]) as mocked:
+            result = self.client.request('GET', '/2/chat/conversations')
+        self.assertEqual(mocked.call_count, 2)
+        self.assertEqual(sleep.call_args_list[0].args[0], 2.0)
+        self.assertEqual(result, {'data': {}})
+
+    def test_no_retry_429_without_or_with_long_wait(self):
+        """Without a bounded wait there is nothing to retry against."""
+        from odoo.addons.social_twitter.models.social_account import SocialAccount
+        for headers in ({}, {'Retry-After': '120'}):
+            response = self._mock_response(429)
+            response.headers = headers
+            with patch.object(SocialAccount, '_get_twitter_oauth_header',
+                              return_value={'Authorization': 'Bearer t'}), \
+                 patch.object(TwitterApiClient, '_sleep') as sleep, \
+                 patch('requests.request', return_value=response) as mocked:
+                with self.assertRaises(twitter_errors.TwitterRateLimitError):
+                    self.client.request('GET', '/2/chat/conversations')
+            self.assertEqual(mocked.call_count, 1)
+            sleep.assert_not_called()
