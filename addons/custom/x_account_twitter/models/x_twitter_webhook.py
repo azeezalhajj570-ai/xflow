@@ -9,8 +9,12 @@ safe to run repeatedly (idempotent: never duplicate what already exists).
 """
 
 import json
+import logging
+from datetime import timedelta
 
 from odoo import api, fields, models
+
+_logger = logging.getLogger(__name__)
 
 
 class XTwitterWebhook(models.Model):
@@ -166,18 +170,55 @@ class XTwitterEvent(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
+        key_changes = []
         for vals in vals_list:
-            if 'conversation_id' in vals and 'has_key_change' in vals:
-                continue
-            conversation_id, has_key_change = \
+            conversation_id, key_blob = \
                 self._payload_conversation_fields(vals.get('payload'))
             vals.setdefault('conversation_id', conversation_id)
-            vals.setdefault('has_key_change', has_key_change)
-        return super().create(vals_list)
+            vals.setdefault('has_key_change', bool(key_blob))
+            account_id = vals.get('account_id')
+            if account_id and conversation_id and key_blob:
+                key_changes.append((account_id, conversation_id, key_blob))
+        events = super().create(vals_list)
+        if key_changes:
+            # The blob is stored once per conversation instead of once per
+            # delivery, which is what lets the event payload be dropped later.
+            self.env['x.twitter.key.change'].sudo().store(key_changes)
+        return events
+
+    @api.model
+    def _gc_processed_events(self, days=7, batch_size=2000):
+        """Delete processed deliveries older than ``days``.
+
+        ``event_uuid`` dedup only has to outlive X's redelivery window; keeping
+        every processed row forever is what filled the database. Only terminal
+        states are purged so a queued or retrying delivery is never dropped.
+        """
+        deadline = fields.Datetime.now() - timedelta(days=days)
+        total = 0
+        while True:
+            self.env.cr.execute("""
+                DELETE FROM x_twitter_event
+                WHERE id IN (
+                    SELECT id FROM x_twitter_event
+                    WHERE state IN ('done', 'skipped', 'failed')
+                      AND create_date < %s
+                    LIMIT %s
+                )
+            """, (deadline, batch_size))
+            deleted = self.env.cr.rowcount
+            total += deleted
+            if deleted < batch_size:
+                break
+        if total:
+            _logger.info(
+                'x_account_twitter: purged %s processed webhook event(s) '
+                'older than %s day(s)', total, days)
+        return total
 
     @staticmethod
     def _payload_conversation_fields(payload):
-        """Extract ``(conversation_id, has_key_change)`` from a stored payload.
+        """Extract ``(conversation_id, key_change_blob)`` from a stored payload.
 
         The stored payload is ``json.dumps({'payload': {...}})``. A malformed
         payload yields ``(False, False)`` instead of raising, so a bad row can
@@ -191,6 +232,6 @@ class XTwitterEvent(models.Model):
         conversation_id = inner.get('conversation_id')
         return (
             str(conversation_id) if conversation_id else False,
-            bool(inner.get('conversation_key_change_event')),
+            inner.get('conversation_key_change_event') or False,
         )
 

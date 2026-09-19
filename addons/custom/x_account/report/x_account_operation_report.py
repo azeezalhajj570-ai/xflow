@@ -2,11 +2,11 @@
 
 """Read-only SQL-view report for X engagement operations.
 
-One row per ``x.account.task`` whose operation is one of the four engagement
-actions (like, repost, bookmark, comment), enriched with the acting X account,
-the discuss channel the automation fired from (linked to its X chat URL
-``https://x.com/i/chat/<conversation_id>``), and the target tweet (id, author
-handle and a clickable link).
+One row per ``x.account.task`` whose operation is one of the six engagement
+actions (like, repost, bookmark, comment, follow, unbookmark), enriched with
+the acting X account, the discuss channel the automation fired from (linked to
+its X chat URL ``https://x.com/i/chat/<conversation_id>``), and the target
+tweet (id, author handle and a clickable link).
 
 Implemented as a PostgreSQL view (``_auto = False``) so the raw operation log
 can be sliced by channel / account / tweet in list, pivot and graph views
@@ -27,7 +27,8 @@ link was picked up as the receipt.
 
 from odoo import fields, models, tools
 
-_ENGAGEMENT_OPERATIONS = ('like', 'repost', 'bookmark', 'comment')
+_ENGAGEMENT_OPERATIONS = (
+    'like', 'repost', 'bookmark', 'comment', 'follow', 'unbookmark')
 
 
 class XAccountOperationReport(models.Model):

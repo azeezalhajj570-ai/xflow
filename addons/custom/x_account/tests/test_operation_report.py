@@ -115,18 +115,21 @@ class TestXAccountOperationReport(XAccountTestBase):
     def test_only_engagement_operations_are_reported(self):
         self._task('like', {'post_id': '1'})
         self._task('follow', {'screen_name': 'x'})
+        self._task('unbookmark', {'post': {'post_id': '2'}})
         self._task('send_dm', {'recipient_id': '9'})
         rows = self.Report.search([('account_id', '=', self.account.id)])
-        self.assertEqual(set(rows.mapped('operation')), {'like'})
+        self.assertEqual(
+            set(rows.mapped('operation')), {'like', 'follow', 'unbookmark'})
 
-    def test_all_four_operations_group_by_channel(self):
-        for op in ('like', 'repost', 'bookmark', 'comment'):
+    def test_all_six_operations_group_by_channel(self):
+        for op in ('like', 'repost', 'bookmark', 'comment', 'follow',
+                   'unbookmark'):
             self._task(op, {'post_id': '900', 'channel_id': self.channel.id})
         rows = self.Report.search([('channel_id', '=', self.channel.id)])
         self.assertEqual(
             set(rows.mapped('operation')),
-            {'like', 'repost', 'bookmark', 'comment'})
-        self.assertEqual(sum(rows.mapped('operation_count')), 4)
+            {'like', 'repost', 'bookmark', 'comment', 'follow', 'unbookmark'})
+        self.assertEqual(sum(rows.mapped('operation_count')), 6)
 
     def test_received_at_comes_from_the_message(self):
         message = self.env['x.message'].create({
@@ -244,6 +247,13 @@ class TestXAccountOperationReport(XAccountTestBase):
             view_type='search')['arch']
         self.assertIn('name="received_today"', arch)
         self.assertIn('name="received_last_hour"', arch)
+
+    def test_search_view_offers_every_operation_filter(self):
+        arch = self.env['x.account.operation.report'].get_view(
+            view_type='search')['arch']
+        for name in ('op_like', 'op_repost', 'op_bookmark', 'op_comment',
+                     'op_follow', 'op_unbookmark'):
+            self.assertIn('name="%s"' % name, arch)
 
     def test_action_lists_records_without_default_grouping(self):
         action = self.env.ref('x_account.action_x_account_operation_report')

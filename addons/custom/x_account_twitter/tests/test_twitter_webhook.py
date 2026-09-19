@@ -405,6 +405,43 @@ class TestTwitterActivityProcess(XAccountTwitterTestBase):
         self.assertEqual(xm.direction, 'inbound')
         self.assertEqual(xm.body_plain, 'inbound hello')
 
+    def test_processed_event_drops_its_payload(self):
+        """A processed delivery has nothing left to reprocess, so its (large)
+        payload is cleared instead of being kept forever."""
+        payload = _dm_payload('111', OWNER_ID, 'dm-payload-1', 'hi')
+        self._process('dm.received', 'uuid-payload', payload)
+        event = self.env['x.twitter.event'].sudo().search(
+            [('event_uuid', '=', 'uuid-payload')], limit=1)
+        self.assertEqual(event.state, 'done')
+        self.assertFalse(event.payload)
+
+    def test_gc_purges_old_processed_events_but_keeps_queued(self):
+        old = self.env['x.twitter.event'].sudo().create({
+            'event_uuid': 'gc-old',
+            'account_id': self.account.id,
+            'event_type': 'chat.received',
+            'state': 'done',
+            'payload': '{}',
+        })
+        queued = self.env['x.twitter.event'].sudo().create({
+            'event_uuid': 'gc-queued',
+            'account_id': self.account.id,
+            'event_type': 'chat.received',
+            'state': 'queued',
+            'payload': '{}',
+        })
+        self.env.cr.execute(
+            "UPDATE x_twitter_event SET create_date = "
+            "now() AT TIME ZONE 'UTC' - interval '30 days' WHERE id = %s",
+            (old.id,))
+        self.env.invalidate_all()
+        purged = self.env['x.twitter.event']._gc_processed_events(days=7)
+        self.assertGreaterEqual(purged, 1)
+        self.env.invalidate_all()
+        self.assertFalse(self.env['x.twitter.event'].browse(old.id).exists())
+        self.assertTrue(
+            self.env['x.twitter.event'].browse(queued.id).exists())
+
     def test_process_dm_outbound_saves_message(self):
         payload = _dm_payload(
             OWNER_ID, '222', 'dm-out-1', 'outbound hi')

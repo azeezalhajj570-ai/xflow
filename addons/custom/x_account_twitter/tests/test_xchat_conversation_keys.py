@@ -114,6 +114,44 @@ class TestXChatConversationKeys(XAccountTwitterTestBase):
         self.assertIn('KC1', blobs)
         self.assertNotIn('KC2', blobs)
 
+    def test_duplicate_key_change_blobs_are_stored_once(self):
+        """The same key repeated by many deliveries is kept once, not per row.
+
+        Storing the blob once per delivery is what made x_twitter_event grow to
+        dominate the database.
+        """
+        for uuid in ('kc-dup-1', 'kc-dup-2', 'kc-dup-3'):
+            self.env['x.twitter.event'].create({
+                'account_id': self.account.id,
+                'event_uuid': uuid,
+                'event_type': 'chat.received',
+                'payload': json.dumps({'payload': {
+                    'conversation_id': 'c1',
+                    'conversation_key_change_event': 'SAME'}}),
+            })
+        changes = self.env['x.twitter.key.change'].sudo().search([
+            ('account_id', '=', self.account.id),
+            ('conversation_id', '=', 'c1'),
+        ])
+        self.assertEqual(len(changes), 1)
+        self.assertEqual(changes.blob, 'SAME')
+
+    def test_key_change_blob_outlives_the_event_payload(self):
+        """Clearing the payload of a processed event must not lose its key."""
+        event = self.env['x.twitter.event'].create({
+            'account_id': self.account.id,
+            'event_uuid': 'kc-cleared-1',
+            'event_type': 'chat.received',
+            'payload': json.dumps({'payload': {
+                'conversation_id': 'c1',
+                'conversation_key_change_event': 'KC1'}}),
+        })
+        event.write({'state': 'done', 'payload': False})
+        blobs = TwitterActivity(self.env)._conversation_key_change_blobs(
+            self.account, 'c1', current='KC0')
+        self.assertIn('KC0', blobs)
+        self.assertIn('KC1', blobs)
+
     def test_event_create_extracts_conversation_fields(self):
         """A created event indexes its conversation and key-change presence, so
         the key-change lookup never LIKE-scans the payload text."""
