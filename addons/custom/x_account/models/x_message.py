@@ -218,6 +218,17 @@ class XMessage(models.Model):
                 )
                 return
 
+            comment_text = ''
+            if operation == 'comment':
+                comment_text = (channel.x_auto_comment_text or '').strip()
+                if not comment_text:
+                    _logger.info(
+                        'Channel automation skipped (operation=comment): no comment '
+                        'text set on channel id=%s for x.message id=%s',
+                        channel.id if channel else None, self.id,
+                    )
+                    return
+
             for tweet_id in tweet_ids:
                 if self.env['x.account.task'].sudo()._has_blocking_task(
                         account.id, operation, target_post_id=tweet_id):
@@ -233,10 +244,13 @@ class XMessage(models.Model):
                     continue
                 task_ctx = {
                     'post': {'post_id': tweet_id},
+                    'tweet_id': tweet_id,
                     'channel_id': self.channel_id.id,
                     'author_x_id': self.author_x_id,
                     'source': 'channel_automation',
                 }
+                if operation == 'comment':
+                    task_ctx['text'] = comment_text
                 task = self.env['x.account.task'].sudo().create({
                     'account_id': account.id,
                     'operation': operation,

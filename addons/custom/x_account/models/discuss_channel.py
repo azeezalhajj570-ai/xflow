@@ -69,6 +69,35 @@ class DiscussChannel(models.Model):
         store=True,
         index=True,
     )
+    x_auto_like = fields.Boolean(
+        string='Auto Like',
+        help='Automatically like X posts linked in new messages of this chat.',
+    )
+    x_auto_repost = fields.Boolean(
+        string='Auto Repost',
+        help='Automatically repost (retweet) X posts linked in new messages '
+             'of this chat.',
+    )
+    x_auto_comment = fields.Boolean(
+        string='Auto Comment',
+        help='Automatically comment on X posts linked in new messages of '
+             'this chat.',
+    )
+    x_auto_bookmark = fields.Boolean(
+        string='Auto Bookmark',
+        help='Automatically bookmark X posts linked in new messages of '
+             'this chat.',
+    )
+    x_auto_follow = fields.Boolean(
+        string='Auto Follow',
+        help='Automatically follow the author of new messages in this chat.',
+    )
+    x_auto_comment_text = fields.Text(
+        string='Auto Comment Text',
+        help='Reply text posted on X posts linked in this chat when '
+             'Auto Comment is on. Auto Comment is skipped while this is '
+             'empty.',
+    )
 
     @api.depends('channel_member_ids', 'channel_member_ids.partner_id')
     def _compute_x_group_members(self):
