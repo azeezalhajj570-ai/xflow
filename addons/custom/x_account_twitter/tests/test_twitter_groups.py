@@ -626,6 +626,24 @@ class TestTwitterGroups(XAccountTwitterTestBase):
         self.assertIn('Bulk Broken', result['params']['message'])
         self.assertIn('not found', result['params']['message'])
 
+    def test_action_fetch_group_members_bulk_stops_on_rate_limit(self):
+        """A spent X quota must end the sweep instead of draining it further."""
+        ok_channel = self._make_member_channel('Rate Stop Members Ok')
+        throttled = self._make_member_channel('Rate Stop Members Throttled')
+        untouched = self._make_member_channel('Rate Stop Members Untouched')
+        with patch.object(TwitterApiClient, 'request', side_effect=[
+                self._members_payload(),
+                TwitterRateLimitError('Too Many Requests')]) as mocked:
+            result = (ok_channel | throttled | untouched) \
+                .action_fetch_group_members_bulk()
+        # The third channel needs the same endpoint and quota, so it is not
+        # looked up at all.
+        self.assertEqual(mocked.call_count, 2)
+        message = result['params']['message']
+        self.assertIn('1 chat(s)', message)
+        self.assertIn('1 failed', message)
+        self.assertIn('1 chat(s) not attempted', message)
+
     def test_action_fetch_group_members_bulk_no_actionable_chats(self):
         config = self.env['discuss.channel'].sudo().create({
             'name': 'Plain Group',
@@ -685,6 +703,32 @@ class TestTwitterGroups(XAccountTwitterTestBase):
         self.assertIn('1 failed', result['params']['message'])
         self.assertIn('Info Bulk Broken', result['params']['message'])
         self.assertIn('not found', result['params']['message'])
+        self.assertEqual(ok_channel.name, 'Design Team')
+
+    def test_action_fetch_group_info_bulk_stops_on_rate_limit(self):
+        """A spent X quota must end the sweep instead of draining it further."""
+        payload = {
+            'data': {'id': CHAT_GROUP_ID, 'type': 'group',
+                     'group_name': 'Design Team',
+                     'member_ids': ['111'], 'participant_ids': ['111'],
+                     'admin_ids': ['111']},
+            'includes': {'users': [
+                {'id': '111', 'name': 'Alice', 'username': 'alice'}]},
+        }
+        ok_channel = self._make_member_channel('Rate Stop Info Ok')
+        throttled = self._make_member_channel('Rate Stop Info Throttled')
+        untouched = self._make_member_channel('Rate Stop Info Untouched')
+        with patch.object(TwitterApiClient, 'request', side_effect=[
+                payload, TwitterRateLimitError('Too Many Requests')]) as mocked:
+            result = (ok_channel | throttled | untouched) \
+                .action_fetch_group_info_bulk()
+        # The third channel needs the same endpoint and quota, so it is not
+        # looked up at all.
+        self.assertEqual(mocked.call_count, 2)
+        message = result['params']['message']
+        self.assertIn('1 chat(s)', message)
+        self.assertIn('1 failed', message)
+        self.assertIn('1 chat(s) not attempted', message)
         self.assertEqual(ok_channel.name, 'Design Team')
 
     def test_action_fetch_group_info_bulk_no_actionable_chats(self):

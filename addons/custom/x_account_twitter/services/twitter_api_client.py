@@ -63,14 +63,20 @@ def _endpoint_for_path(path):
 class TwitterApiClient:
     """Transport for one linked social.account (OAuth 1.0a or OAuth 2.0)."""
 
-    # Bounded retry policy for temporary failures (network + 5xx).
+    # Bounded retry policy for temporary failures (network + 5xx), plus the
+    # two shapes X uses to report an exhausted request quota.
     # - 2 retries per request, honoring Retry-After when present, otherwise
     #   exponential backoff (2s, 4s) — short enough to not block workers.
-    # - 429 is NOT retried here: it is classified as a retryable rate_limit
-    #   error and the caller/task queue decides whether to back off.
+    # - A 5xx carrying ``x-rate-limit-remaining: 0`` is a throttle, not a
+    #   transient failure: it is not retried (that only spends more of a
+    #   window that has nothing left) and classifies as rate_limit.
+    # - 429 is retried only when X says how long to wait and that wait is
+    #   short (MAX_RATE_LIMIT_WAIT_SECONDS); a longer wait is left to the
+    #   caller/task queue to back off.
     # - 401/403/404 are permanent and never retried.
     DEFAULT_RETRIES = 2
     BACKOFF_BASE_SECONDS = 2
+    MAX_RATE_LIMIT_WAIT_SECONDS = 10.0
 
     def __init__(self, account, endpoint=None, timeout=_TIMEOUT_SECONDS):
         self.account = account
@@ -87,8 +93,8 @@ class TwitterApiClient:
         token refresh + retry.
 
         ``retries`` controls the bounded retry policy for temporary failures
-        (network errors and 5xx, honoring ``Retry-After``). ``None`` uses the
-        class default ``DEFAULT_RETRIES``; pass 0 to disable retries.
+        (network errors, 5xx, and 429s with a short ``Retry-After``). ``None``
+        uses the class default ``DEFAULT_RETRIES``; pass 0 to disable retries.
         """
         url = self._url_for_path(path)
         params = params or {}
@@ -111,8 +117,14 @@ class TwitterApiClient:
             except ValueError:
                 raise twitter_errors.TwitterTemporaryError('non_json_response')
         exc = twitter_errors.classify(response.status_code, self._body_json(response))
-        if response.status_code == 429 \
-                and isinstance(exc, twitter_errors.TwitterRateLimitError):
+        if isinstance(exc, twitter_errors.TwitterTemporaryError) \
+                and self._quota_exhausted(response.headers):
+            # X answers an exhausted endpoint quota with 503 as well as 429.
+            # Classifying that as a plain temporary failure reported the
+            # throttle as 'Service Unavailable' and let bulk callers keep
+            # spending a window that had nothing left in it.
+            exc = twitter_errors.TwitterRateLimitError(exc.message)
+        if isinstance(exc, twitter_errors.TwitterRateLimitError):
             exc.reset_epoch = self._reset_epoch(response)
             self._attach_rate_limit_headers(exc, response)
         raise exc
@@ -141,14 +153,33 @@ class TwitterApiClient:
                     self._sleep(self._retry_delay(attempt, None))
                     continue
                 raise twitter_errors.TwitterTemporaryError('network_error: %s' % exc)
-            if response.status_code < 500 or attempt >= retries:
+            delay = self._retry_delay_for_response(response, attempt, retries)
+            if delay is None:
                 return response
-            delay = self._retry_delay(attempt + 1, response.headers.get('Retry-After'))
             attempt += 1
             _LOGGER.warning(
                 'X API temporary failure %s on %s (attempt %s/%s); retrying in %ss',
                 response.status_code, url, attempt, retries, delay)
             self._sleep(delay)
+
+    def _retry_delay_for_response(self, response, attempt, retries):
+        """Seconds to wait before retrying ``response``, or None to return it.
+
+        Implements the class-level retry policy. ``attempt`` is the number of
+        retries already performed.
+        """
+        if attempt >= retries:
+            return None
+        status = response.status_code
+        if status == 429:
+            retry_after = self._retry_after_seconds(response.headers)
+            if retry_after is None \
+                    or retry_after > self.MAX_RATE_LIMIT_WAIT_SECONDS:
+                return None
+            return max(0.5, retry_after)
+        if status < 500 or self._quota_exhausted(response.headers):
+            return None
+        return self._retry_delay(attempt + 1, response.headers.get('Retry-After'))
 
     def _can_refresh_oauth2(self):
         """Only OAuth 2.0 accounts (refresh token present) can recover a 401."""
@@ -160,6 +191,32 @@ class TwitterApiClient:
         """
         return self.account._get_twitter_oauth_header(
             url, params=params or {}, method=method)
+
+    @staticmethod
+    def _retry_after_seconds(headers):
+        """Seconds X asked us to wait (``Retry-After``), or None when absent.
+
+        Only a numeric delay is honored: an HTTP-date ``Retry-After`` carries
+        no bounded wait we can act on, so it is treated as "no retry" rather
+        than guessed at.
+        """
+        try:
+            return max(0.0, float(headers.get('Retry-After')))
+        except (AttributeError, TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _quota_exhausted(headers):
+        """Whether the response reports the endpoint's request quota used up.
+
+        ``x-rate-limit-remaining: 0`` is X's own statement that the current
+        window is spent, which is how a throttled 503 is told apart from a
+        genuine server failure.
+        """
+        try:
+            return int(headers.get('x-rate-limit-remaining')) <= 0
+        except (AttributeError, TypeError, ValueError):
+            return False
 
     @staticmethod
     def _reset_epoch(response):
