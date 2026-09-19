@@ -75,6 +75,8 @@
                 <filter string="Repost" name="op_repost" domain="[('operation', '=', 'repost')]"/>
                 <filter string="Bookmark" name="op_bookmark" domain="[('operation', '=', 'bookmark')]"/>
                 <filter string="Comment" name="op_comment" domain="[('operation', '=', 'comment')]"/>
+                <filter string="Follow" name="op_follow" domain="[('operation', '=', 'follow')]"/>
+                <filter string="Unbookmark" name="op_unbookmark" domain="[('operation', '=', 'unbookmark')]"/>
                 <separator/>
                 <filter string="Success" name="status_success" domain="[('status', '=', 'success')]"/>
                 <filter string="Failed" name="status_failed" domain="[('status', '=', 'failed')]"/>
@@ -106,8 +108,8 @@
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">No X operations recorded yet.</p>
             <p>
-                Likes, reposts, bookmarks and comments performed by X accounts are
-                listed here, one row per operation.
+                Likes, reposts, bookmarks, comments, follows and unbookmarks
+                performed by X accounts are listed here, one row per operation.
             </p>
         </field>
     </record>
