@@ -39,17 +39,7 @@
         <field name="arch" type="xml">
             <form string="X Account Task" create="false">
                 <header>
-                    <button name="action_process_queue"
-                            string="Process Queue"
-                            type="object"
-                            class="btn-primary"
-                            title="Run the pending task queue now"/>
                     <button name="action_cancel" string="Cancel" type="object" class="btn-secondary"/>
-                    <button name="action_cancel_duplicate_tasks"
-                            string="Cancel Duplicate Failed Tasks"
-                            type="object"
-                            class="btn-secondary"
-                            title="Cancel failed tasks whose operation already succeeded for the same target"/>
                 </header>
                 <sheet>
                     <group>
