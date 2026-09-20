@@ -1,4 +1,5 @@
 from . import res_config_settings
+from . import ir_cron
 from . import social_media
 from . import social_account
 from . import session_store
