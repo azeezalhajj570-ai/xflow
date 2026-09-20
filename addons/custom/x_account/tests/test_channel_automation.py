@@ -148,7 +148,7 @@ class TestChannelAutomationDedup(XAccountTestBase):
         channel = self._make_channel(account)
         first = self._make_message(account, channel, 'evt-ops-1')
         second = self._make_message(account, channel, 'evt-ops-2')
-        for operation in ('like', 'repost', 'comment', 'bookmark', 'unbookmark'):
+        for operation in ('like', 'repost', 'comment', 'bookmark'):
             with self.subTest(operation=operation):
                 first._run_channel_automation(operation)
                 second._run_channel_automation(operation)

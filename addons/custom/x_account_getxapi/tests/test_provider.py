@@ -86,6 +86,28 @@ class TestGetXAPIProvider(XAccountGetXAPITestBase):
             result = self.provider.repost({'post_id': '111'})
         self.assertTrue(result['success'])
 
+    def test_writes_tolerate_channel_automation_context(self):
+        """Channel automation stores the target under both ``post`` and
+        ``tweet_id``. The id is already passed positionally to the tweet
+        service, so forwarding the leftover ``tweet_id`` raised
+        "got multiple values for argument 'tweet_id'" (regression)."""
+        context = {
+            'post': {'post_id': '111'},
+            'tweet_id': '111',
+            'channel_id': 5,
+            'author_x_id': '9',
+            'source': 'channel_automation',
+        }
+        for operation in ('like', 'repost', 'bookmark'):
+            with self.subTest(operation=operation):
+                with patch.object(GetXAPIClient, 'post', return_value={
+                    'data': {'result': {}},
+                }) as mocked:
+                    result = getattr(self.provider, operation)(**context)
+                self.assertTrue(result['success'])
+                body = mocked.call_args.kwargs['json']
+                self.assertEqual(body['tweet_id'], '111')
+
     def test_follow(self):
         with patch.object(GetXAPIClient, 'post', return_value={
             'data': {'result': {'following': True}},

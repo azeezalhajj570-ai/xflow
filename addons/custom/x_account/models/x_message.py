@@ -208,7 +208,7 @@ class XMessage(models.Model):
             )
             return
 
-        if operation in ('like', 'repost', 'comment', 'bookmark', 'unbookmark'):
+        if operation in ('like', 'repost', 'comment', 'bookmark'):
             tweet_ids = self._extract_tweet_ids()
             if not tweet_ids:
                 _logger.info(
@@ -313,10 +313,6 @@ class XMessage(models.Model):
     def _run_channel_bookmark(self):
         """Execute bookmark automation for this message."""
         return self._run_channel_automation('bookmark')
-
-    def _run_channel_unbookmark(self):
-        """Execute unbookmark automation for this message."""
-        return self._run_channel_automation('unbookmark')
 
     def _run_channel_follow(self):
         """Execute follow automation for this message."""

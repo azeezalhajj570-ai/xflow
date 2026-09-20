@@ -125,8 +125,7 @@ class GetXAPIProvider:
         if not post_id:
             raise ValueError('post_id is required')
         self._preflight_write('like')
-        kwargs['auth_token'] = self._auth_token
-        return self._tweets.like(post_id, **kwargs)
+        return self._tweets.like(post_id, **self._write_args(kwargs))
 
     def comment(self, post, text=None, **kwargs):
         """Reply to a post via GetXAPI."""
@@ -135,8 +134,8 @@ class GetXAPIProvider:
             raise ValueError('post_id is required')
         text = (text or '').strip() or 'Thanks for sharing!'
         self._preflight_write('comment')
-        kwargs['auth_token'] = self._auth_token
-        return self._tweets.create(text, reply_to_tweet_id=post_id, **kwargs)
+        return self._tweets.create(
+            text, reply_to_tweet_id=post_id, **self._write_args(kwargs))
 
     def repost(self, post, **kwargs):
         """Repost (retweet) a post via GetXAPI."""
@@ -144,8 +143,7 @@ class GetXAPIProvider:
         if not post_id:
             raise ValueError('post_id is required')
         self._preflight_write('repost')
-        kwargs['auth_token'] = self._auth_token
-        return self._tweets.retweet(post_id, **kwargs)
+        return self._tweets.retweet(post_id, **self._write_args(kwargs))
 
     def bookmark(self, post, **kwargs):
         """Bookmark a post via GetXAPI."""
@@ -153,8 +151,7 @@ class GetXAPIProvider:
         if not post_id:
             raise ValueError('post_id is required')
         self._preflight_write('bookmark')
-        kwargs['auth_token'] = self._auth_token
-        return self._tweets.bookmark(post_id, **kwargs)
+        return self._tweets.bookmark(post_id, **self._write_args(kwargs))
 
     def unbookmark(self, post, **kwargs):
         """Remove a post from bookmarks via GetXAPI."""
@@ -162,8 +159,20 @@ class GetXAPIProvider:
         if not post_id:
             raise ValueError('post_id is required')
         self._preflight_write('unbookmark')
+        return self._tweets.unbookmark(post_id, **self._write_args(kwargs))
+
+    def _write_args(self, kwargs):
+        """Request body fields shared by the tweet-write calls.
+
+        Channel automation stores the target under both ``post`` and
+        ``tweet_id`` so every provider family can read it. The id is already
+        handed to :class:`GetXAPITweetService` positionally, so forwarding the
+        leftover ``tweet_id`` as a body field raised "got multiple values for
+        argument 'tweet_id'".
+        """
+        kwargs.pop('tweet_id', None)
         kwargs['auth_token'] = self._auth_token
-        return self._tweets.unbookmark(post_id, **kwargs)
+        return kwargs
 
     def follow(self, screen_name=None, target_user_id=None, **kwargs):
         """Follow a user via GetXAPI."""
