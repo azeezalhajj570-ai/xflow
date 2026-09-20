@@ -418,6 +418,32 @@ class TestXTaskQueue(XAccountTestBase):
             task.invalidate_recordset()
             self.assertEqual(task.status, 'success')
 
+    def test_ir_cron_supports_seconds_interval(self):
+        """Task-queue shards tick in seconds; both the selection and the
+        rescheduling map must know about it."""
+        from odoo.addons.base.models.ir_cron import _intervalTypes
+        self.assertIn('seconds', _intervalTypes)
+        values = [value for value, _label in
+                  self.env['ir.cron']._fields['interval_type'].selection]
+        self.assertIn('seconds', values)
+
+    def test_task_create_wakes_task_queue_crons(self):
+        """Enqueueing a task must make the queue cron immediately ready so
+        the scheduler thread wakes on the pg_notify instead of waiting for
+        the next tick (the 60s SLEEP_INTERVAL poll)."""
+        cron_a = self.env.ref('x_account.cron_process_x_task_queue')
+        cron_b = self.env.ref('x_account.cron_process_x_task_queue_1')
+        self.env.cr.execute('DELETE FROM ir_cron_trigger')
+        self._make_task(self.account_a)
+        self.env.cr.execute(
+            """
+            SELECT cron_id
+              FROM ir_cron_trigger
+            """)
+        triggered = {row[0] for row in self.env.cr.fetchall()}
+        self.assertIn(cron_a.id, triggered)
+        self.assertIn(cron_b.id, triggered)
+
 
 @tagged('post_install', '-at_install', 'x_account')
 class TestTaskTargetsAndDuplicateCleanup(XAccountTestBase):

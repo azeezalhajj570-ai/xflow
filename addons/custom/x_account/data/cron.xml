@@ -19,19 +19,30 @@
          and claiming is atomic (per-account advisory lock + FOR UPDATE SKIP
          LOCKED). Requires max_cron_threads >= shards.
 
+         Fresh work wakes these jobs immediately: ``x.account.task.create``
+         inserts an ``ir.cron.trigger`` row for them and pg_notifies the
+         scheduler thread (see account_task.py), so a new task is drained
+         within seconds instead of on the next crontab tick. The 10s interval
+         below is the backstop cadence that picks up backlog which piled up
+         without a create (server downtime, retries falling due). Do not push
+         it back to minutes: ``_reschedule_later`` computes the next run from
+         ``interval_type``/``interval_number``, and ``seconds`` is added to
+         ``ir.cron`` by models/ir_cron.py.
+
          These records are deliberately NOT noupdate: the shard code/count is
          part of the deployment contract and must follow module upgrades. The
          legacy ``cron_process_x_task_queue`` record predates this and was
          created noupdate, so its linked server action is rewired by
-         migrations/19.0.1.4.0/post-migrate.py. -->
+         migrations/19.0.1.4.0/post-migrate.py and its interval by
+         migrations/19.0.1.16.0/post-migrate.py. -->
     <data>
         <record id="cron_process_x_task_queue" model="ir.cron">
             <field name="name">X: Process Task Queue (shard 0)</field>
             <field name="model_id" ref="model_x_account_task"/>
             <field name="state">code</field>
             <field name="code">model._process_queue(shard=0, shards=2, commit=True)</field>
-            <field name="interval_number">1</field>
-            <field name="interval_type">minutes</field>
+            <field name="interval_number">10</field>
+            <field name="interval_type">seconds</field>
             <field name="active">True</field>
         </record>
 
@@ -40,8 +51,8 @@
             <field name="model_id" ref="model_x_account_task"/>
             <field name="state">code</field>
             <field name="code">model._process_queue(shard=1, shards=2, commit=True)</field>
-            <field name="interval_number">1</field>
-            <field name="interval_type">minutes</field>
+            <field name="interval_number">10</field>
+            <field name="interval_type">seconds</field>
             <field name="active">True</field>
         </record>
 

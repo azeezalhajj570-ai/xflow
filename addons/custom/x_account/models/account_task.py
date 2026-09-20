@@ -184,7 +184,36 @@ class XAccountTask(models.Model):
         for task in res:
             if not task.next_retry_at:
                 task.write({'next_retry_at': fields.Datetime.now()})
+        if res:
+            self._wake_task_queue_crons()
         return res
+
+    def _wake_task_queue_crons(self):
+        """Wake the task-queue cron workers as soon as new work is enqueued.
+
+        The scheduler thread polls ``ir_cron`` every ``SLEEP_INTERVAL`` (60s,
+        see odoo/service/server.py) and only wakes early on a ``cron_trigger``
+        NOTIFY. A task enqueued between two polls would otherwise wait up to
+        a minute even with a 10s cron interval. Inserting an ``ir_cron_trigger``
+        row makes the job ready immediately (``_get_ready_sql_condition``
+        matches trigger rows regardless of ``nextcall``) and the post-commit
+        ``pg_notify`` wakes the thread the moment the task is visible.
+        """
+        cr = self.env.cr
+        cr.execute(
+            """
+            INSERT INTO ir_cron_trigger (call_at, cron_id)
+            SELECT %s, c.id
+              FROM ir_cron c
+              JOIN ir_act_server a ON a.id = c.ir_actions_server_id
+             WHERE c.active
+               AND a.code LIKE %s
+            """,
+            (cr.now(), '%_process_queue(%'),
+        )
+        if cr.rowcount:
+            self.env.cr.postcommit.add(
+                lambda: self.env['ir.cron']._notifydb())
 
     def write(self, vals):
         """Stamp ``done_at`` when a task reaches a terminal state.
