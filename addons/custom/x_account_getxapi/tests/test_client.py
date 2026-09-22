@@ -32,7 +32,7 @@ class TestGetXAPIClient(XAccountGetXAPITestBase):
             'social_account_handle': 'usage_user',
             'twitter_user_id': '999',
             'x_provider': 'getxapi',
-            'x_getxapi_auth_token': 'tok',
+            'authtoken': 'tok',
         }
         base.update(vals)
         return self.env['social.account'].create(base)
@@ -166,7 +166,7 @@ class TestGetXAPIClient(XAccountGetXAPITestBase):
             'social_account_handle': 'usage_user',
             'twitter_user_id': '999',
             'x_provider': 'getxapi',
-            'x_getxapi_auth_token': 'tok',
+            'authtoken': 'tok',
         })
         client = GetXAPIClient(self.env, 'test_api_key', account_id=account.id)
         with patch('requests.request') as mocked:

@@ -43,7 +43,7 @@ class XSubscriptionEventType(models.Model):
         help='Inactive event types are not available for subscription.',
     )
 
-    _sql_constraints = [
-        ('name_unique', 'UNIQUE(name)',
-         'Event type name must be unique.'),
-    ]
+    _name_unique = models.Constraint(
+        'UNIQUE(name)',
+        'Event type name must be unique.',
+    )

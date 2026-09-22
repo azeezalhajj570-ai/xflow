@@ -73,11 +73,11 @@ class XAccountOperationReport(models.Model):
     processing_time = fields.Integer(
         string='Period of Processing (sec)',
         readonly=True,
-        group_operator='avg',
+        aggregator='avg',
         help='Seconds between the received post and the processed task.',
     )
     operation_count = fields.Integer(
-        string='Operations', readonly=True, group_operator='sum')
+        string='Operations', readonly=True, aggregator='sum')
 
     def init(self):
         tools.drop_view_if_exists(self.env.cr, self._table)

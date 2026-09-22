@@ -4,6 +4,7 @@
     'category': 'Marketing/Social Marketing',
     'summary': 'Twitter/X provider for X Account & Session Platform via OAuth 2.0',
     'version': '19.0.2.0.5',
+    'author': 'Azeez Tech',
     'description': """
 X Account Twitter Provider
 ==========================

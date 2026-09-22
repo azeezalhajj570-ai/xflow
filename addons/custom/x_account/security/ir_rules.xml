@@ -25,4 +25,30 @@
         <field name="domain_force">['|', ('x_company_id', '=', False), ('x_company_id', 'in', company_ids)]</field>
     </record>
 
+    <!-- mail's "can access channels (as member or as group allowed)" rule only
+         lets an internal user read or write a non-'channel' channel when it is a
+         member of it. X chats are 'x'/'x_group' channels whose members are the
+         external X participants, not the operating Odoo users, so without this
+         rule the X Account chats/groups show their badge count but an empty list,
+         and the chat form's automation toggles fail to save. Group rules are OR'd:
+         this one grants read and write on every X chat to social users, while the
+         multi-company rule above still scopes them by company. Creating and
+         deleting channels stays restricted (channels are created by the sync).
+
+         ``x_account_id != False`` keeps account-less X channels out: those are
+         stale duplicates/orphans that predate the account link (they share their
+         ``x_conversation_id`` with an accounted channel) and are not meant to be
+         surfaced to operators. They fall back to the membership rule, and the
+         orphan backfill links them from code (sudo). -->
+    <record id="security_rule_discuss_channel_x_social_rw" model="ir.rule">
+        <field name="name">Discuss Channel (X): Social users can read/write X chats</field>
+        <field name="model_id" ref="mail.model_discuss_channel"/>
+        <field name="domain_force">[('channel_type', 'in', ['x', 'x_group']), ('x_account_id', '!=', False)]</field>
+        <field name="groups" eval="[(4, ref('social.group_social_user'))]"/>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
 </odoo>

@@ -286,3 +286,70 @@ class TestXSaveXMessage(XAccountTestBase):
         )
         self.assertTrue(xm)
         self.assertEqual(xm.body_plain, 'stored while hidden')
+
+    def test_x_chat_opens_with_the_x_account_chat_form(self):
+        """A chat must look the same wherever it is opened from.
+
+        The message form reaches its chat through a many2one, which the web
+        client resolves through ``get_formview_action``. Left to the model
+        default, that click opened mail's generic group form instead of the X
+        chat form the X Account ▸ Chat list uses.
+        """
+        chat_form = self.env.ref('x_account.x_group_channel_view_form')
+        for channel_type in ('x', 'x_group'):
+            channel = self.env['discuss.channel'].sudo()._get_x_channel(
+                self.account,
+                conversation_id='g-open-%s' % channel_type,
+                channel_type=channel_type,
+                create_if_not_found=True,
+            )
+            action = channel.get_formview_action()
+            self.assertEqual(action['res_model'], 'discuss.channel')
+            self.assertEqual(action['res_id'], channel.id)
+            self.assertEqual(action['views'], [(chat_form.id, 'form')])
+
+    def test_plain_chat_keeps_the_default_form(self):
+        """Only X conversations are rerouted to the X chat form."""
+        plain = self.env['discuss.channel'].create({'name': 'Plain chat'})
+        self.assertEqual(
+            plain.get_formview_action()['views'], [(False, 'form')])
+
+    def test_search_chat_by_full_link(self):
+        channel = self._channel('g-search-1')
+        found = self.env['discuss.channel'].sudo().search([
+            ('x_chat_link', '=', 'https://x.com/i/chat/g-search-1'),
+        ])
+        self.assertIn(channel, found)
+
+    def test_search_chat_by_bare_conversation_id(self):
+        """Pasting the link and typing the id have to agree."""
+        channel = self._channel('g-search-2')
+        found = self.env['discuss.channel'].sudo().search([
+            ('x_chat_link', 'ilike', 'g-search-2'),
+        ])
+        self.assertIn(channel, found)
+
+    def test_search_chat_by_partial_link(self):
+        channel = self._channel('g-search-3')
+        found = self.env['discuss.channel'].sudo().search([
+            ('x_chat_link', 'ilike', 'https://x.com/i/chat/g-search-3'),
+        ])
+        self.assertIn(channel, found)
+
+    def test_search_chat_link_matches_only_the_chat_it_points_at(self):
+        target = self._channel('g-search-4')
+        other = self._channel('g-search-5')
+        found = self.env['discuss.channel'].sudo().search([
+            ('x_chat_link', '=', 'https://x.com/i/chat/g-search-4'),
+        ])
+        self.assertIn(target, found)
+        self.assertNotIn(other, found)
+
+    def test_chat_without_a_conversation_id_has_no_link(self):
+        plain = self.env['discuss.channel'].create({'name': 'No link chat'})
+        self.assertFalse(plain.x_chat_link)
+
+    def test_chat_search_view_offers_the_chat_link(self):
+        view = self.env.ref(
+            'x_account.view_discuss_channel_search_inherit_x_account')
+        self.assertIn('name="x_chat_link"', view.arch_db)

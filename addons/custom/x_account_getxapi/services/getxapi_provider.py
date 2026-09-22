@@ -59,13 +59,26 @@ class GetXAPIProvider:
         self.account = account
         self._api_key = env['ir.config_parameter'].sudo().get_param(
             'x_account.getxapi_api_key')
-        self._auth_token = getattr(account, 'x_getxapi_auth_token', '') or ''
+        self._auth_token = getattr(account, 'authtoken', '') or ''
+        self._ct0 = getattr(account, 'ct0', '') or ''
         self._client = GetXAPIClient(
             env, self._api_key, account_id=account.id)
         self._tweets = GetXAPITweetService(self._client)
         self._users = GetXAPIUserService(self._client)
         self._dms = GetXAPIDMService(self._client)
         self._media = GetXAPIMediaService(self._client)
+
+    def _session_fields(self):
+        """Request body fields that identify the X session behind a call.
+
+        ``ct0`` is only included when the account has one: accounts set up
+        before the field existed keep sending exactly the payload they sent
+        before, instead of an empty cookie the API would have to reject.
+        """
+        fields = {'auth_token': self._auth_token}
+        if self._ct0:
+            fields['ct0'] = self._ct0
+        return fields
 
     def _preflight_write(self, operation, screen_name=None, target_user_id=None):
         """Fail fast BEFORE spending a paid write on a doomed request.
@@ -171,7 +184,7 @@ class GetXAPIProvider:
         argument 'tweet_id'".
         """
         kwargs.pop('tweet_id', None)
-        kwargs['auth_token'] = self._auth_token
+        kwargs.update(self._session_fields())
         return kwargs
 
     def follow(self, screen_name=None, target_user_id=None, **kwargs):
@@ -185,7 +198,7 @@ class GetXAPIProvider:
             screen_name = user.get('username')
         if not screen_name:
             raise ValueError('target_user_id or screen_name is required')
-        kwargs['auth_token'] = self._auth_token
+        kwargs.update(self._session_fields())
         return self._users.follow(screen_name, **kwargs)
 
     def post_tweet(self, text, **kwargs):
@@ -193,19 +206,19 @@ class GetXAPIProvider:
         if not text:
             raise ValueError('text is required')
         self._preflight_write('post_tweet')
-        kwargs['auth_token'] = self._auth_token
+        kwargs.update(self._session_fields())
         return self._tweets.create(text, **kwargs)
 
     def get_dms(self, conversation_id, limit=100, cursor=None):
         """Return normalized messages for one conversation."""
         return self._dms.conversation(
-            conversation_id, auth_token=self._auth_token,
-            count=limit, cursor=cursor)
+            conversation_id, count=limit, cursor=cursor,
+            **self._session_fields())
 
     def send_dm(self, recipient_id, text):
         """Send a direct message via GetXAPI."""
         self._preflight_write('send_dm')
-        return self._dms.send(recipient_id, text, auth_token=self._auth_token)
+        return self._dms.send(recipient_id, text, **self._session_fields())
 
     def fetch_groups(self, account, limit=100, create_missing=True):
         """Sync the account's DM conversations into discuss channels.
@@ -242,8 +255,12 @@ class GetXAPIProvider:
                 'inbox list requires it.')
         return self._sync_inbox(account, limit=limit, create_missing=create_missing)
 
-    def _iter_inbox_conversations(self, auth_token, limit=50, tab='all'):
+    def _iter_inbox_conversations(self, session_fields, limit=50, tab='all'):
         """Yield every conversation in the account's DM inbox.
+
+        ``session_fields`` is the auth token / ct0 body pair from
+        :meth:`_session_fields`; the inbox endpoint needs the same session
+        identification as every other DM call.
 
         GetXAPI paginates the inbox (~50 per page); walking every page via
         ``cursor`` / ``has_more`` guarantees the whole inbox is seen, not just
@@ -256,7 +273,7 @@ class GetXAPIProvider:
         max_pages = 200  # ~50/page -> up to ~10k conversations
         while pages < max_pages:
             result = self._dms.list(
-                auth_token=auth_token, count=limit, cursor=cursor, tab=tab)
+                count=limit, cursor=cursor, tab=tab, **session_fields)
             conversations = result.get('conversations', [])
             if conversations:
                 yield conversations
@@ -307,7 +324,7 @@ class GetXAPIProvider:
         conversations = {}
         groups = 0
         for page in self._iter_inbox_conversations(
-                self._auth_token, limit=limit, tab=tab):
+                self._session_fields(), limit=limit, tab=tab):
             for conv in page:
                 conv_id = str(conv.get('conversation_id') or '')
                 if not conv_id:
@@ -639,7 +656,7 @@ class GetXAPIProvider:
     def get_conversations(self, limit=50, cursor=None):
         """Return DM conversations."""
         return self._dms.list(
-            auth_token=self._auth_token, count=limit, cursor=cursor)
+            count=limit, cursor=cursor, **self._session_fields())
 
     def supported_operations(self):
         """Operations this provider supports for the task queue."""

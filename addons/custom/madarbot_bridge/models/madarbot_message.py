@@ -85,12 +85,11 @@ class MadarBotTelegramMessage(models.Model):
     delivered_at = fields.Datetime('Delivered At', copy=False)
     processed_at = fields.Datetime('Processed At', copy=False)
 
-    _sql_constraints = [
-        ('check_state_direction',
-         "CHECK( (direction='incoming' AND state IN ('pending','processing','processed','error','dead_letter'))"
-         " OR (direction='outgoing' AND state IN ('pending','processing','sent','delivered','error','dead_letter','cancelled')) )",
-         "Invalid state for the given direction"),
-    ]
+    _check_state_direction = models.Constraint(
+        "CHECK( (direction='incoming' AND state IN ('pending','processing','processed','error','dead_letter'))"
+        " OR (direction='outgoing' AND state IN ('pending','processing','sent','delivered','error','dead_letter','cancelled')) )",
+        "Invalid state for the given direction",
+    )
 
     def _compute_display_name(self):
         for record in self:

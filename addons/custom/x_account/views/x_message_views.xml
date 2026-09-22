@@ -6,7 +6,7 @@
         <field name="arch" type="xml">
             <list string="X Messages" create="false" delete="false" edit="false">
                 <field name="direction"/>
-                <field name="channel_id"/>
+                <field name="channel_id" string="Chat"/>
                 <field name="account_id"/>
                 <field name="author_partner_id"/>
                 <field name="body_plain"/>
@@ -23,7 +23,7 @@
                 <sheet>
                     <group>
                         <field name="direction"/>
-                        <field name="channel_id"/>
+                        <field name="channel_id" string="Chat" options="{'no_create': True}"/>
                         <field name="account_id"/>
                         <field name="author_partner_id"/>
                         <field name="author_x_id"/>

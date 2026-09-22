@@ -7,7 +7,9 @@
         <field name="arch" type="xml">
             <xpath expr="//group[@name='x_account']" position="inside">
                 <field name="x_provider" invisible="x_provider != 'getxapi'"/>
-                <field name="x_getxapi_auth_token" password="True"
+                <field name="authtoken" password="True"
+                    invisible="x_action_provider != 'getxapi'"/>
+                <field name="ct0" password="True"
                     invisible="x_action_provider != 'getxapi'"/>
                 <field name="x_getxapi_credit_blocked"
                     invisible="not x_getxapi_credit_blocked"/>
@@ -29,7 +31,9 @@
         <field name="inherit_id" ref="x_account.x_account_social_account_view_form_standalone"/>
         <field name="arch" type="xml">
             <xpath expr="//field[@name='x_action_provider']" position="after">
-                <field name="x_getxapi_auth_token" password="True"
+                <field name="authtoken" password="True"
+                    invisible="x_action_provider != 'getxapi'"/>
+                <field name="ct0" password="True"
                     invisible="x_action_provider != 'getxapi'"/>
             </xpath>
         </field>

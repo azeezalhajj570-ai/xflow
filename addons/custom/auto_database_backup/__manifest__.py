@@ -29,11 +29,11 @@
      Automatic Backup,Database auto-backup, odoo backup google drive, dropbox,
      nextcloud, amazon S3, onedrive or remote server, Odoo19, Backup, Database,
       Odoo Apps""",
-    'description': """Odoo Database Backup, Database Backup, Automatic Backup, 
-    automatic database backup, odoo19, odoo apps,backup, automatic backup, 
-    odoo19 automatic database backup,backup google drive,backup dropbox, backup
-     nextcloud, backup amazon S3, backup onedrive. It also provides option to 
-     submit support tickets.""",
+    'description': """Odoo Database Backup, Database Backup, Automatic Backup,
+automatic database backup, odoo19, odoo apps,backup, automatic backup,
+odoo19 automatic database backup,backup google drive,backup dropbox, backup
+nextcloud, backup amazon S3, backup onedrive. It also provides option to
+submit support tickets.""",
     'author': "Cybrosys Techno Solutions",
     'company': 'Cybrosys Techno Solutions',
     'maintainer': 'Cybrosys Techno Solutions',

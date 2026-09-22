@@ -33,7 +33,7 @@ class TestGetXAPIProvider(XAccountGetXAPITestBase):
             'twitter_user_id': '12345',
             'x_provider': 'getxapi',
             'x_auth_method': 'session_cookie',
-            'x_getxapi_auth_token': 'test_auth_token',
+            'authtoken': 'test_auth_token',
         })
         cls.provider = GetXAPIProvider(cls.env, cls.account)
 
@@ -181,6 +181,49 @@ class TestGetXAPIProvider(XAccountGetXAPITestBase):
                     self.provider.send_dm('9', 'hello')
         self.assertEqual(mocked.call_count, 0)
 
+    def test_ct0_rides_along_with_the_auth_token(self):
+        """The ct0 cookie is sent on write calls when the account has one."""
+        self.account.write({'ct0': 'test_ct0'})
+        provider = GetXAPIProvider(self.env, self.account)
+        with patch.object(GetXAPIClient, 'post', return_value={
+            'data': {'result': {'favorited': True}},
+        }) as mocked:
+            provider.like({'post_id': '111'})
+        body = mocked.call_args.kwargs['json']
+        self.assertEqual(body['auth_token'], 'test_auth_token')
+        self.assertEqual(body['ct0'], 'test_ct0')
+
+    def test_ct0_is_sent_on_send_dm(self):
+        """The DM endpoint carries ct0 too, not just the tweet writes."""
+        self.account.write({'ct0': 'test_ct0'})
+        provider = GetXAPIProvider(self.env, self.account)
+        with patch.object(GetXAPIClient, 'post', return_value={
+            'data': {'message_id': 'dm-1', 'created_at': '2026-01-01'},
+        }) as mocked:
+            provider.send_dm('9', 'hello')
+        self.assertEqual(mocked.call_args.kwargs['json']['ct0'], 'test_ct0')
+
+    def test_ct0_is_sent_on_inbox_listing(self):
+        """Paging the DM inbox identifies the session the same way."""
+        self.account.write({'ct0': 'test_ct0'})
+        provider = GetXAPIProvider(self.env, self.account)
+        with patch.object(GetXAPIDMService, 'list',
+                          return_value={'conversations': []}) as lst:
+            list(provider._iter_inbox_conversations(provider._session_fields()))
+        self.assertEqual(lst.call_args.kwargs['ct0'], 'test_ct0')
+
+    def test_ct0_is_omitted_when_the_account_has_none(self):
+        """Accounts without ct0 keep sending exactly their previous payload.
+
+        The field is new: sending an empty cookie would change the request
+        for every account configured before it existed.
+        """
+        with patch.object(GetXAPIClient, 'post', return_value={
+            'data': {'result': {'favorited': True}},
+        }) as mocked:
+            self.provider.like({'post_id': '111'})
+        self.assertNotIn('ct0', mocked.call_args.kwargs['json'])
+
     def test_supported_operations(self):
         ops = self.provider.supported_operations()
         self.assertIn('validate_session', ops)
@@ -239,7 +282,7 @@ class TestSyncChatNames(XAccountGetXAPITestBase):
             'social_account_handle': 'getxapi_names',
             'twitter_user_id': '12345',
             'x_provider': 'getxapi',
-            'x_getxapi_auth_token': 'test_auth_token',
+            'authtoken': 'test_auth_token',
             'x_auth_method': 'session_cookie',
         })
         cls.provider = GetXAPIProvider(cls.env, cls.account)

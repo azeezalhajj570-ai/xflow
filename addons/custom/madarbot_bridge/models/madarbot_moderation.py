@@ -67,10 +67,10 @@ class MadarBotRepeatedMessage(models.Model):
     message_hash = fields.Char('Message Hash', required=True, index=True)
     created_at = fields.Datetime('Created At', default=fields.Datetime.now, required=True)
 
-    _sql_constraints = [
-        ('unique_user_channel_hash', 'UNIQUE(telegram_user_id, channel_id, message_hash)',
-         'This exact message was already sent by this user in this channel.'),
-    ]
+    _unique_user_channel_hash = models.Constraint(
+        'UNIQUE(telegram_user_id, channel_id, message_hash)',
+        'This exact message was already sent by this user in this channel.',
+    )
 
     @api.model
     def check_repeated(self, tg_user_id, channel_id, message_text):

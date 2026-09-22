@@ -74,8 +74,8 @@ for record in records:
             <field name="name">X: Channel Bookmark</field>
             <field name="model_id" ref="model_x_message"/>
             <field name="trigger">on_time_created</field>
-            <field name="trg_date_range">1</field>
-            <field name="trg_date_range_type">minutes</field>
+            <field name="trg_date_range">10</field>
+            <field name="trg_date_range_type">seconds</field>
             <field name="active" eval="False"/>
         </record>
         <record id="ir_actions_server_x_channel_bookmark" model="ir.actions.server">

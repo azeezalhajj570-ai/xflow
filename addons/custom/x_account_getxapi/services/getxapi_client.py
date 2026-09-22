@@ -30,6 +30,8 @@ import requests
 
 from odoo import fields
 
+from odoo.addons.x_account.models.account_task import TASK_CONTEXT_KEY
+
 from . import getxapi_errors
 from .getxapi_cost import estimate_cost
 
@@ -293,6 +295,7 @@ class GetXAPIClient:
                 'retry_after': retry_after,
                 'error_message': error_message,
                 'account_id': self._account_id,
+                'task_id': self._env.context.get(TASK_CONTEXT_KEY),
             }
             created = self._env['getxapi.api.usage'].sudo().create(vals)
             _LOGGER.info('GetXAPI usage logged: acc=%s status=%s endpoint=%s id=%s',

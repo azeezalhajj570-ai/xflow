@@ -14,6 +14,7 @@
                 <field name="x_auto_follow" string="Follow" widget="boolean_toggle"/>
                 <field name="channel_type" string="Type" readonly="1"/>
                 <field name="x_conversation_id" string="Conversation ID" readonly="1"/>
+                <field name="x_chat_link" widget="url"/>
                 <field name="x_account_id" readonly="1"/>
                 <field name="x_group_member_count" string="Members" readonly="1"/>
             </list>
@@ -99,6 +100,7 @@
             </xpath>
             <xpath expr="//search" position="inside">
                 <field name="x_conversation_id" string="X Conversation ID"/>
+                <field name="x_chat_link" string="X Chat Link"/>
                 <field name="x_account_id" string="X Account"/>
                 <separator/>
                 <filter string="X: 1:1" name="x_type_direct"

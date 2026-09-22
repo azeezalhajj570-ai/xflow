@@ -4,6 +4,7 @@
     'category': 'Marketing/Social Marketing',
     'summary': 'Optional OmniX REST provider for X Account & Session Platform',
     'version': '19.0.1.0.0',
+    'author': 'Azeez Tech',
     'description': """
 X Account OmniX API
 ===================
@@ -16,10 +17,9 @@ Official Publish adapter never import or depend on it. It is a per-account
 either/or alternative to SessionWebProvider.
 
 Highlights:
-- `OmniXProvider` implementing the XProvider surface (validate, DMs, group
-  automation ops) against the OmniX REST API
-- Layered client: transport (`OmniXHttpClient`), envelope parsing
-  (`OmniXEnvelopeParser`), error classification (`OmniXErrorMapper`)
+
+- `OmniXProvider` implementing the XProvider surface (validate, DMs, group automation ops) against the OmniX REST API
+- Layered client: transport (`OmniXHttpClient`), envelope parsing (`OmniXEnvelopeParser`), error classification (`OmniXErrorMapper`)
 - Group DM sync + member sync into `discuss.channel` / `res.partner`
 - OmniX webhook registration/validation/deletion + CRC receiver route
 - `x_omnix_api_key` configuration field in X Account Settings
