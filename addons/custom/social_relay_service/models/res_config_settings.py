@@ -32,11 +32,11 @@ class ResConfigSettings(models.TransientModel):
     )
 
     social_relay_youtube_client_id = fields.Char(
-        string='YouTube OAuth Client ID',
+        string='Relay YouTube OAuth Client ID',
         config_parameter='social_relay_service.youtube_client_id',
     )
     social_relay_youtube_client_secret = fields.Char(
-        string='YouTube OAuth Client Secret',
+        string='Relay YouTube OAuth Client Secret',
         config_parameter='social_relay_service.youtube_client_secret',
     )
 
@@ -46,22 +46,22 @@ class ResConfigSettings(models.TransientModel):
     )
 
     social_relay_firebase_project_id = fields.Char(
-        string='Firebase Project ID',
+        string='Relay Firebase Project ID',
         config_parameter='social_relay_service.firebase_project_id',
     )
     social_relay_firebase_web_api_key = fields.Char(
-        string='Firebase Web API Key',
+        string='Relay Firebase Web API Key',
         config_parameter='social_relay_service.firebase_web_api_key',
     )
     social_relay_firebase_push_certificate_key = fields.Char(
-        string='Firebase Push Certificate Key',
+        string='Relay Firebase Push Certificate Key',
         config_parameter='social_relay_service.firebase_push_certificate_key',
     )
     social_relay_firebase_sender_id = fields.Char(
-        string='Firebase Sender ID',
+        string='Relay Firebase Sender ID',
         config_parameter='social_relay_service.firebase_sender_id',
     )
     social_relay_firebase_web_app_id = fields.Char(
-        string='Firebase Web App ID',
+        string='Relay Firebase Web App ID',
         config_parameter='social_relay_service.firebase_web_app_id',
     )

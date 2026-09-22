@@ -52,3 +52,13 @@ class TestGetXAPIUsageViews(XAccountGetXAPITestBase):
             menu.parent_id, self.env.ref('x_account.menu_x_account_reporting'))
         self.assertEqual(
             menu.action, self.env.ref('x_account_getxapi.getxapi_usage_action'))
+
+    def test_usage_links_to_the_triggering_task(self):
+        """Each usage row exposes the task that triggered the call and a button
+        to its operations-report row."""
+        self.assertIn('name="task_id"', self._arch('getxapi.api.usage', 'list'))
+        form_arch = self._arch('getxapi.api.usage', 'form')
+        self.assertIn('name="task_id"', form_arch)
+        self.assertIn('name="action_view_operation"', form_arch)
+        self.assertIn(
+            'name="task_id"', self._arch('getxapi.api.usage', 'search'))

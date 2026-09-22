@@ -8,3 +8,5 @@ access_x_subscription_event_type_user,x.subscription.event.type.user,model_x_sub
 access_x_subscription_event_type_system,x.subscription.event.type.system,model_x_subscription_event_type,base.group_system,1,1,1,1
 access_x_twitter_key_change_manager,x.twitter.key.change.manager,model_x_twitter_key_change,social.group_social_manager,1,0,0,0
 access_x_twitter_key_change_system,x.twitter.key.change.system,model_x_twitter_key_change,base.group_system,1,1,1,1
+access_x_twitter_event_manager,x.twitter.event.manager,model_x_twitter_event,social.group_social_manager,1,1,1,1
+access_x_twitter_event_system,x.twitter.event.system,model_x_twitter_event,base.group_system,1,1,1,1

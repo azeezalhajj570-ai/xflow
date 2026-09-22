@@ -2,7 +2,7 @@
 <odoo>
     <data>
         <record id="getxapi_usage_action" model="ir.actions.act_window">
-            <field name="name">GetXAPI Usage</field>
+            <field name="name">Usage</field>
             <field name="res_model">getxapi.api.usage</field>
             <field name="view_mode">list,form,pivot</field>
             <field name="context">{'search_default_groupby_account': 1}</field>
@@ -17,9 +17,10 @@
             <field name="name">getxapi.api.usage.list</field>
             <field name="model">getxapi.api.usage</field>
             <field name="arch" type="xml">
-                <list string="GetXAPI Usage" default_order="create_date desc" create="false">
+                <list string="Usage" default_order="create_date desc" create="false">
                     <field name="timestamp" widget="datetime" options="{'show_seconds': True}"/>
                     <field name="account_id" optional="show"/>
+                    <field name="task_id" optional="show"/>
                     <field name="endpoint"/>
                     <field name="method" widget="badge"/>
                     <field name="status_code"/>
@@ -37,11 +38,22 @@
             <field name="name">getxapi.api.usage.form</field>
             <field name="model">getxapi.api.usage</field>
             <field name="arch" type="xml">
-                <form string="GetXAPI Usage" create="false">
+                <form string="Usage" create="false" edit="false" delete="false">
                     <sheet>
+                        <div class="oe_button_box" name="button_box">
+                            <button name="action_view_operation"
+                                    type="object"
+                                    class="oe_stat_button"
+                                    icon="fa-list"
+                                    invisible="not task_id">
+                                <span class="o_stat_text">View</span>
+                                <span class="o_stat_text">Operation</span>
+                            </button>
+                        </div>
                         <group>
                             <group>
                                 <field name="account_id"/>
+                                <field name="task_id"/>
                                 <field name="endpoint"/>
                                 <field name="method"/>
                                 <field name="status_code"/>
@@ -71,6 +83,7 @@
                 <search string="GetXAPI Usage">
                     <field name="endpoint"/>
                     <field name="account_id"/>
+                    <field name="task_id"/>
                     <field name="error_type"/>
                     <field name="error_message"/>
                     <field name="twitter_error_code"/>
@@ -117,7 +130,7 @@
         </record>
 
         <menuitem id="menu_getxapi_usage"
-                  name="GetXAPI Usage"
+                  name="Usage"
                   parent="x_account.menu_x_account_reporting"
                   action="getxapi_usage_action"
                   sequence="20"

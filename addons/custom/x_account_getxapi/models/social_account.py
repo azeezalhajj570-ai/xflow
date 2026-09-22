@@ -19,9 +19,15 @@ class SocialAccount(models.Model):
         ondelete={'getxapi': 'cascade'},
     )
 
-    x_getxapi_auth_token = fields.Char(
+    authtoken = fields.Char(
         string='GetXAPI Auth Token',
         help='Twitter session auth_token for GetXAPI write operations.',
+    )
+    ct0 = fields.Char(
+        string='GetXAPI ct0',
+        help='Twitter session ct0 (CSRF) cookie, sent alongside the auth '
+             'token when set. Leave empty for accounts whose GetXAPI calls '
+             'only need the auth token.',
     )
     x_getxapi_credit_blocked = fields.Boolean(
         string='GetXAPI Credit Exhausted',

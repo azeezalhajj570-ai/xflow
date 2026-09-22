@@ -21,6 +21,7 @@ services:
       ODOO_RC: /etc/odoo/odoo.conf
       ODOO_PROXY_MODE: ${ODOO_PROXY_MODE}
       PYTHONOPTIMIZE: "0"
+      PYTHONPATH: /mnt/python-deps
       TZ: ${TZ}
     volumes:
       - ./config/odoo.conf:/etc/odoo/odoo.conf
@@ -31,6 +32,7 @@ services:
       - ./logs:/var/log/odoo
       - ./backups:/mnt/backups
       - ./scripts:/mnt/scripts
+      - ./python:/mnt/python-deps
     ports:
       - "${ODOO_PORT}:8069"
       - "${ODOO_LONGPOLLING_PORT}:8072"

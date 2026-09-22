@@ -32,6 +32,15 @@ class GetXAPIUsage(models.Model):
         store=True,
         index=True,
     )
+    task_id = fields.Many2one(
+        'x.account.task',
+        string='Triggered By',
+        index=True,
+        ondelete='set null',
+        help='The X task whose execution produced this API call. Empty for '
+             'calls made outside the task queue (e.g. webhook registration or '
+             'a session check).',
+    )
     endpoint = fields.Char(
         string='Endpoint',
         index=True,
@@ -81,6 +90,23 @@ class GetXAPIUsage(models.Model):
         string='Error Message',
         help='Sanitized error detail returned in the GetXAPI response body.',
     )
+
+    def action_view_operation(self):
+        """Open the operations report row for the task that triggered this call.
+
+        The report is a SQL view keyed by ``x.account.task`` id, so the row is
+        the task's own id.
+        """
+        self.ensure_one()
+        if not self.task_id:
+            return False
+        action = self.env['ir.actions.act_window']._for_xml_id(
+            'x_account.action_x_account_operation_report')
+        action['domain'] = [('id', '=', self.task_id.id)]
+        action['view_mode'] = 'list'
+        action['views'] = [(False, 'list')]
+        action['context'] = {}
+        return action
 
     @api.model
     def _archive_old_records(self, days=90):

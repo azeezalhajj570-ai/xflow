@@ -9,6 +9,13 @@ from ..services.x_provider import x_conversation_is_group
 
 _logger = logging.getLogger(__name__)
 
+# Public X chat links look like https://x.com/i/chat/<conversation_id>.
+X_CHAT_LINK_TEMPLATE = 'https://x.com/i/chat/%s'
+
+# Path segment separating the host from the conversation id, so a pasted link
+# can be reduced to the id it points at (x.com or twitter.com alike).
+_X_CHAT_LINK_PATH = '/i/chat/'
+
 
 def _x_failure_reason(exc):
     """Coarse reason for a failed X provider call, for the bulk actions.
@@ -47,6 +54,48 @@ class DiscussChannel(models.Model):
         index=True,
         help='External X conversation id.',
     )
+
+    x_chat_link = fields.Char(
+        string='X Chat Link',
+        compute='_compute_x_chat_link',
+        search='_search_x_chat_link',
+    )
+
+    @api.depends('x_conversation_id')
+    def _compute_x_chat_link(self):
+        for channel in self:
+            channel.x_chat_link = (
+                X_CHAT_LINK_TEMPLATE % channel.x_conversation_id
+                if channel.x_conversation_id
+                else False
+            )
+
+    @api.model
+    def _search_x_chat_link(self, operator, value):
+        """Search chats by chat link.
+
+        The link is computed, so the domain resolves to the underlying
+        ``x_conversation_id``: a pasted full link, the same link without its
+        scheme, and a bare conversation id all find the channel.
+        """
+        if operator in ('in', 'not in'):
+            value = [self._x_conversation_id_from_chat_link(item)
+                     for item in value or []]
+        else:
+            value = self._x_conversation_id_from_chat_link(value)
+        return [('x_conversation_id', operator, value)]
+
+    @api.model
+    def _x_conversation_id_from_chat_link(self, value):
+        """Reduce a chat link (or a bare conversation id) to its id."""
+        if not isinstance(value, str):
+            return value
+        text = value.strip()
+        index = text.lower().rfind(_X_CHAT_LINK_PATH)
+        if index != -1:
+            text = text[index + len(_X_CHAT_LINK_PATH):]
+        return text.split('?')[0].strip().rstrip('/')
+
     last_x_mail_message_id = fields.Many2one(
         'mail.message',
         string='Last X Mail Message',
@@ -186,6 +235,25 @@ class DiscussChannel(models.Model):
         # delivery for an archived conversation failed its batch and the
         # message was dropped.
         return self.with_context(active_test=False).search(domain, limit=1)
+
+    def get_formview_action(self, access_uid=None):
+        """Open an X conversation with the X Account chat form.
+
+        The message form reaches its chat through a plain many2one, and the
+        web client resolves that click through this method. Without the
+        override it returns no explicit view, so the client falls back to the
+        model's default form — mail's generic group form, which carries none
+        of the X information (account, conversation id, members, automation)
+        shown by X Account ▸ Chat. Binding the X form here makes a chat look
+        the same wherever it is opened from.
+        """
+        action = super().get_formview_action(access_uid=access_uid)
+        if self.channel_type in ('x', 'x_group'):
+            view = self.env.ref(
+                'x_account.x_group_channel_view_form', raise_if_not_found=False)
+            if view:
+                action['views'] = [(view.id, 'form')]
+        return action
 
     def _save_x_message(self, direction, external_id, body, external_created_at,
                         author_partner=None, **kw):

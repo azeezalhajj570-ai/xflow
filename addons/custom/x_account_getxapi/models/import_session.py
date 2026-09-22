@@ -44,6 +44,7 @@ class XImportSession(models.TransientModel):
             raise ValidationError(_('Username / Handle is required for GetXAPI.'))
 
         auth_token = self.auth_token.strip() if self.auth_token else ''
+        ct0 = self.ct0.strip() if self.ct0 else ''
 
         account = self.env['social.account'].with_context(
             x_no_default_stream=True).create({
@@ -53,7 +54,8 @@ class XImportSession(models.TransientModel):
                 'x_provider': 'getxapi',
                 'x_auth_method': 'session_cookie',
                 'x_connection_status': 'authenticating',
-                'x_getxapi_auth_token': auth_token,
+                'authtoken': auth_token,
+                'ct0': ct0,
             })
 
         from odoo.addons.x_account_getxapi.services.getxapi_provider import GetXAPIProvider

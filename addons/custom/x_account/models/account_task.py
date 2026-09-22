@@ -7,6 +7,11 @@ from datetime import timedelta
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 
+# Environment-context key a running task stamps on the provider it builds, so
+# the API transports it calls can attribute the usage they log back to the
+# task (and through it the operations report).
+TASK_CONTEXT_KEY = 'x_account_task_id'
+
 
 class XAccountTask(models.Model):
     """Durable, retryable, owned, prioritized X task queue.
@@ -168,6 +173,23 @@ class XAccountTask(models.Model):
             task.target_post_id = task._target_post_id_from_context(ctx)
             task.target_screen_name = ctx.get('screen_name') or False
             task.source = ctx.get('source') or False
+
+    @api.depends('operation', 'status', 'account_id', 'target_post_id',
+                 'target_screen_name')
+    def _compute_display_name(self):
+        """Readable label for the task wherever it is referenced (e.g. the
+        usage rows it triggered): ``operation · account · target · status``
+        instead of the default ``x.account.task,<id>``."""
+        for task in self:
+            parts = [task.operation or 'Task']
+            if task.account_id:
+                parts.append(task.account_id.display_name)
+            target = task.target_post_id or task.target_screen_name
+            if target:
+                parts.append(str(target))
+            if task.status:
+                parts.append(task.status)
+            task.display_name = ' · '.join(parts)
 
     @api.depends('create_date', 'done_at')
     def _compute_processing_time(self):
@@ -554,7 +576,10 @@ class XAccountTask(models.Model):
             return None
         try:
             op = operation or self.operation
-            provider = account.get_provider_for_operation(op)
+            # Stamp the task on the provider env so the API usage logged while
+            # it runs can be linked back to this task (and its report row).
+            provider = account.with_context(
+                **{TASK_CONTEXT_KEY: self.id}).get_provider_for_operation(op)
             fn = getattr(provider, op, None)
             if not fn or not callable(fn):
                 self._schedule_retry('Unknown operation %s' % op)
@@ -574,16 +599,19 @@ class XAccountTask(models.Model):
             return None
 
     def _schedule_retry(self, error):
-        """Retry ``error`` with backoff, or fail it permanently.
+        """Retry ``error`` with backoff, or settle it permanently.
 
         Only errors flagged retryable by the provider (transient rate limits,
         timeouts, 5xx) are re-queued. Permanent conditions — depleted credits,
         invalid credentials, a recipient who cannot receive DMs — fail
-        immediately instead of burning every attempt.
+        immediately instead of burning every attempt. An error the provider
+        flags ``cancelled`` (an upstream rejection it refused) is settled as
+        ``cancelled`` with the error message kept as-is.
         """
         self.ensure_one()
         message = str(error)
         retryable = getattr(error, 'retryable', True)
+        cancelled = getattr(error, 'cancelled', False)
         self.write({'error': message})
         if retryable and self.retry_count < self.max_attempts - 1:
             delay = self.backoff_base * (2 ** self.retry_count)
@@ -593,7 +621,7 @@ class XAccountTask(models.Model):
                 'next_retry_at': fields.Datetime.now() + timedelta(seconds=delay),
             })
         else:
-            self.write({'status': 'failed'})
+            self.write({'status': 'cancelled' if cancelled else 'failed'})
 
     def _task_context(self):
         try:

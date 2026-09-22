@@ -23,9 +23,11 @@ Classification relevant to 429s:
 - plain 429 -> ``rate_limit``, retryable (honor ``retry_after``).
 - HTTP 402 -> ``credit_exhausted``, NOT retryable (getxapi billing balance;
   adding credit fixes it, retrying cannot).
+- HTTP 502 -> ``upstream_rejection``, NOT retryable (X/GetXAPI returned a hard
+  upstream 5xx; re-queuing just burns the task's attempts and the paid quota).
 """
 
-_RETRYABLE = frozenset({'rate_limit', 'temporary_error', 'upstream_rejection', 'timeout'})
+_RETRYABLE = frozenset({'rate_limit', 'temporary_error', 'timeout'})
 
 # Substrings that mark a response as a GetXAPI billing/credit problem rather
 # than a transient upstream throttle. Kept here (not in the transport) so the
@@ -87,6 +89,11 @@ class GetXAPIError(Exception):
         self.code = code or _HTTP_ERROR_CODES.get(
             status_code, 'http_%s' % status_code)
         self.retryable = self.code in _RETRYABLE
+        # An upstream rejection is refused by X/GetXAPI itself: it is not
+        # retried and must not count as this task's own failure, so the task
+        # queue records it as ``cancelled`` (keeping the original message)
+        # instead of ``failed``.
+        self.cancelled = self.code == 'upstream_rejection'
         self.twitter_error_code = twitter_error_code
         self.retry_after = retry_after
         super().__init__(self.message)

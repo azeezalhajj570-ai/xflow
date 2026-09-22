@@ -155,9 +155,14 @@ msgstr "مفتاح GetXAPI API (ترويسة Authorization: Bearer). يستخد�
 "GetXAPI الاختياري فقط؛ ولا يُخزَّن أبدًا في x.session.store."
 
 #. module: x_account_getxapi
-#: model:ir.model.fields,field_description:x_account_getxapi.field_social_account__x_getxapi_auth_token
+#: model:ir.model.fields,field_description:x_account_getxapi.field_social_account__authtoken
 msgid "GetXAPI Auth Token"
 msgstr "رمز مصادقة GetXAPI"
+
+#. module: x_account_getxapi
+#: model:ir.model.fields,field_description:x_account_getxapi.field_social_account__ct0
+msgid "GetXAPI ct0"
+msgstr "GetXAPI ct0"
 
 #. module: x_account_getxapi
 #: model:ir.model.fields,field_description:x_account_getxapi.field_social_account__x_getxapi_credit_blocked
@@ -178,13 +183,17 @@ msgstr "GetXAPI REST API"
 
 #. module: x_account_getxapi
 #: model:ir.actions.act_window,name:x_account_getxapi.getxapi_usage_action
-#: model:ir.ui.menu,name:x_account_getxapi.menu_getxapi_usage
 #: model_terms:ir.ui.view,arch_db:x_account_getxapi.getxapi_usage_view_form
 #: model_terms:ir.ui.view,arch_db:x_account_getxapi.getxapi_usage_view_list
 #: model_terms:ir.ui.view,arch_db:x_account_getxapi.getxapi_usage_view_pivot
 #: model_terms:ir.ui.view,arch_db:x_account_getxapi.getxapi_usage_view_search
 msgid "GetXAPI Usage"
 msgstr "استخدام GetXAPI"
+
+#. module: x_account_getxapi
+#: model:ir.ui.menu,name:x_account_getxapi.menu_getxapi_usage
+msgid "Usage"
+msgstr "الاستخدام"
 
 #. module: x_account_getxapi
 #: model:ir.actions.server,name:x_account_getxapi.cron_archive_getxapi_usage_ir_actions_server
@@ -389,9 +398,19 @@ msgid "Twitter Error Code"
 msgstr "رمز خطأ تويتر"
 
 #. module: x_account_getxapi
-#: model:ir.model.fields,help:x_account_getxapi.field_social_account__x_getxapi_auth_token
+#: model:ir.model.fields,help:x_account_getxapi.field_social_account__authtoken
 msgid "Twitter session auth_token for GetXAPI write operations."
 msgstr "رمز الجلسة auth_token الخاص بتويتر لعمليات الكتابة في GetXAPI."
+
+#. module: x_account_getxapi
+#: model:ir.model.fields,help:x_account_getxapi.field_social_account__ct0
+msgid ""
+"Twitter session ct0 (CSRF) cookie, sent alongside the auth token when set. "
+"Leave empty for accounts whose GetXAPI calls only need the auth token."
+msgstr ""
+"كوكي ct0 (CSRF) الخاص بجلسة تويتر، يُرسَل إلى جانب رمز المصادقة عند "
+"تعيينه. اتركه فارغًا للحسابات التي تحتاج استدعاءات GetXAPI فيها رمز "
+"المصادقة فقط."
 
 #. module: x_account_getxapi
 #: model:ir.model.fields,help:x_account_getxapi.field_getxapi_api_usage__twitter_error_code

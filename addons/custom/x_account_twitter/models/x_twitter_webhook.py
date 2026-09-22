@@ -91,11 +91,19 @@ class XTwitterSubscription(models.Model):
         'UNIQUE(account_id, event_type)',
         'Only one subscription per event type on an X account.',
     )
-    _subscription_id_uniq = models.Constraint(
-        'UNIQUE(subscription_id) WHERE subscription_id IS NOT NULL AND subscription_id != \'\''
-        ,
-        'An X subscription id must be unique.',
-    )
+
+    def init(self):
+        # A *partial* unique index cannot be expressed with models.Constraint:
+        # Odoo emits it as a table constraint (UNIQUE(...) WHERE ...), which is
+        # invalid SQL and made every upgrade log a syntax error. Create the
+        # index directly instead — live subscription ids stay unique while the
+        # '' placeholder for an id X did not echo stays unconstrained.
+        self.env.cr.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS
+                x_twitter_subscription__subscription_id_uniq
+            ON x_twitter_subscription (subscription_id)
+            WHERE subscription_id IS NOT NULL AND subscription_id != ''
+        """)
 
 
 class XTwitterEvent(models.Model):

@@ -23,3 +23,4 @@ access_ir_model_manager,ir.model.manager,base.model_ir_model,social.group_social
 social.access_social_account_user,social.account.user,social.model_social_account,social.group_social_user,1,1,1,1
 access_ir_cron_user,ir.cron.user,base.model_ir_cron,social.group_social_user,1,1,0,0
 access_ir_cron_manager,ir.cron.manager,base.model_ir_cron,social.group_social_manager,1,1,1,0
+access_x_orphan_channel_backfill_user,x.orphan.channel.backfill.user,model_x_orphan_channel_backfill,base.group_user,1,1,1,0

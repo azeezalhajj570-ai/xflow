@@ -3,7 +3,8 @@
     'name': 'X Account GetXAPI Provider',
     'category': 'Marketing/Social Marketing',
     'summary': 'Optional GetXAPI REST provider for X Account & Session Platform',
-    'version': '19.0.1.0.0',
+    'version': '19.0.1.1.0',
+    'author': 'Azeez Tech',
     'description': """
 X Account GetXAPI Provider
 ==========================
@@ -15,10 +16,9 @@ a clean abstraction with centralized cost tracking, cursor pagination, bounded
 retries, and call minimization.
 
 Highlights:
-- `GetXAPIProvider` implementing the XProvider surface (validate, DMs, tweet
-  reads/writes, user operations, media upload)
-- Layered client: transport (`GetXAPIClient`), envelope parsing
-  (`GetXAPIEnvelopeParser`), error classification (`GetXAPIError`)
+
+- `GetXAPIProvider` implementing the XProvider surface (validate, DMs, tweet reads/writes, user operations, media upload)
+- Layered client: transport (`GetXAPIClient`), envelope parsing (`GetXAPIEnvelopeParser`), error classification (`GetXAPIError`)
 - Centralized pricing table (`ENDPOINT_COSTS`) with automatic cost tracking
 - `getxapi.api.usage` model with admin UI for monitoring API spend
 - Cursor pagination helper (`GetXAPIClient.paginate`)

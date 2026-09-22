@@ -1,6 +1,7 @@
 {
     'name': 'Automation Rules - Seconds Support',
     'version': '19.0.1.0.0',
+    'author': 'Azeez Tech',
     'category': 'Technical',
     'summary': 'Add seconds support to automation rule intervals',
     'description': """

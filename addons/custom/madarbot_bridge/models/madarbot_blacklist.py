@@ -12,10 +12,10 @@ class MadarBotBlacklist(models.Model):
     active = fields.Boolean('Active', default=True)
     blocked_at = fields.Datetime('Blocked At', default=fields.Datetime.now)
 
-    _sql_constraints = [
-        ('unique_telegram_user_id', 'UNIQUE(telegram_user_id)',
-         'This Telegram user is already blacklisted.'),
-    ]
+    _unique_telegram_user_id = models.Constraint(
+        'UNIQUE(telegram_user_id)',
+        'This Telegram user is already blacklisted.',
+    )
 
     @api.model
     def _add(self, telegram_user_id, reason=None, username=None):

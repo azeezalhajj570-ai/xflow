@@ -16,7 +16,7 @@ class XImportSession(models.TransientModel):
     _description = 'Import X Session'
 
     media_id = fields.Many2one('social.media', string='X Media', required=True)
-    name = fields.Char(string='Display Name')
+    name = fields.Char(string='Name')
     auth_token = fields.Char(string='auth_token', required=True)
     ct0 = fields.Char(string='ct0')
     username = fields.Char(string='Username / Handle')

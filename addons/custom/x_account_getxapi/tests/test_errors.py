@@ -106,10 +106,11 @@ class TestGetXAPIErrors(XAccountGetXAPITestBase):
         self.assertEqual(error.code, 'temporary_error')
         self.assertTrue(error.retryable)
 
-    def test_502_is_upstream_rejection(self):
+    def test_502_is_upstream_rejection_not_retryable(self):
         error = classify(502, '/test')
         self.assertEqual(error.code, 'upstream_rejection')
-        self.assertTrue(error.retryable)
+        self.assertFalse(error.retryable)
+        self.assertTrue(error.cancelled)
 
     def test_503_is_temporary_error(self):
         error = classify(503, '/test')
