@@ -40,6 +40,27 @@ class TestXAccountLifecycle(XAccountTestBase):
         self.account._set_last_error('verify_credentials returned HTTP 401')
         self.assertEqual(self.account.last_error, 'verify_credentials returned HTTP 401')
 
+    def test_reauth_notification_emails_company_users(self):
+        """A reauth notice must also email the users who manage X accounts in
+        the account's company, not only push an in-app notification."""
+        notif_user = self.env['res.users'].with_context(
+            no_reset_password=True).create({
+                'name': 'X Reauth Receiver',
+                'login': 'x_reauth_receiver',
+                'email': 'x_reauth_receiver@example.com',
+                'group_ids': [(6, 0, [
+                    self.env.ref('social.group_social_user').id])],
+                'company_ids': [(6, 0, self.account.company_id.ids)],
+            })
+        with self.mock_mail_gateway():
+            self.account._notify_reauth_required('invalid_request: bad token')
+        mails = self._new_mails
+        self.assertTrue(mails)
+        self.assertIn(notif_user.partner_id, mails.recipient_ids)
+        self.assertIn('reauthentication', mails.subject)
+        self.assertIn(self.account.name, mails.subject)
+        self.assertIn('reauthentication', mails.body)
+
     def test_audit_fields(self):
         self.account.write({
             'x_migration_status': 'migrated',
