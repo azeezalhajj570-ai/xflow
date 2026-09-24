@@ -914,15 +914,15 @@ class XAccountTask(models.Model):
         # ``isinstance(True, int)`` is True: the single-delivery path reports a
         # boolean here, and 'True processed' is not a count.
         if isinstance(processed, int) and not isinstance(processed, bool):
-            details.append('%s processed' % processed)
+            details.append(_('%(count)s processed', count=processed))
         skipped = data.get('skipped')
         if isinstance(skipped, int) and skipped:
-            details.append('%s skipped' % skipped)
+            details.append(_('%(count)s skipped', count=skipped))
         elif isinstance(skipped, str) and skipped:
-            details.append('skipped: %s' % skipped)
+            details.append(_('skipped: %(reason)s', reason=skipped))
         if not details:
             return False
-        return 'Nothing stored (%s)' % ', '.join(details)
+        return _('Nothing stored (%(details)s)', details=', '.join(details))
 
     def action_cancel(self):
         self.write({'status': 'cancelled'})

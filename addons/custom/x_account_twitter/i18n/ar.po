@@ -88,6 +88,7 @@ msgstr "تهيئة الإعدادات"
 
 #. module: x_account_twitter
 #: model:ir.model.fields,field_description:x_account_twitter.field_x_twitter_event__conversation_id
+#: model:ir.model.fields,field_description:x_account_twitter.field_x_twitter_key_change__conversation_id
 msgid "Conversation ID"
 msgstr "معرّف المحادثة"
 
@@ -175,8 +176,8 @@ msgstr "خطأ"
 
 #. module: x_account_twitter
 #: model:ir.model.fields,field_description:x_account_twitter.field_x_subscription_event_type__name
-#: model:ir.model.fields,field_description:x_account_twitter.field_x_twitter_event__event_type
 #: model:ir.model.fields,field_description:x_account_twitter.field_x_twitter_subscription__event_type
+#: model:ir.model.fields,field_description:x_account_twitter.field_x_twitter_event__event_type
 msgid "Event Type"
 msgstr "نوع الحدث"
 
@@ -227,7 +228,7 @@ msgstr "أنواع الأحداث غير النشطة غير متاحة للاش
 
 #. module: x_account_twitter
 #. odoo-python
-#: code:addons/x_account_twitter/controllers/main.py:0
+#: code:addons/x_account_twitter/controllers/main.py:100
 msgid ""
 "Invalid state parameter. This could be a CSRF attack – please try adding the"
 " account again."
@@ -256,7 +257,7 @@ msgid "Like"
 msgstr "إعجاب"
 
 #. module: x_account_twitter
-#: model:ir.actions.act_window,name:x_account_twitter.action_x_account_twitter_link_account
+#: model_terms:ir.actions.act_window,name:x_account_twitter.action_x_account_twitter_link_account
 msgid "Link X Account"
 msgstr "ربط حساب X"
 
@@ -363,7 +364,7 @@ msgstr "قيد الانتظار"
 
 #. module: x_account_twitter
 #. odoo-python
-#: code:addons/x_account_twitter/controllers/main.py:0
+#: code:addons/x_account_twitter/controllers/main.py:67
 msgid ""
 "Please configure the X OAuth 2.0 Client ID and Client Secret in the X "
 "Account settings first."
@@ -430,14 +431,13 @@ msgid "Registered At"
 msgstr "تم التسجيل في"
 
 #. module: x_account_twitter
-#: model_terms:ir.ui.view,arch_db:x_account_twitter.x_account_twitter_social_account_view_form
-#: model_terms:ir.ui.view,arch_db:x_account_twitter.x_account_twitter_social_account_view_form_standalone
+#: model_terms:ir.actions.server,name:x_account_twitter.action_form_relink_account
 msgid "Relink Account"
 msgstr "إعادة ربط الحساب"
 
 #. module: x_account_twitter
-#: model_terms:ir.ui.view,arch_db:x_account_twitter.x_account_twitter_social_account_view_form
-#: model_terms:ir.ui.view,arch_db:x_account_twitter.x_account_twitter_social_account_view_form_standalone
+#: model_terms:ir.ui.view,x_subscription_event_ids:x_account_twitter.x_account_twitter_social_account_view_form
+#: model_terms:ir.ui.view,x_subscription_event_ids:x_account_twitter.x_account_twitter_social_account_view_form_standalone
 msgid "Select event types..."
 msgstr "اختر أنواع الأحداث..."
 
@@ -473,8 +473,8 @@ msgid "Spaces"
 msgstr "المساحات"
 
 #. module: x_account_twitter
-#: model:ir.model.fields,field_description:x_account_twitter.field_x_twitter_event__state
 #: model:ir.model.fields,field_description:x_account_twitter.field_x_twitter_subscription__state
+#: model:ir.model.fields,field_description:x_account_twitter.field_x_twitter_event__state
 msgid "State"
 msgstr "الحالة"
 
@@ -550,7 +550,8 @@ msgstr "التاريخ والوقت بتوقيت UTC الذي يجب بعده ت
 
 #. module: x_account_twitter
 #. odoo-python
-#: code:addons/x_account_twitter/controllers/main.py:0
+#: code:addons/x_account_twitter/controllers/main.py:91
+#: code:addons/x_account_twitter/controllers/main.py:62
 msgid "Unauthorized. Please contact your administrator."
 msgstr "غير مصرّح. يرجى التواصل مع المسؤول."
 
@@ -586,6 +587,7 @@ msgstr "بيانات اعتماد X API"
 
 #. module: x_account_twitter
 #: model:ir.model.fields,field_description:x_account_twitter.field_x_twitter_event__account_id
+#: model:ir.model.fields,field_description:x_account_twitter.field_x_twitter_key_change__account_id
 #: model:ir.model.fields,field_description:x_account_twitter.field_x_twitter_subscription__account_id
 msgid "X Account"
 msgstr "حساب X"
@@ -687,31 +689,31 @@ msgstr "ويب هوك X ممكّن"
 
 #. module: x_account_twitter
 #. odoo-python
-#: code:addons/x_account_twitter/controllers/main.py:0
+#: code:addons/x_account_twitter/controllers/main.py:127
 msgid "X authorization failed (%s). Please try again."
 msgstr "فشلت مصادقة X (%s). يرجى المحاولة مرة أخرى."
 
 #. module: x_account_twitter
 #. odoo-python
-#: code:addons/x_account_twitter/controllers/main.py:0
+#: code:addons/x_account_twitter/controllers/main.py:94
 msgid "X authorization was denied or failed."
 msgstr "تم رفض مصادقة X أو فشلت."
 
 #. module: x_account_twitter
 #. odoo-python
-#: code:addons/x_account_twitter/controllers/main.py:0
+#: code:addons/x_account_twitter/controllers/main.py:107
 msgid "X did not provide a valid authorization code. Please try again."
 msgstr "لم يوفّر X رمز تفويض صالحًا. يرجى المحاولة مرة أخرى."
 
 #. module: x_account_twitter
 #. odoo-python
-#: code:addons/x_account_twitter/models/social_account.py:0
+#: code:addons/x_account_twitter/models/social_account.py:581
 msgid "X did not return a valid user ID during account linking."
 msgstr "لم يُرجِع X معرّف مستخدم صالحًا أثناء ربط الحساب."
 
 #. module: x_account_twitter
 #. odoo-python
-#: code:addons/x_account_twitter/controllers/main.py:0
+#: code:addons/x_account_twitter/controllers/main.py:118
 msgid ""
 "X did not return the refresh token. Make sure the \"offline.access\" scope "
 "is granted to the app."
@@ -719,11 +721,340 @@ msgstr "لم يُرجِع X رمز التحديث. تأكد من منح نطاق
 
 #. module: x_account_twitter
 #. odoo-python
-#: code:addons/x_account_twitter/controllers/main.py:0
+#: code:addons/x_account_twitter/controllers/main.py:124
 msgid "X did not return the user information."
 msgstr "لم يُرجِع X معلومات المستخدم."
 
 #. module: x_account_twitter
-#: model:ir.actions.server,name:x_account_twitter.cron_x_twitter_ensure_webhook_subscriptions_ir_actions_server
+#: model_terms:ir.cron,name:x_account_twitter.cron_x_twitter_ensure_webhook_subscriptions
 msgid "X: Ensure webhook + activity subscriptions"
 msgstr "X: ضمان اشتراكات الويب هوك والنشاط"
+
+#. module: x_account_twitter
+#: model:ir.model,name:x_account_twitter.model_x_twitter_key_change
+msgid ""
+"X Chat Conversation Key Change"
+msgstr ""
+"تغيّر مفتاح محادثة X"
+
+#. module: x_account_twitter
+#: model:ir.model.fields,field_description:x_account_twitter.field_x_twitter_key_change__blob
+msgid ""
+"Key Change Blob"
+msgstr ""
+"كتلة تغيّر المفتاح"
+
+#. module: x_account_twitter
+#: model:ir.model.fields,field_description:x_account_twitter.field_x_twitter_key_change__blob_hash
+msgid ""
+"Blob Hash"
+msgstr ""
+"بصمة الكتلة"
+
+#. module: x_account_twitter
+#: model:ir.model.fields,help:x_account_twitter.field_x_twitter_key_change__blob_hash
+msgid ""
+"md5 of the key-change blob: the dedup key that keeps each distinct conversation key stored once."
+msgstr ""
+"بصمة md5 لكتلة تغيّر المفتاح: مفتاح إزالة التكرار الذي يضمن تخزين كل مفتاح محادثة مميز مرة واحدة."
+
+#. module: x_account_twitter
+#: model_terms:ir.cron,name:x_account_twitter.cron_x_twitter_gc_events
+msgid ""
+"X: Purge processed webhook events"
+msgstr ""
+"X: حذف أحداث الويب هوك المعالَجة"
+
+#. module: x_account_twitter
+#: model_terms:ir.rule,name:x_account_twitter.security_rule_x_twitter_event_company
+msgid ""
+"X Twitter Event: Multi-Company"
+msgstr ""
+"حدث X: متعدد الشركات"
+
+#. module: x_account_twitter
+#: model_terms:ir.rule,name:x_account_twitter.security_rule_x_twitter_key_change_company
+msgid ""
+"X Twitter Key Change: Multi-Company"
+msgstr ""
+"تغيّر مفتاح X: متعدد الشركات"
+
+#. module: x_account_twitter
+#: model_terms:ir.rule,name:x_account_twitter.security_rule_x_twitter_subscription_company
+msgid ""
+"X Twitter Subscription: Multi-Company"
+msgstr ""
+"اشتراك X: متعدد الشركات"
+
+#. module: x_account_twitter
+#: model_terms:ir.rule,name:x_account_twitter.security_rule_x_twitter_webhook_company
+msgid ""
+"X Twitter Webhook: Global"
+msgstr ""
+"ويب هوك X: عام"
+
+#. module: x_account_twitter
+#: model_terms:x.subscription.event.type,description:x_account_twitter.event_type_broadcast_chat
+msgid ""
+"Live broadcast chat event"
+msgstr ""
+"حدث دردشة بث مباشر"
+
+#. module: x_account_twitter
+#: model_terms:x.subscription.event.type,description:x_account_twitter.event_type_broadcast_end
+msgid ""
+"User ends a live broadcast"
+msgstr ""
+"المستخدم ينهي بثًا مباشرًا"
+
+#. module: x_account_twitter
+#: model_terms:x.subscription.event.type,description:x_account_twitter.event_type_broadcast_start
+msgid ""
+"User starts a live broadcast"
+msgstr ""
+"المستخدم يبدأ بثًا مباشرًا"
+
+#. module: x_account_twitter
+#: model_terms:x.subscription.event.type,description:x_account_twitter.event_type_chat_conversation_admin_added
+msgid ""
+"Admin added to conversation"
+msgstr ""
+"إضافة مشرف إلى المحادثة"
+
+#. module: x_account_twitter
+#: model_terms:x.subscription.event.type,description:x_account_twitter.event_type_chat_conversation_admin_removed
+msgid ""
+"Admin removed from conversation"
+msgstr ""
+"إزالة مشرف من المحادثة"
+
+#. module: x_account_twitter
+#: model_terms:x.subscription.event.type,description:x_account_twitter.event_type_chat_conversation_join
+msgid ""
+"Conversation Join (deprecated alias)"
+msgstr ""
+"الانضمام إلى محادثة (اسم قديم مهمل)"
+
+#. module: x_account_twitter
+#: model_terms:x.subscription.event.type,description:x_account_twitter.event_type_chat_conversation_join_canonical
+msgid ""
+"Conversation Join"
+msgstr ""
+"الانضمام إلى محادثة"
+
+#. module: x_account_twitter
+#: model_terms:x.subscription.event.type,description:x_account_twitter.event_type_chat_conversation_member_added
+msgid ""
+"Member added to conversation"
+msgstr ""
+"إضافة عضو إلى المحادثة"
+
+#. module: x_account_twitter
+#: model_terms:x.subscription.event.type,description:x_account_twitter.event_type_chat_conversation_member_removed
+msgid ""
+"Member removed from conversation"
+msgstr ""
+"إزالة عضو من المحادثة"
+
+#. module: x_account_twitter
+#: model_terms:x.subscription.event.type,description:x_account_twitter.event_type_chat_received
+msgid ""
+"XChat Messages (received)"
+msgstr ""
+"رسائل XChat (واردة)"
+
+#. module: x_account_twitter
+#: model_terms:x.subscription.event.type,description:x_account_twitter.event_type_chat_sent
+msgid ""
+"XChat Messages (sent)"
+msgstr ""
+"رسائل XChat (صادرة)"
+
+#. module: x_account_twitter
+#: model_terms:x.subscription.event.type,description:x_account_twitter.event_type_chat_update_group_name
+msgid ""
+"Conversation group name updated"
+msgstr ""
+"تحديث اسم مجموعة المحادثة"
+
+#. module: x_account_twitter
+#: model_terms:x.subscription.event.type,description:x_account_twitter.event_type_chat_update_restrictions
+msgid ""
+"Conversation restrictions updated"
+msgstr ""
+"تحديث قيود المحادثة"
+
+#. module: x_account_twitter
+#: model_terms:x.subscription.event.type,description:x_account_twitter.event_type_dm_indicate_typing
+msgid ""
+"User is typing in a DM"
+msgstr ""
+"المستخدم يكتب في رسالة خاصة"
+
+#. module: x_account_twitter
+#: model_terms:x.subscription.event.type,description:x_account_twitter.event_type_dm_read
+msgid ""
+"DM read receipt"
+msgstr ""
+"إشعار قراءة رسالة خاصة"
+
+#. module: x_account_twitter
+#: model_terms:x.subscription.event.type,description:x_account_twitter.event_type_dm_received
+msgid ""
+"Direct Messages (received)"
+msgstr ""
+"الرسائل الخاصة (واردة)"
+
+#. module: x_account_twitter
+#: model_terms:x.subscription.event.type,description:x_account_twitter.event_type_dm_sent
+msgid ""
+"Direct Messages (sent)"
+msgstr ""
+"الرسائل الخاصة (صادرة)"
+
+#. module: x_account_twitter
+#: model_terms:x.subscription.event.type,description:x_account_twitter.event_type_follow_follow
+msgid ""
+"User follows another user"
+msgstr ""
+"المستخدم يتابع مستخدمًا آخر"
+
+#. module: x_account_twitter
+#: model_terms:x.subscription.event.type,description:x_account_twitter.event_type_follow_unfollow
+msgid ""
+"User unfollows another user"
+msgstr ""
+"المستخدم يلغي متابعة مستخدم آخر"
+
+#. module: x_account_twitter
+#: model_terms:x.subscription.event.type,description:x_account_twitter.event_type_like_create
+msgid ""
+"The user's Post is liked"
+msgstr ""
+"إعجاب بمنشور المستخدم"
+
+#. module: x_account_twitter
+#: model_terms:x.subscription.event.type,description:x_account_twitter.event_type_news_new
+msgid ""
+"New news event"
+msgstr ""
+"حدث أخبار جديد"
+
+#. module: x_account_twitter
+#: model_terms:x.subscription.event.type,description:x_account_twitter.event_type_post_create
+msgid ""
+"User creates a Post"
+msgstr ""
+"المستخدم ينشئ منشورًا"
+
+#. module: x_account_twitter
+#: model_terms:x.subscription.event.type,description:x_account_twitter.event_type_post_delete
+msgid ""
+"User deletes a Post"
+msgstr ""
+"المستخدم يحذف منشورًا"
+
+#. module: x_account_twitter
+#: model_terms:x.subscription.event.type,description:x_account_twitter.event_type_post_mention_create
+msgid ""
+"Someone @mentions the user in a Post"
+msgstr ""
+"إشارة إلى المستخدم (@) في منشور"
+
+#. module: x_account_twitter
+#: model_terms:x.subscription.event.type,description:x_account_twitter.event_type_post_quote_create
+msgid ""
+"The user's Post is quoted"
+msgstr ""
+"اقتباس من منشور المستخدم"
+
+#. module: x_account_twitter
+#: model_terms:x.subscription.event.type,description:x_account_twitter.event_type_post_reply_create
+msgid ""
+"A reply to the user's Post is created"
+msgstr ""
+"إنشاء رد على منشور المستخدم"
+
+#. module: x_account_twitter
+#: model_terms:x.subscription.event.type,description:x_account_twitter.event_type_post_repost_create
+msgid ""
+"The user's Post is reposted"
+msgstr ""
+"إعادة نشر منشور المستخدم"
+
+#. module: x_account_twitter
+#: model_terms:x.subscription.event.type,description:x_account_twitter.event_type_profile_update_affiliate_badge
+msgid ""
+"User updates their affiliate badge"
+msgstr ""
+"المستخدم يحدّث شارة الانتساب"
+
+#. module: x_account_twitter
+#: model_terms:x.subscription.event.type,description:x_account_twitter.event_type_profile_update_banner_picture
+msgid ""
+"User updates their banner picture"
+msgstr ""
+"المستخدم يحدّث صورة الغلاف"
+
+#. module: x_account_twitter
+#: model_terms:x.subscription.event.type,description:x_account_twitter.event_type_profile_update_bio
+msgid ""
+"User updates their bio"
+msgstr ""
+"المستخدم يحدّث نبذته التعريفية"
+
+#. module: x_account_twitter
+#: model_terms:x.subscription.event.type,description:x_account_twitter.event_type_profile_update_geo
+msgid ""
+"User updates their geo"
+msgstr ""
+"المستخدم يحدّث موقعه الجغرافي"
+
+#. module: x_account_twitter
+#: model_terms:x.subscription.event.type,description:x_account_twitter.event_type_profile_update_handle
+msgid ""
+"User updates their handle"
+msgstr ""
+"المستخدم يحدّث معرّفه"
+
+#. module: x_account_twitter
+#: model_terms:x.subscription.event.type,description:x_account_twitter.event_type_profile_update_profile_picture
+msgid ""
+"User updates their profile picture"
+msgstr ""
+"المستخدم يحدّث صورة ملفه الشخصي"
+
+#. module: x_account_twitter
+#: model_terms:x.subscription.event.type,description:x_account_twitter.event_type_profile_update_screenname
+msgid ""
+"User updates their screen name"
+msgstr ""
+"المستخدم يحدّث اسمه الظاهر"
+
+#. module: x_account_twitter
+#: model_terms:x.subscription.event.type,description:x_account_twitter.event_type_profile_update_url
+msgid ""
+"User updates their website URL"
+msgstr ""
+"المستخدم يحدّث رابط موقعه"
+
+#. module: x_account_twitter
+#: model_terms:x.subscription.event.type,description:x_account_twitter.event_type_profile_update_verified_badge
+msgid ""
+"User updates their verified badge"
+msgstr ""
+"المستخدم يحدّث شارة التوثيق"
+
+#. module: x_account_twitter
+#: model_terms:x.subscription.event.type,description:x_account_twitter.event_type_spaces_end
+msgid ""
+"User ends a Space"
+msgstr ""
+"المستخدم ينهي مساحة صوتية"
+
+#. module: x_account_twitter
+#: model_terms:x.subscription.event.type,description:x_account_twitter.event_type_spaces_start
+msgid ""
+"User starts a Space"
+msgstr ""
+"المستخدم يبدأ مساحة صوتية"
