@@ -70,29 +70,15 @@
                     </page>
                 </notebook>
             </xpath>
-            <xpath expr="//div[@class='oe_title']/h1" position="before">
+            <xpath expr="//div[hasclass('oe_title')]/h1" position="before">
                 <field name="active" widget="boolean_toggle"/>
             </xpath>
             <xpath expr="//header" position="inside">
+                <!-- The buttons that used to sit here are server actions bound
+                     to social.account, offered in the form's Action menu; see
+                     data/server_actions_form.xml. -->
                 <field name="x_connection_status" widget="statusbar"
-                    statusbar_visible="new,authenticating,active,reauth_required,error,disconnected"/>
-                <button name="action_initialize_x_chat_encryption" type="object"
-                    string="Initialize Encryption"
-                    class="btn-secondary"
-                    groups="social.group_social_user"
-                    confirm="Initialize X Chat encryption using the configured key source?"/>
-                <button name="action_register_x_chat_public_keys" type="object"
-                    string="Setup Chat Keys"
-                    class="btn-secondary"
-                    groups="social.group_social_user"
-                    invisible="x_chat_initialized"
-                    confirm="Register a fresh X Chat identity? This is a one-time, rate-limited write that generates keys, registers them with X and backs them up (PIN mode)."/>
-                <button name="action_register_x_chat_public_keys" type="object"
-                    string="Reconfigure Encryption Key"
-                    class="btn-primary"
-                    groups="social.group_social_user"
-                    invisible="not x_chat_initialized"
-                    confirm="Re-register this account's X Chat encryption keys? This writes a fresh identity to X and consumes one of the limited daily registration slots. Use it when the account stopped decrypting messages."/>
+                    statusbar_visible="new,authenticating,active,reauth_required,disconnected,error"/>
             </xpath>
             <xpath expr="//form" position="inside">
                 <chatter/>
@@ -106,45 +92,10 @@
         <field name="arch" type="xml">
             <form string="X Account" create="false">
                 <header>
+                    <!-- The actions that used to be buttons here are bound
+                         server actions; see data/server_actions_form.xml. -->
                     <field name="x_connection_status" widget="statusbar"
-                        statusbar_visible="new,authenticating,active,reauth_required,error,disconnected"/>
-                    <button name="action_initialize_x_chat_encryption" type="object"
-                        string="Initialize Encryption"
-                        class="btn-primary"
-                        confirm="Initialize X Chat encryption using the configured key source?"
-                        groups="social.group_social_user"/>
-                    <button name="action_register_x_chat_public_keys" type="object"
-                        string="Setup Chat Keys"
-                        class="btn-primary"
-                        confirm="Register a fresh X Chat identity? This is a one-time, rate-limited write that generates keys, registers them with X and backs them up (PIN mode)."
-                        groups="social.group_social_user"
-                        invisible="x_chat_initialized"/>
-                    <button name="action_register_x_chat_public_keys" type="object"
-                        string="Reconfigure Encryption Key"
-                        class="btn-primary"
-                        confirm="Re-register this account's X Chat encryption keys? This writes a fresh identity to X and consumes one of the limited daily registration slots. Use it when the account stopped decrypting messages."
-                        groups="social.group_social_user"
-                        invisible="not x_chat_initialized"/>
-                    <button name="action_delete_x_subscriptions" type="object"
-                        string="Delete X Subscriptions"
-                        class="btn-secondary"
-                        confirm="Delete all X Activity API subscriptions for this account?"
-                        invisible="(not x_action_provider and not x_provider) or not twitter_user_id"/>
-                    <button name="action_resubscribe_x_subscriptions" type="object"
-                        string="Resubscribe"
-                        invisible="(not x_action_provider and not x_provider) or not twitter_user_id"/>
-                    <button name="action_sync_chat_names" type="object"
-                        string="Sync Chat Names"
-                        class="btn-secondary"
-                        groups="social.group_social_user"
-                        confirm="Sync chat names from the provider into existing channels?"
-                        invisible="(not x_action_provider and not x_provider) or not twitter_user_id"/>
-                    <button name="action_fetch_groups" type="object"
-                        string="Fetch Groups"
-                        class="btn-secondary"
-                        groups="social.group_social_user"
-                        confirm="Fetch X groups for this account?"
-                        invisible="(not x_action_provider and not x_provider) or not twitter_user_id"/>
+                        statusbar_visible="new,authenticating,active,reauth_required,disconnected,error"/>
                 </header>
                 <sheet>
                     <div class="oe_title">

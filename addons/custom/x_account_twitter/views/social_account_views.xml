@@ -17,12 +17,8 @@
             <xpath expr="//group[@name='x_account_status_connection']" position="inside">
                 <field name="x_oauth2_token_expires_at" readonly="1"/>
             </xpath>
-            <xpath expr="//group[@name='x_account_connection']" position="inside">
-                <button name="action_relink" type="object"
-                    string="Relink Account"
-                    class="btn-secondary"
-                    confirm="Re-running the X OAuth 2.0 flow will issue new tokens on X's side. Continue?"/>
-            </xpath>
+            <!-- Relink Account is a bound server action now; see
+                 data/server_actions_form.xml. -->
         </field>
     </record>
 
@@ -43,12 +39,8 @@
             <xpath expr="//group[@name='x_account_status_connection']" position="inside">
                 <field name="x_oauth2_token_expires_at" readonly="1"/>
             </xpath>
-            <xpath expr="//header" position="inside">
-                <button name="action_relink" type="object"
-                    string="Relink Account"
-                    class="btn-primary"
-                    confirm="Re-running the X OAuth 2.0 flow will issue new tokens on X's side. Continue?"/>
-            </xpath>
+            <!-- The Relink Account button that used to be in this header is a
+                 bound server action now; see data/server_actions_form.xml. -->
         </field>
     </record>
 

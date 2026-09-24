@@ -37,6 +37,7 @@ Highlights:
         'views/getxapi_usage_views.xml',
         'views/social_account_views.xml',
         'data/cron.xml',
+        'data/server_actions_form.xml',
     ],
     'installable': True,
     'application': False,

@@ -49,6 +49,7 @@ Highlights.
         'security/ir_rules.xml',
         'data/subscription_event_types.xml',
         'data/cron.xml',
+        'data/server_actions_form.xml',
         'views/res_config_settings_views.xml',
         'views/social_media_views.xml',
         'views/social_account_views.xml',

@@ -603,6 +603,26 @@ class SocialAccount(models.Model):
         return self._display_notification(
             'Sync Chat Names', message, kind=kind)
 
+    def _check_chat_key_setup_state(self, expect_initialized):
+        """Refuse a Chat key registration that does not match the account state.
+
+        The form used to hide the wrong half of the pair (Setup Chat Keys vs
+        Reconfigure Encryption Key) behind an invisible condition. A bound
+        server action cannot express that condition, and registering again
+        writes a fresh identity to X and consumes one of the limited daily
+        slots, so the state is checked here instead of trusted to the view.
+        """
+        self.ensure_one()
+        if self.x_chat_initialized == expect_initialized:
+            return
+        if expect_initialized:
+            raise UserError(_(
+                'Chat keys are not set up yet. Use "Setup Chat Keys" to '
+                'register the first identity.'))
+        raise UserError(_(
+            'Chat keys are already registered. Use "Reconfigure Encryption '
+            'Key" to register a new identity.'))
+
     def action_initialize_x_chat_encryption(self):
         """Initialize the account's XChat encryption via its provider.
 

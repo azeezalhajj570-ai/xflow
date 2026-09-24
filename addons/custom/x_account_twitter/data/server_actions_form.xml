@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Relink was a header button on the account form; it is now a server
+         action bound to social.account and shown only in the form view.
+         Its confirm="..." prompt is lost with the button: re-running the flow
+         issues new tokens on X's side without asking. -->
+    <data>
+        <record id="action_form_relink_account" model="ir.actions.server">
+            <field name="name">Relink Account</field>
+            <field name="model_id" ref="social.model_social_account"/>
+            <field name="binding_model_id" ref="social.model_social_account"/>
+            <field name="binding_type">action</field>
+            <field name="binding_view_types">form</field>
+            <field name="sequence">80</field>
+            <field name="state">code</field>
+            <field name="code">action = (records or record)[:1].action_relink()</field>
+        </record>
+    </data>
+</odoo>

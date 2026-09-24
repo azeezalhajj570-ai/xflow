@@ -1,15 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <data noupdate="1">
-        <record id="action_server_fetch_groups" model="ir.actions.server">
-            <field name="name">Fetch Groups</field>
-            <field name="model_id" ref="social.model_social_account"/>
-            <field name="state">code</field>
-            <field name="code">action = False
-for rec in records:
-    action = rec.with_context(dialog=True).action_fetch_groups()</field>
-        </record>
-
         <record id="action_server_fetch_group_messages" model="ir.actions.server">
             <field name="name">Fetch Group Messages</field>
             <field name="model_id" ref="mail.model_discuss_channel"/>
@@ -67,20 +58,6 @@ if records:
     action = records[:1].action_x_account_groups_by_account()</field>
         </record>
 
-        <record id="action_server_delete_x_subscriptions" model="ir.actions.server">
-            <field name="name">Delete X Subscriptions</field>
-            <field name="model_id" ref="social.model_social_account"/>
-            <field name="state">code</field>
-            <field name="code">results = []
-for rec in records:
-    if rec.x_provider == 'twitter' and rec.twitter_user_id:
-        try:
-            result = rec.action_delete_x_subscriptions()
-            results.append({'account': rec.name, 'deleted': result.get('deleted', 0)})
-        except Exception as e:
-            results.append({'account': rec.name, 'error': str(e)})
-action = {'type': 'ir.actions.client', 'tag': 'display_notification', 'params': {'title': 'Delete X Subscriptions', 'message': str(results), 'type': 'info', 'sticky': True}}</field>
-        </record>
         <record id="action_server_cancel_duplicate_tasks" model="ir.actions.server">
             <field name="name">Cancel Duplicate Failed Tasks</field>
             <field name="model_id" ref="x_account.model_x_account_task"/>

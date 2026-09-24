@@ -17,10 +17,8 @@
                     invisible="not x_getxapi_credit_blocked"/>
                 <field name="x_getxapi_credit_error"
                     invisible="not x_getxapi_credit_blocked"/>
-                <button name="action_resume_getxapi_credit" type="object"
-                    string="Resume API Usage" class="btn-primary"
-                    invisible="not x_getxapi_credit_blocked"
-                    groups="x_account.group_x_account_manager"/>
+                <!-- Resume API Usage is a bound server action now; see
+                     data/server_actions_form.xml. -->
             </xpath>
         </field>
     </record>
