@@ -13,8 +13,8 @@ class TestChannelActionToggles(XAccountTestBase):
     Each action has one base_automation rule on x.message whose filter_domain
     requires the matching toggle on the message's conversation, so a chat opts
     in/out of like/repost/comment/bookmark/follow on its own form. The rule
-    gates through ``Model.filtered_domain`` (the on_time_created path), which is
-    what ``base.automation._filter_post`` applies here — same pattern as
+    gates through ``Model.filtered_domain``, which is what
+    ``base.automation._filter_post`` applies here — same pattern as
     ``test_message_age_filter``.
     """
 
@@ -75,6 +75,23 @@ class TestChannelActionToggles(XAccountTestBase):
                 rule = self._rule(operation)
                 self.assertTrue(rule.active)
                 self.assertTrue(rule.action_server_ids)
+
+    def test_rules_fire_on_create(self):
+        """The rules must run on create, not on the lossy on_time_created scan.
+
+        ``on_time_created`` is a cron scan over ``create_date``, and
+        ``create_date`` is the creating transaction's start time: a message
+        whose transaction commits after the scan window has moved past that
+        timestamp is never selected, so its like/repost is never queued at all.
+        The toggle must therefore still gate through ``filter_domain`` — that
+        field is computed and gets blanked for non-time triggers unless it is
+        written along with the trigger.
+        """
+        for operation in self.TOGGLES:
+            with self.subTest(operation=operation):
+                rule = self._rule(operation)
+                self.assertEqual(rule.trigger, 'on_create')
+                self.assertIn('x_auto_%s' % operation, rule.filter_domain or '')
 
     def test_action_rule_filters_by_channel_toggle(self):
         """Only the message whose chat has the toggle on passes the rule."""
