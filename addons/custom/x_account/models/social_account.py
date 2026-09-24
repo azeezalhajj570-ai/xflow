@@ -733,7 +733,8 @@ class SocialAccount(models.Model):
         social.account is a plain model (not a mail.thread), so an inbox
         notification is generated explicitly from the recorded mail.message for
         every internal user who manages X accounts in the account's company.
-        The bell badge in Odoo shows it immediately.
+        The bell badge in Odoo shows it immediately. Those same users are also
+        emailed, so the request reaches someone who is not currently logged in.
         """
         self.ensure_one()
         body = (
@@ -757,7 +758,36 @@ class SocialAccount(models.Model):
                     'notification_type': 'inbox',
                     'notification_status': 'ready',
                 })
+        self._email_reauth_required(users)
         return message
+
+    def _email_reauth_required(self, users):
+        """Email the users who manage X accounts for this account's company.
+
+        Only partners carrying an email address are targeted. This runs from the
+        token-refresh failure path, so a mail problem (no outgoing server, SMTP
+        refused) is logged instead of raised: it must not roll back the
+        ``reauth_required`` status write or surface as an RPC_ERROR.
+        """
+        self.ensure_one()
+        partners = users.partner_id.filtered('email')
+        if not partners:
+            return
+        template = self.env.ref(
+            'x_account.mail_template_x_account_reauth_required',
+            raise_if_not_found=False)
+        if not template:
+            return
+        try:
+            template.sudo().send_mail(
+                self.id,
+                force_send=True,
+                email_values={'recipient_ids': [(6, 0, partners.ids)]},
+            )
+        except Exception as exc:
+            _logger.warning(
+                'x_account: could not email the reauthentication notice for '
+                'account %s: %s', self.id, exc)
 
     @api.constrains('x_auto_archive', 'x_auto_archive_start', 'x_auto_archive_end')
     def _check_auto_archive_window(self):
