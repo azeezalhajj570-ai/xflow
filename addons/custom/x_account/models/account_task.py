@@ -36,6 +36,16 @@ class XAccountTask(models.Model):
         string='X Account Group',
         ondelete='set null',
     )
+    message_id = fields.Many2one(
+        'x.message',
+        string='Source Message',
+        index=True,
+        ondelete='set null',
+        help='The X message this task was created from. Set by the message '
+             'automation (channel engagement, follow, DM reply); empty for '
+             'tasks enqueued by other paths (group automation, webhook '
+             'backfill, bulk follow).',
+    )
     operation = fields.Char(
         string='Operation',
         required=True,

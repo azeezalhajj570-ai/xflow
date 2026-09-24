@@ -79,6 +79,17 @@ class XMessage(models.Model):
         index=True,
         ondelete='set null',
     )
+    task_ids = fields.One2many(
+        'x.account.task',
+        'message_id',
+        string='Tasks',
+        help='X tasks created from this message by the message automation.',
+    )
+    task_count = fields.Integer(
+        string='Tasks',
+        compute='_compute_task_count',
+        help='Number of X tasks created from this message.',
+    )
     company_id = fields.Many2one(
         'res.company',
         string='Company',
@@ -86,6 +97,26 @@ class XMessage(models.Model):
         store=True,
         index=True,
     )
+
+    @api.depends('task_ids')
+    def _compute_task_count(self):
+        for message in self:
+            message.task_count = len(message.task_ids)
+
+    def action_view_tasks(self):
+        """Open the X tasks created from this message.
+
+        The action is stripped of its default filters so every task of the
+        message shows, not just the ones created in the last hour.
+        """
+        self.ensure_one()
+        action = self.env['ir.actions.act_window']._for_xml_id(
+            'x_account.action_x_account_task')
+        action['domain'] = [('message_id', '=', self.id)]
+        action['view_mode'] = 'list'
+        action['views'] = [(False, 'list')]
+        action['context'] = {}
+        return action
 
     _external_id_uniq = models.Constraint(
         'UNIQUE(channel_id, external_id)',
@@ -255,6 +286,7 @@ class XMessage(models.Model):
                     'account_id': account.id,
                     'operation': operation,
                     'priority': 1,
+                    'message_id': self.id,
                     'task_context': json.dumps(task_ctx),
                 })
                 _logger.info(
@@ -290,6 +322,7 @@ class XMessage(models.Model):
                 'account_id': account.id,
                 'operation': 'follow',
                 'priority': 1,
+                'message_id': self.id,
                 'task_context': json.dumps(task_ctx),
             })
             _logger.info(
@@ -323,7 +356,8 @@ class XMessage(models.Model):
 
         Routes to the 1:1 user conversation (``x``) or the group conversation
         (``x_group``) automatically via ``discuss.channel._enqueue_send_dm``.
-        An archived conversation is skipped so no DM task is created.
+        An archived conversation is skipped so no DM task is created. The
+        message is passed along so the task records where it came from.
         """
         self.ensure_one()
         channel = self.channel_id
@@ -333,4 +367,4 @@ class XMessage(models.Model):
                 channel.id,
             )
             return False
-        return channel._enqueue_send_dm(text=text)
+        return channel._enqueue_send_dm(text=text, source_message=self)

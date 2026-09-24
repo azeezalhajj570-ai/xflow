@@ -973,7 +973,7 @@ class DiscussChannel(models.Model):
             return ''
         return ''
 
-    def _enqueue_send_dm(self, text=None):
+    def _enqueue_send_dm(self, text=None, source_message=None):
         """Enqueue an X direct-message task for this conversation (user or group).
 
         Routes by conversation shape: real group conversations send via the
@@ -1027,6 +1027,7 @@ class DiscussChannel(models.Model):
             'account_id': account.id,
             'operation': operation,
             'priority': 1,
+            'message_id': source_message.id if source_message else False,
             'task_context': json.dumps(task_ctx),
         })
         _logger.info(
