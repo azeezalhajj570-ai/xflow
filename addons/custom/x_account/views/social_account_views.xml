@@ -79,6 +79,10 @@
                      data/server_actions_form.xml. -->
                 <field name="x_connection_status" widget="statusbar"
                     statusbar_visible="new,authenticating,active,reauth_required,disconnected,error"/>
+                <!-- Computed, so it reports rather than switches. -->
+                <field name="x_chat_status" widget="statusbar" readonly="1"
+                    groups="social.group_social_user"
+                    statusbar_visible="not_configured,ready,pin_locked,stopped"/>
             </xpath>
             <xpath expr="//form" position="inside">
                 <chatter/>
@@ -96,6 +100,10 @@
                          server actions; see data/server_actions_form.xml. -->
                     <field name="x_connection_status" widget="statusbar"
                         statusbar_visible="new,authenticating,active,reauth_required,disconnected,error"/>
+                    <!-- Computed, so it reports rather than switches. -->
+                    <field name="x_chat_status" widget="statusbar" readonly="1"
+                        groups="social.group_social_user"
+                        statusbar_visible="not_configured,ready,pin_locked,stopped"/>
                 </header>
                 <sheet>
                     <div class="oe_title">

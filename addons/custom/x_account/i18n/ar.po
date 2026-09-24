@@ -63,8 +63,8 @@ msgid "Action Needed"
 msgstr "مطلوب إجراء"
 
 #. module: x_account
-#: model:ir.model.fields,field_description:x_account.field_res_config_settings__x_action_provider
 #: model:ir.model.fields,field_description:x_account.field_social_account__x_action_provider
+#: model:ir.model.fields,field_description:x_account.field_res_config_settings__x_action_provider
 #: model_terms:ir.ui.view,arch_db:x_account.x_account_res_config_settings_view_form
 msgid "Action Provider"
 msgstr "مزوّد الإجراءات"
@@ -75,11 +75,11 @@ msgid "Action automated for the group."
 msgstr "الإجراء المؤتمت للمجموعة."
 
 #. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_social_account__active
 #: model:ir.model.fields,field_description:x_account.field_x_account_group__active
 #: model:ir.model.fields.selection,name:x_account.selection__social_account__x_connection_status__active
-#: model:ir.model.fields,field_description:x_account.field_social_account__active
-#: model_terms:ir.ui.view,arch_db:x_account.view_social_account_search_inherit_x_account
 #: model_terms:ir.ui.view,arch_db:x_account.view_discuss_channel_search_inherit_x_account
+#: model_terms:ir.ui.view,arch_db:x_account.view_social_account_search_inherit_x_account
 msgid "Active"
 msgstr "نشط"
 
@@ -171,8 +171,8 @@ msgstr "جاري المصادقة"
 
 #. module: x_account
 #: model_terms:ir.ui.view,arch_db:x_account.x_account_social_account_view_form
-#: model_terms:ir.ui.view,arch_db:x_account.x_account_social_account_view_form_standalone
 #: model_terms:ir.ui.view,arch_db:x_account.x_account_res_config_settings_view_form
+#: model_terms:ir.ui.view,arch_db:x_account.x_account_social_account_view_form_standalone
 msgid "Authentication"
 msgstr "المصادقة"
 
@@ -194,8 +194,8 @@ msgstr "طريقة المصادقة. مستقلة عن المزوّد."
 
 #. module: x_account
 #: model:ir.model.fields,field_description:x_account.field_x_account_operation_report__author_link
-#: model_terms:ir.ui.view,arch_db:x_account.x_message_view_search
 #: model_terms:ir.ui.view,author_link:x_account.x_account_operation_report_view_list
+#: model_terms:ir.ui.view,arch_db:x_account.x_message_view_search
 msgid "Author"
 msgstr "الكاتب"
 
@@ -292,16 +292,16 @@ msgid "Bulk follow is only available on X conversations, got %r"
 msgstr "المتابعة الجماعية متاحة فقط في محادثات X، لكن النوع المستلم %r"
 
 #. module: x_account
-#: model_terms:ir.ui.view,arch_db:x_account.x_message_composer_view_form
 #: model_terms:ir.ui.view,arch_db:x_account.x_account_task_view_form
 #: model_terms:ir.ui.view,arch_db:x_account.x_follow_composer_view_form
 #: model_terms:ir.ui.view,arch_db:x_account.x_import_session_view_form
+#: model_terms:ir.ui.view,arch_db:x_account.x_message_composer_view_form
 msgid "Cancel"
 msgstr "إلغاء"
 
 #. module: x_account
-#: model:ir.model.fields.selection,name:x_account.selection__x_account_task__status__cancelled
 #: model:ir.model.fields.selection,name:x_account.selection__x_account_operation_report__status__cancelled
+#: model:ir.model.fields.selection,name:x_account.selection__x_account_task__status__cancelled
 #: model_terms:ir.ui.view,arch_db:x_account.x_account_task_view_search
 msgid "Cancelled"
 msgstr "ملغاة"
@@ -344,15 +344,15 @@ msgid "Channel group members available for selection."
 msgstr "أعضاء مجموعة القناة المتاحون للاختيار."
 
 #. module: x_account
-#: model_terms:ir.ui.view,arch_db:x_account.x_group_channel_view_form
-#: model_terms:ir.ui.view,arch_db:x_account.x_message_view_search
-#: model_terms:ir.actions.act_window,name:x_account.action_x_account_group_channels
-#: model_terms:ir.ui.view,channel_id:x_account.x_message_view_list
 #: model_terms:ir.ui.view,arch_db:x_account.x_account_operation_report_view_search
-#: model_terms:ir.ui.view,arch_db:x_account.x_group_channel_view_tree
-#: model_terms:ir.ui.view,channel_link:x_account.x_account_operation_report_view_list
-#: model_terms:ir.ui.menu,name:x_account.menu_x_account_x_groups
 #: model_terms:ir.ui.view,channel_id:x_account.x_message_view_form
+#: model_terms:ir.ui.view,channel_link:x_account.x_account_operation_report_view_list
+#: model_terms:ir.ui.view,arch_db:x_account.x_group_channel_view_tree
+#: model_terms:ir.ui.menu,name:x_account.menu_x_account_x_groups
+#: model_terms:ir.ui.view,channel_id:x_account.x_message_view_list
+#: model_terms:ir.actions.act_window,name:x_account.action_x_account_group_channels
+#: model_terms:ir.ui.view,arch_db:x_account.x_message_view_search
+#: model_terms:ir.ui.view,arch_db:x_account.x_group_channel_view_form
 msgid "Chat"
 msgstr "الدردشة"
 
@@ -384,12 +384,12 @@ msgid "Comment"
 msgstr "تعليق"
 
 #. module: x_account
-#: model:ir.model.fields,field_description:x_account.field_x_account_task__company_id
 #: model:ir.model.fields,field_description:x_account.field_x_account_operation_report__company_id
+#: model:ir.model.fields,field_description:x_account.field_x_account_task__company_id
 #: model:ir.model.fields,field_description:x_account.field_x_message__company_id
-#: model_terms:ir.ui.view,arch_db:x_account.x_message_view_search
-#: model_terms:ir.ui.view,arch_db:x_account.x_account_task_view_search
 #: model_terms:ir.ui.view,arch_db:x_account.x_account_operation_report_view_search
+#: model_terms:ir.ui.view,arch_db:x_account.x_account_task_view_search
+#: model_terms:ir.ui.view,arch_db:x_account.x_message_view_search
 msgid "Company"
 msgstr "الشركة"
 
@@ -409,15 +409,15 @@ msgid "Contact"
 msgstr "جهة الاتصال"
 
 #. module: x_account
-#: model:ir.model.fields,field_description:x_account.field_x_follow_composer__channel_id
 #: model:ir.model.fields,field_description:x_account.field_x_message_composer__channel_id
+#: model:ir.model.fields,field_description:x_account.field_x_follow_composer__channel_id
 msgid "Conversation"
 msgstr "محادثة"
 
 #. module: x_account
 #: model:ir.model.fields,field_description:x_account.field_x_message_composer__conversation_id
-#: model_terms:ir.ui.view,x_conversation_id:x_account.x_group_channel_view_form
 #: model_terms:ir.ui.view,x_conversation_id:x_account.x_group_channel_view_tree
+#: model_terms:ir.ui.view,x_conversation_id:x_account.x_group_channel_view_form
 msgid "Conversation ID"
 msgstr "معرّف المحادثة"
 
@@ -487,8 +487,8 @@ msgstr "تاريخ الإنشاء"
 
 #. module: x_account
 #: model_terms:ir.ui.view,arch_db:x_account.x_account_group_view_search
-#: model_terms:ir.ui.view,arch_db:x_account.x_message_view_search
 #: model_terms:ir.ui.view,arch_db:x_account.x_account_task_view_search
+#: model_terms:ir.ui.view,arch_db:x_account.x_message_view_search
 msgid "Creation Date"
 msgstr "تاريخ الإنشاء"
 
@@ -540,8 +540,8 @@ msgid "Disconnected"
 msgstr "غير متصل"
 
 #. module: x_account
-#: model:ir.model.fields,field_description:x_account.field_x_message__channel_id
 #: model:ir.model.fields,field_description:x_account.field_x_account_operation_report__channel_id
+#: model:ir.model.fields,field_description:x_account.field_x_message__channel_id
 msgid "Discuss Channel"
 msgstr "قناة النقاش"
 
@@ -638,8 +638,8 @@ msgid "Enqueued %s follow request(s)."
 msgstr "تم إدراج %s من طلبات المتابعة."
 
 #. module: x_account
-#: model:ir.model.fields.selection,name:x_account.selection__social_account__x_connection_status__error
 #: model:ir.model.fields,field_description:x_account.field_x_account_task__error
+#: model:ir.model.fields.selection,name:x_account.selection__social_account__x_connection_status__error
 msgid "Error"
 msgstr "خطأ"
 
@@ -679,8 +679,8 @@ msgstr "معرّف رسالة/حدث محادثة X الخارجي."
 #: model:ir.model.fields.selection,name:x_account.selection__x_account_task__status__failed
 #: model:ir.model.fields.selection,name:x_account.selection__x_account_operation_report__status__failed
 #: model:ir.model.fields.selection,name:x_account.selection__social_account__x_migration_status__failed
-#: model_terms:ir.ui.view,arch_db:x_account.x_account_task_view_search
 #: model_terms:ir.ui.view,arch_db:x_account.x_account_operation_report_view_search
+#: model_terms:ir.ui.view,arch_db:x_account.x_account_task_view_search
 msgid "Failed"
 msgstr "فشل"
 
@@ -722,9 +722,9 @@ msgid "Follow"
 msgstr "متابعة"
 
 #. module: x_account
-#: model_terms:ir.actions.server,name:x_account.action_server_bulk_follow
 #: model_terms:ir.ui.view,arch_db:x_account.x_group_channel_view_form
 #: model_terms:ir.ui.view,arch_db:x_account.x_follow_composer_view_form
+#: model_terms:ir.actions.server,name:x_account.action_server_bulk_follow
 #: model_terms:ir.actions.act_window,name:x_account.action_x_follow_composer
 msgid "Follow Members"
 msgstr "متابعة الأعضاء"
@@ -896,8 +896,8 @@ msgstr "آخر تنفيذ في"
 
 #. module: x_account
 #: model_terms:ir.ui.view,arch_db:x_account.x_account_operation_report_view_search
-#: model_terms:ir.ui.view,arch_db:x_account.x_message_view_search
 #: model_terms:ir.ui.view,arch_db:x_account.x_account_task_view_search
+#: model_terms:ir.ui.view,arch_db:x_account.x_message_view_search
 msgid "Last Hour"
 msgstr "الساعة الأخيرة"
 
@@ -981,8 +981,8 @@ msgid "Link Account"
 msgstr "ربط الحساب"
 
 #. module: x_account
-#: model_terms:ir.actions.act_window,name:x_account.action_x_import_session
 #: model_terms:ir.ui.view,arch_db:x_account.x_import_session_view_form
+#: model_terms:ir.actions.act_window,name:x_account.action_x_import_session
 msgid "Link X Account"
 msgstr "ربط الحساب"
 
@@ -1019,10 +1019,10 @@ msgstr "الشركاء الأعضاء في قناة مجموعة X هذه."
 
 #. module: x_account
 #: model:ir.model.fields,field_description:x_account.field_x_follow_composer__member_ids
-#: model_terms:ir.ui.view,arch_db:x_account.x_group_channel_view_form
 #: model_terms:ir.ui.view,channel_member_ids:x_account.x_group_channel_view_form
-#: model_terms:ir.ui.view,x_group_member_count:x_account.x_group_channel_view_tree
 #: model_terms:ir.ui.view,x_group_member_count:x_account.x_group_channel_view_form
+#: model_terms:ir.ui.view,x_group_member_count:x_account.x_group_channel_view_tree
+#: model_terms:ir.ui.view,arch_db:x_account.x_group_channel_view_form
 msgid "Members"
 msgstr "الأعضاء"
 
@@ -1202,9 +1202,9 @@ msgid "Official Publish"
 msgstr "النشر الرسمي"
 
 #. module: x_account
-#: model:ir.model.fields.selection,name:x_account.selection__social_account__x_event_provider__official
-#: model:ir.model.fields.selection,name:x_account.selection__social_account__x_action_provider__official
 #: model:ir.model.fields.selection,name:x_account.selection__res_config_settings__x_event_provider__official
+#: model:ir.model.fields.selection,name:x_account.selection__social_account__x_action_provider__official
+#: model:ir.model.fields.selection,name:x_account.selection__social_account__x_event_provider__official
 #: model:ir.model.fields.selection,name:x_account.selection__res_config_settings__x_action_provider__official
 msgid "Official X API"
 msgstr "واجهة X API الرسمية"
@@ -1309,11 +1309,11 @@ msgid "Paused"
 msgstr "متوقف مؤقتاً"
 
 #. module: x_account
+#: model:ir.model.fields.selection,name:x_account.selection__social_account__x_migration_status__pending
 #: model:ir.model.fields.selection,name:x_account.selection__x_account_task__status__pending
 #: model:ir.model.fields.selection,name:x_account.selection__x_account_operation_report__status__pending
-#: model:ir.model.fields.selection,name:x_account.selection__social_account__x_migration_status__pending
-#: model_terms:ir.ui.view,arch_db:x_account.x_account_task_view_search
 #: model_terms:ir.ui.view,arch_db:x_account.x_account_operation_report_view_search
+#: model_terms:ir.ui.view,arch_db:x_account.x_account_task_view_search
 msgid "Pending"
 msgstr "قيد الانتظار"
 
@@ -1542,10 +1542,10 @@ msgid "Selectable Members"
 msgstr "الأعضاء القابلون للاختيار"
 
 #. module: x_account
-#: model_terms:ir.actions.server,name:x_account.action_server_send_message
 #: model_terms:ir.ui.view,arch_db:x_account.x_group_channel_view_form
-#: model_terms:ir.ui.view,arch_db:x_account.x_message_composer_view_form
+#: model_terms:ir.actions.server,name:x_account.action_server_send_message
 #: model_terms:ir.actions.act_window,name:x_account.action_x_message_composer
+#: model_terms:ir.ui.view,arch_db:x_account.x_message_composer_view_form
 msgid "Send Message"
 msgstr "إرسال رسالة"
 
@@ -1567,8 +1567,8 @@ msgid "Sending failed: %s"
 msgstr "فشل الإرسال: %s"
 
 #. module: x_account
-#: model_terms:ir.actions.act_window,name:x_account.action_x_account_server_actions
 #: model_terms:ir.ui.menu,name:x_account.menu_x_account_server_actions
+#: model_terms:ir.actions.act_window,name:x_account.action_x_account_server_actions
 msgid "Server Actions"
 msgstr "إجراءات الخادم"
 
@@ -1581,8 +1581,8 @@ msgstr "تُنفّذ إجراءات الخادم كود بايثون عند تش
 "يدويًا."
 
 #. module: x_account
-#: model:ir.model.fields.selection,name:x_account.selection__res_config_settings__x_auth_method__session_cookie
 #: model:ir.model.fields.selection,name:x_account.selection__social_account__x_auth_method__session_cookie
+#: model:ir.model.fields.selection,name:x_account.selection__res_config_settings__x_auth_method__session_cookie
 msgid "Session Cookie"
 msgstr "ملف تعريف الارتباط للجلسة"
 
@@ -1606,7 +1606,7 @@ msgstr "فشل التحقق من الجلسة: %s"
 
 #. module: x_account
 #. odoo-python
-#: code:addons/x_account/models/social_account.py:960
+#: code:addons/x_account/models/social_account.py:989
 msgid ""
 "Set the archive window (Archive From / Archive Until) on \"%s\" before "
 "enabling \"Archive Daily\"."
@@ -1624,8 +1624,8 @@ msgstr "يُضبط عندما يرفض X رمز PIN المُهيّأ لدردش�
 "التي يسمح بها X قبل قفل النسخة الاحتياطية الآمنة نهائيًا."
 
 #. module: x_account
-#: model_terms:ir.ui.menu,name:x_account.menu_x_account_settings
 #: model_terms:ir.actions.act_window,name:x_account.action_x_account_settings
+#: model_terms:ir.ui.menu,name:x_account.menu_x_account_settings
 msgid "Settings"
 msgstr "الإعدادات"
 
@@ -1645,11 +1645,11 @@ msgid "Social Media"
 msgstr "مواقع التواصل الاجتماعي"
 
 #. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_x_account_task__source
 #: model:ir.model.fields,field_description:x_account.field_x_session_store__source
 #: model:ir.model.fields,field_description:x_account.field_x_account_operation_report__source
-#: model:ir.model.fields,field_description:x_account.field_x_account_task__source
-#: model_terms:ir.ui.view,arch_db:x_account.x_account_task_view_search
 #: model_terms:ir.ui.view,arch_db:x_account.x_account_operation_report_view_search
+#: model_terms:ir.ui.view,arch_db:x_account.x_account_task_view_search
 msgid "Source"
 msgstr "المصدر"
 
@@ -1674,9 +1674,9 @@ msgstr "بداية نافذة الأرشفة اليومية لهذا الحسا�
 #. module: x_account
 #: model:ir.model.fields,field_description:x_account.field_x_account_operation_report__status
 #: model:ir.model.fields,field_description:x_account.field_x_account_task__status
-#: model_terms:ir.ui.view,arch_db:x_account.x_account_task_view_search
-#: model_terms:ir.ui.view,arch_db:x_account.x_account_social_account_view_form
 #: model_terms:ir.ui.view,arch_db:x_account.x_account_operation_report_view_search
+#: model_terms:ir.ui.view,arch_db:x_account.x_account_social_account_view_form
+#: model_terms:ir.ui.view,arch_db:x_account.x_account_task_view_search
 #: model_terms:ir.ui.view,arch_db:x_account.x_account_social_account_view_form_standalone
 msgid "Status"
 msgstr "الحالة"
@@ -1697,10 +1697,10 @@ msgid "Status of migration from XAction."
 msgstr "حالة الترحيل من XAction."
 
 #. module: x_account
-#: model:ir.model.fields.selection,name:x_account.selection__x_account_task__status__success
 #: model:ir.model.fields.selection,name:x_account.selection__x_account_operation_report__status__success
-#: model_terms:ir.ui.view,arch_db:x_account.x_account_operation_report_view_search
+#: model:ir.model.fields.selection,name:x_account.selection__x_account_task__status__success
 #: model_terms:ir.ui.view,arch_db:x_account.x_account_task_view_search
+#: model_terms:ir.ui.view,arch_db:x_account.x_account_operation_report_view_search
 msgid "Success"
 msgstr "ناجحة"
 
@@ -1769,8 +1769,8 @@ msgstr "مدة الانتظار بين كل طلب متابعة."
 
 #. module: x_account
 #: model_terms:ir.ui.view,arch_db:x_account.x_account_operation_report_view_search
-#: model_terms:ir.ui.view,arch_db:x_account.x_message_view_search
 #: model_terms:ir.ui.view,arch_db:x_account.x_account_task_view_search
+#: model_terms:ir.ui.view,arch_db:x_account.x_message_view_search
 msgid "Today"
 msgstr "اليوم"
 
@@ -1785,8 +1785,8 @@ msgstr "يصبح صحيحًا بعد أن يستورد Chat XDK مفاتيح ا�
 "أو الكتلة."
 
 #. module: x_account
-#: model_terms:ir.ui.view,arch_db:x_account.x_account_operation_report_view_search
 #: model_terms:ir.ui.view,tweet_url:x_account.x_account_operation_report_view_list
+#: model_terms:ir.ui.view,arch_db:x_account.x_account_operation_report_view_search
 msgid "Tweet"
 msgstr "التغريدة"
 
@@ -1806,9 +1806,9 @@ msgid "Tweet Link"
 msgstr "رابط التغريدة"
 
 #. module: x_account
-#: model_terms:ir.ui.view,channel_type:x_account.x_group_channel_view_form
-#: model_terms:ir.ui.view,channel_type:x_account.x_group_channel_view_tree
 #: model_terms:ir.ui.view,channel_type:x_account.x_message_composer_view_form
+#: model_terms:ir.ui.view,channel_type:x_account.x_group_channel_view_tree
+#: model_terms:ir.ui.view,channel_type:x_account.x_group_channel_view_form
 msgid "Type"
 msgstr "النوع"
 
@@ -1914,37 +1914,37 @@ msgid "Write your message..."
 msgstr "اكتب رسالتك..."
 
 #. module: x_account
-#: model:ir.model.fields,field_description:x_account.field_x_session_store__account_id
 #: model:ir.model.fields,field_description:x_account.field_x_account_operation_report__account_id
-#: model:ir.model.fields,field_description:x_account.field_x_account_task__account_id
 #: model:ir.model.fields,field_description:x_account.field_x_message__account_id
-#: model:ir.model.fields,field_description:x_account.field_x_message_composer__account_id
+#: model:ir.model.fields,field_description:x_account.field_x_account_task__account_id
 #: model:ir.model.fields,field_description:x_account.field_x_follow_composer__account_id
 #: model:ir.model.fields,field_description:x_account.field_discuss_channel__x_account_id
-#: model_terms:ir.ui.view,x_account_id:x_account.view_discuss_channel_search_inherit_x_account
-#: model_terms:ir.ui.view,arch_db:x_account.x_account_res_config_settings_view_form
-#: model_terms:ir.ui.view,x_account_id:x_account.x_group_channel_view_form
-#: model_terms:ir.ui.view,arch_db:x_account.x_message_view_search
-#: model_terms:ir.ui.view,arch_db:x_account.x_account_task_view_search
-#: model_terms:ir.ui.menu,name:x_account.menu_x_account_root
-#: model_terms:res.groups.privilege,name:x_account.res_groups_privilege_x_account
+#: model:ir.model.fields,field_description:x_account.field_x_message_composer__account_id
+#: model:ir.model.fields,field_description:x_account.field_x_session_store__account_id
 #: model_terms:ir.ui.view,arch_db:x_account.view_discuss_channel_search_inherit_x_account
+#: model_terms:res.groups.privilege,name:x_account.res_groups_privilege_x_account
 #: model_terms:ir.ui.view,arch_db:x_account.x_account_operation_report_view_search
+#: model_terms:ir.ui.view,x_account_id:x_account.view_discuss_channel_search_inherit_x_account
+#: model_terms:ir.ui.menu,name:x_account.menu_x_account_root
+#: model_terms:ir.ui.view,arch_db:x_account.x_account_task_view_search
+#: model_terms:ir.ui.view,arch_db:x_account.x_account_res_config_settings_view_form
+#: model_terms:ir.ui.view,arch_db:x_account.x_message_view_search
+#: model_terms:ir.ui.view,x_account_id:x_account.x_group_channel_view_form
 #: model_terms:ir.ui.view,arch_db:x_account.x_account_social_account_view_form_standalone
 msgid "X Account"
 msgstr "حساب X"
 
 #. module: x_account
-#: model:ir.model,name:x_account.model_x_account_group
 #: model:ir.model.fields,field_description:x_account.field_x_account_task__group_id
+#: model:ir.model,name:x_account.model_x_account_group
 #: model_terms:ir.ui.view,arch_db:x_account.x_account_group_view_form
 #: model_terms:ir.ui.view,arch_db:x_account.x_account_task_view_search
 msgid "X Account Group"
 msgstr "مجموعة حساب X"
 
 #. module: x_account
-#: model_terms:ir.ui.view,arch_db:x_account.x_account_group_view_tree
 #: model_terms:ir.ui.view,arch_db:x_account.x_account_group_view_search
+#: model_terms:ir.ui.view,arch_db:x_account.x_account_group_view_tree
 #: model_terms:ir.actions.act_window,name:x_account.action_x_account_group
 msgid "X Account Groups"
 msgstr "مجموعات حسابات X"
@@ -1985,9 +1985,9 @@ msgstr "مستخدم حساب X"
 #. module: x_account
 #: model:ir.model.fields,field_description:x_account.field_x_account_group__account_ids
 #: model_terms:ir.actions.act_window,name:x_account.action_x_account_social_accounts
-#: model_terms:ir.ui.menu,name:x_account.menu_x_account_social_accounts
 #: model_terms:ir.ui.view,arch_db:x_account.x_account_group_view_form
 #: model_terms:ir.ui.view,arch_db:x_account.x_account_social_account_view_list
+#: model_terms:ir.ui.menu,name:x_account.menu_x_account_social_accounts
 msgid "X Accounts"
 msgstr "حسابات X"
 
@@ -2113,9 +2113,9 @@ msgid "X Message"
 msgstr "رسالة X"
 
 #. module: x_account
+#: model_terms:ir.actions.act_window,name:x_account.action_x_account_messages
 #: model_terms:ir.ui.view,arch_db:x_account.x_message_view_search
 #: model_terms:ir.ui.view,arch_db:x_account.x_message_view_list
-#: model_terms:ir.actions.act_window,name:x_account.action_x_account_messages
 msgid "X Messages"
 msgstr "رسائل X"
 
@@ -2125,10 +2125,10 @@ msgid "X Migration Status"
 msgstr "حالة ترحيل X"
 
 #. module: x_account
-#: model_terms:ir.ui.view,arch_db:x_account.x_account_operation_report_view_list
-#: model_terms:ir.ui.view,arch_db:x_account.x_account_operation_report_view_pivot
 #: model_terms:ir.ui.view,arch_db:x_account.x_account_operation_report_view_graph
+#: model_terms:ir.ui.view,arch_db:x_account.x_account_operation_report_view_list
 #: model_terms:ir.ui.view,arch_db:x_account.x_account_operation_report_view_search
+#: model_terms:ir.ui.view,arch_db:x_account.x_account_operation_report_view_pivot
 msgid "X Operations"
 msgstr "عمليات X"
 
@@ -2143,8 +2143,8 @@ msgid "X Partner"
 msgstr "شريك X"
 
 #. module: x_account
-#: model:ir.model.fields,field_description:x_account.field_res_config_settings__x_provider
 #: model:ir.model.fields,field_description:x_account.field_social_account__x_provider
+#: model:ir.model.fields,field_description:x_account.field_res_config_settings__x_provider
 msgid "X Provider"
 msgstr "مزود X"
 
@@ -2221,21 +2221,21 @@ msgid "X: Active"
 msgstr "X: نشط"
 
 #. module: x_account
-#: model_terms:base.automation,name:x_account.base_automation_x_dm_auto_reply_group
 #: model_terms:ir.actions.server,name:x_account.ir_actions_server_x_dm_auto_reply_group
+#: model_terms:base.automation,name:x_account.base_automation_x_dm_auto_reply_group
 msgid "X: Auto-reply DM to Group"
 msgstr "X: رد تلقائي برسالة مباشرة إلى المجموعة"
 
 #. module: x_account
-#: model_terms:base.automation,name:x_account.base_automation_x_dm_auto_reply_user
 #: model_terms:ir.actions.server,name:x_account.ir_actions_server_x_dm_auto_reply_user
+#: model_terms:base.automation,name:x_account.base_automation_x_dm_auto_reply_user
 msgid "X: Auto-reply DM to User"
 msgstr "X: رد تلقائي برسالة مباشرة إلى المستخدم"
 
 #. module: x_account
 #: model_terms:ir.actions.server,name:x_account.ir_actions_server_x_message_bookmark
-#: model_terms:base.automation,name:x_account.base_automation_x_channel_bookmark
 #: model_terms:ir.actions.server,name:x_account.ir_actions_server_x_channel_bookmark
+#: model_terms:base.automation,name:x_account.base_automation_x_channel_bookmark
 msgid "X: Channel Bookmark"
 msgstr "X: إشارة مرجعية للقناة"
 
@@ -2749,8 +2749,8 @@ msgstr ""
 "ثوانٍ"
 
 #. module: x_account
-#: model:ir.model.fields.selection,name:x_account.selection__res_config_settings__x_action_provider__getxapi
 #: model:ir.model.fields.selection,name:x_account.selection__social_account__x_action_provider__getxapi
+#: model:ir.model.fields.selection,name:x_account.selection__res_config_settings__x_action_provider__getxapi
 msgid ""
 "REST API"
 msgstr ""
@@ -2930,8 +2930,8 @@ msgstr ""
 "نص التعليق"
 
 #. module: x_account
-#: model_terms:ir.ui.view,last_error:x_account.x_account_social_account_view_form_standalone
 #: model_terms:ir.ui.view,last_error:x_account.x_account_social_account_view_form
+#: model_terms:ir.ui.view,last_error:x_account.x_account_social_account_view_form_standalone
 msgid ""
 "No error recorded"
 msgstr ""
@@ -2945,8 +2945,8 @@ msgstr ""
 "النص المنشور كرد على المنشورات المرتبطة بهذه المحادثة"
 
 #. module: x_account
-#: model_terms:mail.template,body_html:x_account.mail_template_x_account_reauth_required
 #: model_terms:mail.template,body_html:x_account.mail_template_x_account_decrypt_stopped
+#: model_terms:mail.template,body_html:x_account.mail_template_x_account_reauth_required
 msgid ""
 "Account:"
 msgstr ""
@@ -2995,15 +2995,57 @@ msgstr ""
 "حساب X يحتاج إلى إعادة المصادقة: {{ object.name }}"
 
 #. module: x_account
-#: code:addons/x_account/models/social_account.py:619
+#: code:addons/x_account/models/social_account.py:648
 msgid ""
 "Chat keys are not set up yet. Use \"Setup Chat Keys\" to register the first identity."
 msgstr ""
 "لم يتم إعداد مفاتيح الدردشة بعد. استخدم \"إعداد مفاتيح الدردشة\" لتسجيل الهوية الأولى."
 
 #. module: x_account
-#: code:addons/x_account/models/social_account.py:622
+#: code:addons/x_account/models/social_account.py:651
 msgid ""
 "Chat keys are already registered. Use \"Reconfigure Encryption Key\" to register a new identity."
 msgstr ""
 "مفاتيح الدردشة مسجّلة بالفعل. استخدم \"إعادة إعداد مفتاح التشفير\" لتسجيل هوية جديدة."
+
+#. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_social_account__x_chat_status
+msgid ""
+"X Chat Status"
+msgstr ""
+"حالة تشفير المحادثات"
+
+#. module: x_account
+#: model:ir.model.fields,help:x_account.field_social_account__x_chat_status
+msgid ""
+"Where this account stands with X Chat encryption, in one value: not configured until its keys are registered, ready while encrypted messages are being read, PIN rejected when X refused the configured PIN, and decryption stopped when the account kept receiving encrypted chats it could no longer read."
+msgstr ""
+"موقع هذا الحساب من تشفير محادثات X في قيمة واحدة: غير مُعدّ حتى تُسجَّل مفاتيحه، وجاهز أثناء قراءة الرسائل المشفّرة، ورمز PIN مرفوض عندما يرفض X رمز PIN المضبوط، وتوقف فك التشفير عندما يظل الحساب يستقبل محادثات مشفّرة لم يعد قادرًا على قراءتها."
+
+#. module: x_account
+#: model:ir.model.fields.selection,name:x_account.selection__social_account__x_chat_status__not_configured
+msgid ""
+"Not Configured"
+msgstr ""
+"غير مُعدّ"
+
+#. module: x_account
+#: model:ir.model.fields.selection,name:x_account.selection__social_account__x_chat_status__pin_locked
+msgid ""
+"PIN Rejected"
+msgstr ""
+"رمز PIN مرفوض"
+
+#. module: x_account
+#: model:ir.model.fields.selection,name:x_account.selection__social_account__x_chat_status__ready
+msgid ""
+"Ready"
+msgstr ""
+"جاهز"
+
+#. module: x_account
+#: model:ir.model.fields.selection,name:x_account.selection__social_account__x_chat_status__stopped
+msgid ""
+"Decryption Stopped"
+msgstr ""
+"توقف فك التشفير"

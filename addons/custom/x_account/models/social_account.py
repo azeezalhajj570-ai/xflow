@@ -277,6 +277,35 @@ class SocialAccount(models.Model):
              'its conversations silently receive nothing. Cleared by a stored '
              'message or a key reconfiguration.',
     )
+    x_chat_status = fields.Selection(
+        [
+            ('not_configured', 'Not Configured'),
+            ('ready', 'Ready'),
+            ('pin_locked', 'PIN Rejected'),
+            ('stopped', 'Decryption Stopped'),
+        ],
+        string='X Chat Status',
+        compute='_compute_x_chat_status',
+        groups='social.group_social_user',
+        help='Where this account stands with X Chat encryption, in one value: '
+             'not configured until its keys are registered, ready while '
+             'encrypted messages are being read, PIN rejected when X refused '
+             'the configured PIN, and decryption stopped when the account kept '
+             'receiving encrypted chats it could no longer read.',
+    )
+
+    @api.depends('x_chat_initialized', 'x_chat_pin_locked',
+                 'x_chat_decrypt_stopped')
+    def _compute_x_chat_status(self):
+        for account in self:
+            if not account.x_chat_initialized:
+                account.x_chat_status = 'not_configured'
+            elif account.x_chat_decrypt_stopped:
+                account.x_chat_status = 'stopped'
+            elif account.x_chat_pin_locked:
+                account.x_chat_status = 'pin_locked'
+            else:
+                account.x_chat_status = 'ready'
     x_chat_decrypt_notified_at = fields.Datetime(
         string='X Chat Decryption Alert Sent At',
         copy=False,
