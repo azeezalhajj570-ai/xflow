@@ -105,6 +105,14 @@ class XAccountTask(models.Model):
         index=True,
         help='Where the task came from (e.g. channel_automation, group, webhook).',
     )
+    result_warning = fields.Char(
+        string='Result Warning',
+        compute='_compute_result_warning',
+        help='Set when the task succeeded but stored nothing: the deliveries it '
+             'consumed could not be read (encrypted with no usable key), so no '
+             'message reached its conversation. Without it a broken decryption '
+             'is invisible behind a green task list.',
+    )
     processing_time = fields.Integer(
         string='Period of Processing (sec)',
         compute='_compute_processing_time',
@@ -132,6 +140,10 @@ class XAccountTask(models.Model):
     # processed.
     _QUEUE_MAX_AGE_MINUTES = 60
     _WEBHOOK_OPERATION = 'process_webhook_event'
+    # Operations whose result reports what they stored, so a run that stored
+    # nothing can be flagged: they end ``success`` either way.
+    _RESULT_WARNING_OPERATIONS = (
+        'process_webhook_event', 'process_webhook_events')
     # Source marker the bulk-follow wizard stamps on its tasks. The claim sweep
     # runs at most one such follow per account per sweep so the per-task
     # randomized spacing is not collapsed into a burst by the sweep draining
@@ -200,6 +212,11 @@ class XAccountTask(models.Model):
             if task.status:
                 parts.append(task.status)
             task.display_name = ' · '.join(parts)
+
+    @api.depends('operation', 'status', 'result')
+    def _compute_result_warning(self):
+        for task in self:
+            task.result_warning = task._result_warning_text()
 
     @api.depends('create_date', 'done_at')
     def _compute_processing_time(self):
@@ -846,24 +863,66 @@ class XAccountTask(models.Model):
         }
 
     @staticmethod
-    def _result_message_count(result):
-        if not result:
-            return 0
-        if isinstance(result, str):
+    def _result_payload(result):
+        """The result mapping a task recorded, or ``{}`` when there is none.
+
+        Results are stored as text: JSON from some paths, and a Python dict repr
+        (parsed with ``ast.literal_eval``) from the ones written straight from a
+        dict.
+        """
+        if isinstance(result, dict):
+            return result
+        if not result or not isinstance(result, str):
+            return {}
+        try:
+            data = json.loads(result)
+        except (ValueError, TypeError):
             try:
-                data = json.loads(result)
-            except (ValueError, TypeError):
-                try:
-                    data = ast.literal_eval(result)
-                except (ValueError, SyntaxError):
-                    return 0
-        elif isinstance(result, dict):
-            data = result
-        else:
+                data = ast.literal_eval(result)
+            except (ValueError, SyntaxError):
+                return {}
+        return data if isinstance(data, dict) else {}
+
+    @classmethod
+    def _result_message_count(cls, result):
+        try:
+            return int(cls._result_payload(result).get('messages') or 0)
+        except (TypeError, ValueError):
             return 0
-        if not isinstance(data, dict):
-            return 0
-        return int(data.get('messages') or 0)
+
+    def _result_warning_text(self):
+        """Why a ``success`` task stored nothing, or False when it is fine.
+
+        A webhook batch that cannot read a single delivery still ends
+        ``success``: an undecryptable message is skipped, not an error, so the
+        task list stays green while the account silently stops storing
+        anything. The counts the handler reports are the only signal, so they
+        are surfaced here.
+        """
+        self.ensure_one()
+        if (self.status != 'success'
+                or self.operation not in self._RESULT_WARNING_OPERATIONS):
+            return False
+        data = self._result_payload(self.result)
+        try:
+            if int(data.get('messages') or 0):
+                return False
+        except (TypeError, ValueError):
+            return False
+        details = []
+        processed = data.get('processed')
+        # ``isinstance(True, int)`` is True: the single-delivery path reports a
+        # boolean here, and 'True processed' is not a count.
+        if isinstance(processed, int) and not isinstance(processed, bool):
+            details.append('%s processed' % processed)
+        skipped = data.get('skipped')
+        if isinstance(skipped, int) and skipped:
+            details.append('%s skipped' % skipped)
+        elif isinstance(skipped, str) and skipped:
+            details.append('skipped: %s' % skipped)
+        if not details:
+            return False
+        return 'Nothing stored (%s)' % ', '.join(details)
 
     def action_cancel(self):
         self.write({'status': 'cancelled'})

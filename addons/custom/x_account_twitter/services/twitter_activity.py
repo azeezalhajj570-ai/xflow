@@ -283,6 +283,10 @@ class TwitterActivity:
                 self._close_event(event, 'done')
                 processed += 1
                 messages += result.get('messages', 0)
+                # A delivery with nothing readable is skipped, not failed, so
+                # counting it is what lets the task show it stored nothing.
+                if result.get('skipped'):
+                    skipped += 1
             except twitter_errors.TwitterTemporaryError as exc:
                 event.write({'state': 'failed', 'error': str(exc)})
                 errors.append({'event_uuid': event_uuid, 'error': str(exc)})

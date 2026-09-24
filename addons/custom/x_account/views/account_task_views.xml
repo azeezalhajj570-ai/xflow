@@ -4,10 +4,13 @@
         <field name="name">x.account.task.view.tree</field>
         <field name="model">x.account.task</field>
         <field name="arch" type="xml">
-            <list string="X Account Tasks" create="false">
+            <list string="X Account Tasks" create="false"
+                decoration-warning="result_warning != False">
                 <field name="account_id"/>
                 <field name="operation"/>
                 <field name="status"/>
+                <field name="result_warning" widget="badge" optional="show"
+                    decoration-warning="result_warning != False"/>
                 <field name="priority"/>
                 <field name="retry_count"/>
                 <field name="create_date" optional="show"/>
@@ -42,6 +45,10 @@
                     <button name="action_cancel" string="Cancel" type="object" class="btn-secondary"/>
                 </header>
                 <sheet>
+                    <div class="alert alert-warning" role="alert"
+                        invisible="not result_warning">
+                        <field name="result_warning" readonly="1" nolabel="1"/>
+                    </div>
                     <group>
                         <group>
                             <field name="account_id"/>
