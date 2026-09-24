@@ -6,8 +6,8 @@
         <field name="inherit_id" ref="x_account.x_account_res_config_settings_view_form"/>
         <field name="arch" type="xml">
             <xpath expr="//app[@name='x_account']" position="inside">
-                <block title="GetXAPI Provider">
-                    <setting string="GetXAPI API Key">
+                <block title="REST API Provider">
+                    <setting string="API Key">
                         <field name="x_getxapi_api_key" password="True"/>
                     </setting>
                 </block>

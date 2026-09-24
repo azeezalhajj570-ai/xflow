@@ -14,14 +14,14 @@ class ResConfigSettings(models.TransientModel):
 
     x_provider = fields.Selection(
         selection_add=[
-            ('getxapi', 'GetXAPI REST API'),
+            ('getxapi', 'REST API'),
         ],
         ondelete={'getxapi': 'cascade'},
     )
 
     x_getxapi_api_key = fields.Char(
-        string='GetXAPI API Key',
+        string='API Key',
         config_parameter='x_account.getxapi_api_key',
-        help='GetXAPI API key (Authorization: Bearer). Used only by the optional '
-             'GetXAPI provider; never stored in x.session.store.',
+        help='API key (Authorization: Bearer). Used only by the optional '
+             'REST provider; never stored in x.session.store.',
     )

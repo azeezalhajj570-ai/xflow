@@ -2,7 +2,7 @@
 <odoo>
     <data noupdate="1">
         <record id="cron_archive_getxapi_usage" model="ir.cron">
-            <field name="name">GetXAPI: Archive Old Usage Records</field>
+            <field name="name">API Usage: Archive Old Records</field>
             <field name="model_id" ref="model_getxapi_api_usage"/>
             <field name="state">code</field>
             <field name="code">model._archive_old_records()</field>

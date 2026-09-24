@@ -55,7 +55,7 @@ class SocialLivePostGetXAPI(models.Model):
                 provider = account.get_action_provider()
                 result = provider.post_tweet(message)
                 if not result.get('success'):
-                    raise RuntimeError('GetXAPI returned no tweet_id')
+                    raise RuntimeError('REST provider returned no tweet_id')
                 tweet_id = result.get('tweet_id', '')
                 live_post.write({
                     'state': 'posted',

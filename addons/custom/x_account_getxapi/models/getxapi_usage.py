@@ -12,7 +12,7 @@ from odoo import api, fields, models
 
 class GetXAPIUsage(models.Model):
     _name = 'getxapi.api.usage'
-    _description = 'GetXAPI API Usage'
+    _description = 'API Usage'
     _order = 'create_date desc'
     _rec_name = 'endpoint'
 
@@ -44,7 +44,7 @@ class GetXAPIUsage(models.Model):
     endpoint = fields.Char(
         string='Endpoint',
         index=True,
-        help='The GetXAPI endpoint path (e.g. twitter/tweet/retweet).',
+        help='The provider endpoint path (e.g. twitter/tweet/retweet).',
     )
     method = fields.Selection(
         [('GET', 'GET'), ('POST', 'POST')],
@@ -58,7 +58,7 @@ class GetXAPIUsage(models.Model):
     )
     status_code = fields.Integer(
         string='Status Code',
-        help='HTTP status code returned by GetXAPI.',
+        help='HTTP status code returned by the provider.',
     )
     success = fields.Boolean(
         string='Success',
@@ -80,15 +80,15 @@ class GetXAPIUsage(models.Model):
     )
     twitter_error_code = fields.Integer(
         string='Twitter Error Code',
-        help='Upstream X error code embedded in the GetXAPI body (e.g. 502 = X daily DM/message-request limit).',
+        help='Upstream X error code embedded in the provider body (e.g. 502 = X daily DM/message-request limit).',
     )
     retry_after = fields.Float(
         string='Retry After (s)',
-        help='Seconds X/GetXAPI said to wait before retrying, when disclosed.',
+        help='Seconds X/the provider said to wait before retrying, when disclosed.',
     )
     error_message = fields.Text(
         string='Error Message',
-        help='Sanitized error detail returned in the GetXAPI response body.',
+        help='Sanitized error detail returned in the provider response body.',
     )
 
     def action_view_operation(self):

@@ -16,7 +16,7 @@ class XImportSession(models.TransientModel):
 
     provider = fields.Selection(
         selection_add=[
-            ('getxapi', 'GetXAPI REST API'),
+            ('getxapi', 'REST API'),
         ],
         ondelete={'getxapi': 'cascade'},
     )
@@ -41,7 +41,7 @@ class XImportSession(models.TransientModel):
         self.ensure_one()
         handle = self.username.strip() if self.username else ''
         if not handle:
-            raise ValidationError(_('Username / Handle is required for GetXAPI.'))
+            raise ValidationError(_('Username / Handle is required for the REST provider.'))
 
         auth_token = self.auth_token.strip() if self.auth_token else ''
         ct0 = self.ct0.strip() if self.ct0 else ''
