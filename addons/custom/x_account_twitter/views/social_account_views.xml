@@ -50,7 +50,7 @@
         <field name="inherit_id" ref="x_account.x_account_social_account_view_list"/>
         <field name="arch" type="xml">
             <xpath expr="//field[@name='x_connection_status']" position="after">
-                <field name="x_subscription_status" widget="badge"
+                <field name="x_subscription_status" widget="badge" optional="hide"
                     decoration-success="x_subscription_status == 'Active'"
                     decoration-warning="x_subscription_status == 'Pending'"
                     decoration-danger="x_subscription_status == 'Failed'"/>

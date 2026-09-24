@@ -174,7 +174,10 @@
                 <field name="name"/>
                 <field name="social_account_handle"/>
                 <field name="x_provider" column_invisible="1"/>
-                <field name="x_connection_status"/>
+                <field name="x_connection_status" widget="badge"
+                    decoration-success="x_connection_status == 'active'"
+                    decoration-warning="x_connection_status == 'not_configured'"
+                    decoration-danger="x_connection_status == 'error'"/>
                 <!-- <field name="last_validated"/> -->
             </list>
         </field>
