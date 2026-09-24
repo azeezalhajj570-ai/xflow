@@ -116,9 +116,9 @@ msgstr ""
 "يصبح صحيحًا بعد اجتياز ويب هوك OmniX مصافحة CRC."
 
 #. module: x_account_omnix
+#: model:ir.model.fields.selection,name:x_account_omnix.selection__x_import_session__provider__omnix
 #: model:ir.model.fields.selection,name:x_account_omnix.selection__res_config_settings__x_provider__omnix
 #: model:ir.model.fields.selection,name:x_account_omnix.selection__social_account__x_provider__omnix
-#: model:ir.model.fields.selection,name:x_account_omnix.selection__x_import_session__provider__omnix
 msgid ""
 "OmniX REST API"
 msgstr ""

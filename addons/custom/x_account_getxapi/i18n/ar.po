@@ -129,9 +129,9 @@ msgid "GET"
 msgstr "GET"
 
 #. module: x_account_getxapi
-#: model_terms:ir.ui.menu,name:x_account_getxapi.menu_getxapi_usage
-#: model_terms:ir.ui.view,arch_db:x_account_getxapi.getxapi_usage_view_list
 #: model_terms:ir.ui.view,arch_db:x_account_getxapi.getxapi_usage_view_form
+#: model_terms:ir.ui.view,arch_db:x_account_getxapi.getxapi_usage_view_list
+#: model_terms:ir.ui.menu,name:x_account_getxapi.menu_getxapi_usage
 #: model_terms:ir.actions.act_window,name:x_account_getxapi.getxapi_usage_action
 msgid "Usage"
 msgstr "الاستخدام"
@@ -311,8 +311,8 @@ msgstr ""
 
 #. module: x_account_getxapi
 #: model:ir.model,name:x_account_getxapi.model_getxapi_api_usage
-#: model_terms:ir.ui.view,arch_db:x_account_getxapi.getxapi_usage_view_pivot
 #: model_terms:ir.ui.view,arch_db:x_account_getxapi.getxapi_usage_view_search
+#: model_terms:ir.ui.view,arch_db:x_account_getxapi.getxapi_usage_view_pivot
 msgid ""
 "API Usage"
 msgstr ""
@@ -425,9 +425,9 @@ msgstr ""
 "آخر خطأ نفاد رصيد أبلغ عنه المزود."
 
 #. module: x_account_getxapi
-#: model:ir.model.fields.selection,name:x_account_getxapi.selection__res_config_settings__x_provider__getxapi
 #: model:ir.model.fields.selection,name:x_account_getxapi.selection__social_account__x_provider__getxapi
 #: model:ir.model.fields.selection,name:x_account_getxapi.selection__x_import_session__provider__getxapi
+#: model:ir.model.fields.selection,name:x_account_getxapi.selection__res_config_settings__x_provider__getxapi
 msgid ""
 "REST API"
 msgstr ""

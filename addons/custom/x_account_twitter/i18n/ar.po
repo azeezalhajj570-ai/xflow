@@ -550,8 +550,8 @@ msgstr "التاريخ والوقت بتوقيت UTC الذي يجب بعده ت
 
 #. module: x_account_twitter
 #. odoo-python
-#: code:addons/x_account_twitter/controllers/main.py:91
 #: code:addons/x_account_twitter/controllers/main.py:62
+#: code:addons/x_account_twitter/controllers/main.py:91
 msgid "Unauthorized. Please contact your administrator."
 msgstr "غير مصرّح. يرجى التواصل مع المسؤول."
 
@@ -587,8 +587,8 @@ msgstr "بيانات اعتماد X API"
 
 #. module: x_account_twitter
 #: model:ir.model.fields,field_description:x_account_twitter.field_x_twitter_event__account_id
-#: model:ir.model.fields,field_description:x_account_twitter.field_x_twitter_key_change__account_id
 #: model:ir.model.fields,field_description:x_account_twitter.field_x_twitter_subscription__account_id
+#: model:ir.model.fields,field_description:x_account_twitter.field_x_twitter_key_change__account_id
 msgid "X Account"
 msgstr "حساب X"
 
