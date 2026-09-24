@@ -10,19 +10,18 @@
                     <page string="Account Info" name="x_account_info">
                         <group>
                             <group name="x_account_connection">
-                                <field name="active" widget="boolean_toggle"/>
-                                <field name="x_connection_status" widget="badge"
-                                    decoration-success="x_connection_status == 'active'"
-                                    decoration-warning="x_connection_status == 'reauth_required'"
-                                    decoration-danger="x_connection_status in ('disconnected', 'error', 'invalid')"/>
                                 <field name="twitter_user_id" readonly="1"/>
-                                <field name="x_auto_archive" help="Archive this account automatically once a day inside the window below."/>
-                                <field name="x_auto_archive_start" widget="float_time" options="{'type': 'time'}" required="x_auto_archive" invisible="not x_auto_archive"/>
-                                <field name="x_auto_archive_end" widget="float_time" options="{'type': 'time'}" required="x_auto_archive" invisible="not x_auto_archive"/>
                             </group>
                             <!-- Providers add their own connection settings here
-                                 (GetXAPI credentials, OmniX webhook fields). -->
+                                 (provider credentials, OmniX webhook fields). -->
                             <group name="x_account_api"/>
+                        </group>
+                    </page>
+                    <page string="Archiving" name="x_account_archiving">
+                        <group name="x_account_archiving_group">
+                            <field name="x_auto_archive" help="Archive this account automatically once a day inside the window below."/>
+                            <field name="x_auto_archive_start" widget="float_time" options="{'type': 'time'}" required="x_auto_archive" invisible="not x_auto_archive"/>
+                            <field name="x_auto_archive_end" widget="float_time" options="{'type': 'time'}" required="x_auto_archive" invisible="not x_auto_archive"/>
                         </group>
                     </page>
                     <!-- Everything needed to tell WHY an account is not working:
@@ -31,10 +30,6 @@
                     <page string="Status" name="x_account_status">
                         <group>
                             <group name="x_account_status_connection" string="Authentication">
-                                <field name="x_connection_status" widget="badge" readonly="1"
-                                    decoration-success="x_connection_status == 'active'"
-                                    decoration-warning="x_connection_status == 'reauth_required'"
-                                    decoration-danger="x_connection_status in ('disconnected', 'error', 'invalid')"/>
                                 <field name="x_auth_method" readonly="1"/>
                                 <field name="x_provider" readonly="1"/>
                                 <field name="x_event_provider" readonly="1"/>
@@ -75,7 +70,12 @@
                     </page>
                 </notebook>
             </xpath>
+            <xpath expr="//div[@class='oe_title']/h1" position="before">
+                <field name="active" widget="boolean_toggle"/>
+            </xpath>
             <xpath expr="//header" position="inside">
+                <field name="x_connection_status" widget="statusbar"
+                    statusbar_visible="new,authenticating,active,reauth_required,error,disconnected"/>
                 <button name="action_initialize_x_chat_encryption" type="object"
                     string="Initialize Encryption"
                     class="btn-secondary"
@@ -106,6 +106,8 @@
         <field name="arch" type="xml">
             <form string="X Account" create="false">
                 <header>
+                    <field name="x_connection_status" widget="statusbar"
+                        statusbar_visible="new,authenticating,active,reauth_required,error,disconnected"/>
                     <button name="action_initialize_x_chat_encryption" type="object"
                         string="Initialize Encryption"
                         class="btn-primary"
@@ -135,7 +137,7 @@
                         string="Sync Chat Names"
                         class="btn-secondary"
                         groups="social.group_social_user"
-                        confirm="Sync chat names from GetXAPI into existing channels?"
+                        confirm="Sync chat names from the provider into existing channels?"
                         invisible="(not x_action_provider and not x_provider) or not twitter_user_id"/>
                     <button name="action_fetch_groups" type="object"
                         string="Fetch Groups"
@@ -146,26 +148,26 @@
                 </header>
                 <sheet>
                     <div class="oe_title">
+                        <field name="active" widget="boolean_toggle"/>
                         <h1><field name="name" placeholder="Account name"/></h1>
                     </div>
                     <notebook>
                         <page string="Account Info" name="x_account_info">
                             <group>
                                 <group name="x_account_connection">
-                                    <field name="active" widget="boolean_toggle"/>
                                     <field name="social_account_handle" placeholder="@handle"/>
-                                    <field name="x_connection_status" widget="badge"
-                                        decoration-success="x_connection_status == 'active'"
-                                        decoration-warning="x_connection_status == 'reauth_required'"
-                                        decoration-danger="x_connection_status in ('disconnected', 'error', 'invalid')"/>
                                     <field name="twitter_user_id" readonly="1"/>
-                                    <field name="x_auto_archive" help="Archive this account automatically once a day inside the window below."/>
-                                    <field name="x_auto_archive_start" widget="float_time" options="{'type': 'time'}" required="x_auto_archive" invisible="not x_auto_archive"/>
-                                    <field name="x_auto_archive_end" widget="float_time" options="{'type': 'time'}" required="x_auto_archive" invisible="not x_auto_archive"/>
                                 </group>
                                 <!-- Providers add their own connection settings here
-                                     (GetXAPI credentials, OmniX webhook fields). -->
+                                     (provider credentials, OmniX webhook fields). -->
                                 <group name="x_account_api"/>
+                            </group>
+                        </page>
+                        <page string="Archiving" name="x_account_archiving">
+                            <group name="x_account_archiving_group">
+                                <field name="x_auto_archive" help="Archive this account automatically once a day inside the window below."/>
+                                <field name="x_auto_archive_start" widget="float_time" options="{'type': 'time'}" required="x_auto_archive" invisible="not x_auto_archive"/>
+                                <field name="x_auto_archive_end" widget="float_time" options="{'type': 'time'}" required="x_auto_archive" invisible="not x_auto_archive"/>
                             </group>
                         </page>
                         <!-- Everything needed to tell WHY an account is not working:
@@ -174,10 +176,6 @@
                         <page string="Status" name="x_account_status">
                             <group>
                                 <group name="x_account_status_connection" string="Authentication">
-                                    <field name="x_connection_status" widget="badge" readonly="1"
-                                        decoration-success="x_connection_status == 'active'"
-                                        decoration-warning="x_connection_status == 'reauth_required'"
-                                        decoration-danger="x_connection_status in ('disconnected', 'error', 'invalid')"/>
                                     <field name="x_auth_method" readonly="1"/>
                                     <field name="x_provider" readonly="1"/>
                                     <field name="x_event_provider" readonly="1"/>

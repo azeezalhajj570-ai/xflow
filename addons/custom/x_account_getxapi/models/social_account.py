@@ -14,31 +14,31 @@ class SocialAccount(models.Model):
 
     x_provider = fields.Selection(
         selection_add=[
-            ('getxapi', 'GetXAPI REST API'),
+            ('getxapi', 'REST API'),
         ],
         ondelete={'getxapi': 'cascade'},
     )
 
     authtoken = fields.Char(
-        string='GetXAPI Auth Token',
-        help='Twitter session auth_token for GetXAPI write operations.',
+        string='Auth Token',
+        help='Twitter session auth_token for this provider\'s write operations.',
     )
     ct0 = fields.Char(
-        string='GetXAPI ct0',
+        string='ct0',
         help='Twitter session ct0 (CSRF) cookie, sent alongside the auth '
-             'token when set. Leave empty for accounts whose GetXAPI calls '
+             'token when set. Leave empty for accounts whose provider calls '
              'only need the auth token.',
     )
     x_getxapi_credit_blocked = fields.Boolean(
-        string='GetXAPI Credit Exhausted',
+        string='API Credit Exhausted',
         default=False,
         copy=False,
         readonly=True,
-        help='Set automatically when GetXAPI reports the account has no '
+        help='Set automatically when the provider reports the account has no '
              'credit (HTTP 402 or a credit-related 429). While set, the paid '
-             'task queue for this account is halted and no paid GetXAPI call '
-             'is sent, so the balance is not burned on doomed requests. Add '
-             'credit, then use "Resume GetXAPI" to lift the block.',
+             'task queue for this account is halted and no paid call is sent, '
+             'so the balance is not burned on doomed requests. Add credit, '
+             'then use "Resume API Usage" to lift the block.',
     )
     x_getxapi_credit_blocked_at = fields.Datetime(
         string='Credit Blocked At',

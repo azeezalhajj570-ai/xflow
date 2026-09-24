@@ -101,9 +101,9 @@ class SocialAccount(models.Model):
             ('new', 'New'),
             ('authenticating', 'Authenticating'),
             ('active', 'Active'),
+            ('reauth_required', 'Reauthentication Required'),
             ('disconnected', 'Disconnected'),
             ('invalid', 'Invalid'),
-            ('reauth_required', 'Reauthentication Required'),
             ('error', 'Error'),
             ('disabled', 'Disabled'),
         ],
@@ -166,7 +166,7 @@ class SocialAccount(models.Model):
     )
     x_action_provider = fields.Selection(
         [
-            ('getxapi', 'GetXAPI'),
+            ('getxapi', 'REST API'),
             ('official', 'Official X API'),
         ],
         string='Action Provider',
