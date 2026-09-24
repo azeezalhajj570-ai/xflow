@@ -10,7 +10,7 @@
             </xpath>
             <xpath expr="//group[@name='social_account_global']" position="after">
                 <notebook>
-                    <page string="Additional Info" name="x_account_info">
+                    <page string="Settings" name="x_account_info">
                         <group name="x_account_connection" col="1">
                             <field name="twitter_user_id" readonly="1"/>
                             <!-- Providers inject their credentials just under the
@@ -103,7 +103,7 @@
                         <h1><field name="name" placeholder="Account name"/></h1>
                     </div>
                     <notebook>
-                        <page string="Additional Info" name="x_account_info">
+                        <page string="Settings" name="x_account_info">
                             <group name="x_account_connection" col="1">
                                 <field name="social_account_handle" placeholder="@handle" readonly="1"/>
                                 <field name="twitter_user_id" readonly="1"/>

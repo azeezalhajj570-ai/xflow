@@ -49,14 +49,13 @@ msgstr "معلومات الحساب"
 #. module: x_account
 #: model_terms:ir.ui.view,arch_db:x_account.x_account_social_account_view_form
 #: model_terms:ir.ui.view,arch_db:x_account.x_account_social_account_view_form_standalone
-msgid "Additional Info"
-msgstr "معلومات إضافية"
-
-#. module: x_account
-#: model_terms:ir.ui.view,arch_db:x_account.x_account_social_account_view_form
-#: model_terms:ir.ui.view,arch_db:x_account.x_account_social_account_view_form_standalone
 msgid "Subscriptions"
 msgstr "الاشتراكات"
+
+#. module: x_account
+#: model_terms:ir.ui.view,arch_db:x_account.x_account_group_view_kanban
+msgid "No description"
+msgstr "لا يوجد وصف"
 
 #. module: x_account
 #: model_terms:ir.ui.view,name:x_account.x_account_social_account_view_form_standalone
@@ -3028,6 +3027,48 @@ msgid ""
 "X account requires reauthentication: {{ object.name }}"
 msgstr ""
 "حساب X يحتاج إلى إعادة المصادقة: {{ object.name }}"
+
+#. module: x_account
+#: model_terms:mail.template,name:x_account.mail_template_x_account_status_connected
+msgid ""
+"X Account: Connected"
+msgstr ""
+"حساب X: متصل"
+
+#. module: x_account
+#: model_terms:mail.template,name:x_account.mail_template_x_account_status_failed
+msgid ""
+"X Account: Connection Failed"
+msgstr ""
+"حساب X: فشل الاتصال"
+
+#. module: x_account
+#: model_terms:mail.template,subject:x_account.mail_template_x_account_status_connected
+msgid ""
+"X account connected: {{ object.name }}"
+msgstr ""
+"تم اتصال حساب X: {{ object.name }}"
+
+#. module: x_account
+#: model_terms:mail.template,subject:x_account.mail_template_x_account_status_failed
+msgid ""
+"X account connection failed: {{ object.name }}"
+msgstr ""
+"فشل اتصال حساب X: {{ object.name }}"
+
+#. module: x_account
+#: model_terms:mail.template,body_html:x_account.mail_template_x_account_status_connected
+msgid ""
+"This X account is connected again: X authentication is valid and Chat Encryption is ready, so its automation can run."
+msgstr ""
+"هذا الحساب على X متصل مرة أخرى: مصادقة X صالحة وتشفير المحادثات جاهز، لذا يمكن لأتمتته أن تعمل."
+
+#. module: x_account
+#: model_terms:mail.template,body_html:x_account.mail_template_x_account_status_failed
+msgid ""
+"This X account connection is failing: a required X connection or Chat Encryption component stopped working, so its automation is suspended until it is fixed."
+msgstr ""
+"اتصال هذا الحساب على X يتعطل: أحد مكوّنات الاتصال أو تشفير المحادثات المطلوبة توقف عن العمل، لذا أُوقفت أتمتته حتى يُصلَح."
 
 #. module: x_account
 #: code:addons/x_account/models/social_account.py:648
