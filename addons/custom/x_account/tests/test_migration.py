@@ -67,7 +67,7 @@ class TestXMigration(XAccountTestBase):
             from odoo.addons.x_account.services.x_service import XService
             XService.validate(account)
         account.invalidate_recordset()
-        self.assertEqual(account.x_connection_status, 'active')
+        self.assertEqual(account.x_connection_state, 'active')
 
     def test_migration_rollback_deletes_session_only(self):
         rows = [self._row()]

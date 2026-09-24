@@ -129,7 +129,7 @@ class XMessage(models.Model):
         return self.env['social.account'].sudo().search([
             ('company_id', '=', self.env.company.id),
             ('active', '=', True),
-            ('x_connection_status', 'not in', ('disabled', 'new')),
+            ('x_connection_state', 'not in', ('disabled', 'new')),
         ], limit=1)
 
     def _extract_tweet_ids(self):
@@ -228,14 +228,14 @@ class XMessage(models.Model):
                 operation, account.id,
             )
             return
-        if not account or account.x_connection_status in ('disabled', 'new'):
+        if not account or account.x_connection_state in ('disabled', 'new'):
             account = self._get_company_x_account()
         if not account:
             _logger.info(
                 'Channel automation skipped (operation=%s): no valid X account for x.message id=%s '
                 '(account_id=%s, status=%s)',
                 operation, self.id, self.account_id.id,
-                self.account_id.x_connection_status if self.account_id else 'missing',
+                self.account_id.x_connection_state if self.account_id else 'missing',
             )
             return
 

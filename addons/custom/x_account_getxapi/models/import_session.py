@@ -53,7 +53,7 @@ class XImportSession(models.TransientModel):
                 'media_id': self.media_id.id,
                 'x_provider': 'getxapi',
                 'x_auth_method': 'session_cookie',
-                'x_connection_status': 'authenticating',
+                'x_connection_state': 'authenticating',
                 'authtoken': auth_token,
                 'ct0': ct0,
             })
@@ -70,7 +70,7 @@ class XImportSession(models.TransientModel):
             'twitter_user_id': user.get('id') or account.twitter_user_id,
             'social_account_handle': user.get('username') or account.social_account_handle,
             'name': user.get('name') or account.name,
-            'x_connection_status': 'active',
+            'x_connection_state': 'active',
             'last_connected': fields.Datetime.now(),
             'last_validated': fields.Datetime.now(),
         })

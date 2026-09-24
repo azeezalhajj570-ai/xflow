@@ -35,7 +35,7 @@ class TestChannelActionToggles(XAccountTestBase):
             'social_account_handle': 'toggle_account',
             'x_provider': 'session_web',
             'x_auth_method': 'session_cookie',
-            'x_connection_status': 'active',
+            'x_connection_state': 'active',
         })
 
     def _channel(self, suffix, **toggles):

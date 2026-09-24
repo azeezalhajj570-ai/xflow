@@ -28,7 +28,7 @@ class TestTwitterProviderSendDM(XAccountTwitterTestBase):
             'x_oauth2_access_token': 'user-at-123',
             'x_oauth2_refresh_token': 'user-rt-123',
             'x_oauth2_token_expires_at': fields.Datetime.now() + timedelta(hours=1),
-            'x_connection_status': 'active',
+            'x_connection_state': 'active',
         })
         cls.provider = TwitterProvider(cls.env, cls.account)
 

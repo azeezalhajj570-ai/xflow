@@ -57,4 +57,4 @@ class TestXPortability(XAccountTestBase):
             self.assertEqual(provider.cookies['auth_token'], 'port_auth')
             self.assertTrue(XService.validate(account)['valid'])
         account.invalidate_recordset()
-        self.assertEqual(account.x_connection_status, 'active')
+        self.assertEqual(account.x_connection_state, 'active')

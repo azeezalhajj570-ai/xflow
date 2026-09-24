@@ -329,7 +329,7 @@ class TestOmniXDispatch(XAccountOmniXTestBase):
         }):
             result = XService.validate(self.account)
         self.assertTrue(result['valid'])
-        self.assertEqual(self.account.x_connection_status, 'active')
+        self.assertEqual(self.account.x_connection_state, 'active')
         self.assertIsNotNone(self.account.last_validated)
 
     def test_session_web_works_without_api_key(self):

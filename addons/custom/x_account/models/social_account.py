@@ -53,6 +53,24 @@ _CHAT_KEY_FIELDS = frozenset({
     'x_chat_initialized',
 })
 
+# Detailed connection states that mean a required X component is failing. They
+# all collapse into the 'error' value of the aggregated x_connection_status.
+_X_CONNECTION_FAILED_STATES = frozenset({
+    'reauth_required', 'disconnected', 'invalid', 'error',
+})
+
+# Chat encryption states that mean a required component is failing. Kept next to
+# the connection failures because the account form reports one overall status.
+_X_CHAT_FAILED_STATES = frozenset({'pin_locked', 'stopped'})
+
+# Writing any of these can move the aggregated x_connection_status, so the write
+# hook resyncs it after the change is applied.
+_X_STATUS_TRIGGER_FIELDS = frozenset({
+    'x_connection_state', 'x_chat_initialized', 'x_chat_pin_locked',
+    'x_chat_decrypt_stopped', 'x_encryption_code', 'x_chat_key_blob',
+    'x_chat_key_mode',
+})
+
 _EVENT_PROVIDER_REGISTRY_MAP = {
     'official': 'twitter',
 }
@@ -96,7 +114,7 @@ class SocialAccount(models.Model):
              'its queued tasks are cancelled and no automation runs for it '
              'until it is unarchived.',
     )
-    x_connection_status = fields.Selection(
+    x_connection_state = fields.Selection(
         [
             ('new', 'New'),
             ('authenticating', 'Authenticating'),
@@ -107,10 +125,28 @@ class SocialAccount(models.Model):
             ('error', 'Error'),
             ('disabled', 'Disabled'),
         ],
-        string='X Connection Status',
+        string='X Connection State',
         default='new',
+        copy=False,
+        help='Detailed X connection lifecycle, kept for diagnosis and for the '
+             'automation guards. It is never shown in a view: the account form '
+             'reports the aggregated "X Connection Status" instead.',
+    )
+    x_connection_status = fields.Selection(
+        [
+            ('not_configured', 'غير مُهيأ'),
+            ('active', 'متصل'),
+            ('error', 'خطأ'),
+        ],
+        string='X Connection Status',
+        default='not_configured',
         tracking=True,
-        help='Lifecycle state of the X account connection.',
+        readonly=True,
+        help='Overall X account health, in one value: not configured until the X '
+             'account setup and the required Chat Encryption setup are complete, '
+             'connected while X authentication is valid and Chat Encryption is '
+             'ready, and error when a required X connection/encryption component '
+             'is failing. System-controlled.',
     )
     last_connected = fields.Datetime(string='Last Connected', readonly=True)
     last_validated = fields.Datetime(string='Last Validated', readonly=True)
@@ -781,7 +817,8 @@ class SocialAccount(models.Model):
         return super().create(vals_list)
 
     def write(self, vals):
-        """Clear the PIN-lock flag when the operator changes the PIN.
+        """Clear the PIN-lock flag when the operator changes the PIN, and keep
+        the aggregated connection status in sync with the detailed state.
 
         Each wrong PIN attempt consumes one of X's limited guesses before the
         secure backup is permanently locked. When X rejects the PIN we stamp
@@ -818,10 +855,42 @@ class SocialAccount(models.Model):
                 'status': 'cancelled',
                 'error': 'Skipped: account archived',
             })
-        return super().write(vals)
+        res = super().write(vals)
+        # The detailed state moved: refresh the aggregated status the form shows.
+        # The resync writes x_connection_status only, which is not a trigger, so
+        # this cannot recurse.
+        if _X_STATUS_TRIGGER_FIELDS & set(vals) and 'x_connection_status' not in vals:
+            self._sync_x_connection_status()
+        return res
+
+    def _x_overall_connection_status(self):
+        """Aggregate the detailed connection state and the chat state.
+
+        One value for the account form: a failing component wins over an
+        incomplete setup, which wins over a healthy account.
+        """
+        self.ensure_one()
+        if (self.x_connection_state in _X_CONNECTION_FAILED_STATES
+                or self.x_chat_status in _X_CHAT_FAILED_STATES):
+            return 'error'
+        if self.x_connection_state == 'active' and self.x_chat_status == 'ready':
+            return 'active'
+        return 'not_configured'
+
+    def _sync_x_connection_status(self):
+        """Recompute the aggregated status and persist it when it changed.
+
+        Called after any write that can move it, so the status bar and its
+        chatter trail follow the detailed state without every caller having to
+        know the aggregation rules.
+        """
+        for account in self:
+            status = account._x_overall_connection_status()
+            if account.x_connection_status != status:
+                account.write({'x_connection_status': status})
 
     def _transition(self, status):
-        self.write({'x_connection_status': status})
+        self.write({'x_connection_state': status})
 
     def _set_last_error(self, message):
         self.write({'last_error': message})
@@ -1040,7 +1109,7 @@ class SocialAccount(models.Model):
             ('media_type', '=', 'twitter'),
             ('active', '=', True),
             ('x_session_store_id', '!=', False),
-            ('x_connection_status', 'in', ('active', 'reauth_required', 'error')),
+            ('x_connection_state', 'in', ('active', 'reauth_required', 'error')),
         ])
         from odoo.addons.x_account.services.x_service import XService
         for account in accounts:

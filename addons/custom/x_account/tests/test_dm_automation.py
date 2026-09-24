@@ -43,7 +43,7 @@ class TestXDMEnqueue(XAccountTestBase):
             'social_account_handle': handle,
             'x_provider': 'session_web',
             'x_auth_method': 'session_cookie',
-            'x_connection_status': status,
+            'x_connection_state': status,
         })
 
     def _make_user_channel(self, account, partner, conv_id):
