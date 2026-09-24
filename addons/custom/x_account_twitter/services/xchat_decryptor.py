@@ -35,6 +35,9 @@ import binascii
 import logging
 import re
 import time
+from datetime import timedelta
+
+from odoo import fields
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -48,6 +51,14 @@ _BYTES_REPR_RE = re.compile(r"^(?:bytearray\()?b'(.*)'\)?$", re.DOTALL)
 
 class XChatDecryptor:
     """Lazy, per-account wrapper around the official Chat XDK."""
+
+    # How long a failed public-keys read holds further automatic reads back.
+    # The endpoint's 24h budget is shared with key registration, so retrying a
+    # broken account on every batch only keeps that budget at zero. Kept short
+    # on purpose: a delivery that arrives during the pause is dropped, exactly
+    # as it is when the read fails, so a long pause would delay recovery from a
+    # transient throttle for no gain.
+    _PUBLIC_KEY_FETCH_BACKOFF_SECONDS = 300
 
     def __init__(self, env, account, client=None):
         self.env = env
@@ -204,7 +215,9 @@ class XChatDecryptor:
         from . import twitter_errors
 
         user_id = str(account.twitter_user_id)
-        existing = self._public_key_records_for(user_id)
+        # force: an explicit setup is the operator spending budget on purpose,
+        # so it must not be held back by the automatic read's backoff.
+        existing = self._public_key_records_for(user_id, force=True)
         for record in existing:
             if record.get('juicebox_config'):
                 raise ValueError(
@@ -313,7 +326,9 @@ class XChatDecryptor:
             self._public_key_records_cache.pop(cache_key, None)
             self._public_keys_cache = None
             self._public_key_fetch_error = None
-            for record in self._public_key_records_for(user_id):
+            # Part of the explicit setup flow, so it bypasses the backoff: the
+            # config it waits for only appears because the POST just landed.
+            for record in self._public_key_records_for(user_id, force=True):
                 config = record.get('juicebox_config')
                 if isinstance(config, dict) and config:
                     return config
@@ -588,7 +603,7 @@ class XChatDecryptor:
         self._public_keys_cache = record or {}
         return self._public_keys_cache
 
-    def _public_key_records_for(self, user_id):
+    def _public_key_records_for(self, user_id, force=False):
         """Return every public-key version published by ``user_id``.
 
         X signs each chat event with a ``public_key_version``.  Retaining only
@@ -596,12 +611,22 @@ class XChatDecryptor:
         rotated signing keys and the delivery was signed by another retained
         version.  The XDK selects the matching version itself when it receives
         all rows.
+
+        ``force`` is for the explicit key-setup flow, where the operator is
+        deliberately spending the endpoint's budget; every automatic read backs
+        off after a failure (see ``_public_key_fetch_backoff_active``).
         """
         if not user_id or self.client is None:
             return []
         cache_key = str(user_id)
         if cache_key in self._public_key_records_cache:
             return self._public_key_records_cache[cache_key]
+        if not force and self._public_key_fetch_backoff_active():
+            # A read failed moments ago. X's budget for this endpoint is spent,
+            # so reading again now cannot succeed — it only starves the key
+            # registration that shares the budget.
+            self._public_key_records_cache[cache_key] = []
+            return []
         try:
             data = self.client.request(
                 'GET', '/2/users/%s/public_keys' % user_id,
@@ -611,6 +636,7 @@ class XChatDecryptor:
             rows = (data or {}).get('data') or []
             records = [row for row in rows if isinstance(row, dict)]
             self._public_key_fetch_error = None
+            self._clear_public_key_fetch_backoff()
             self._public_key_records_cache[cache_key] = records
             return records
         except Exception as exc:
@@ -621,12 +647,37 @@ class XChatDecryptor:
             # setup flow can tell "X throttled the fetch" apart from "X
             # returned no Juicebox config" and raise an actionable error.
             self._public_key_fetch_error = exc
+            self._note_public_key_fetch_failure()
             _LOGGER.warning(
                 'Failed to fetch Chat public keys for user %s (account %s): '
                 '%s: %s', user_id, self.account.id, type(exc).__name__,
                 str(exc)[:200])
             self._public_key_records_cache[cache_key] = []
             return []
+
+    def _public_key_fetch_backoff_active(self):
+        """Whether a recent failed public-keys read holds further reads back.
+
+        The endpoint's 24h budget is shared with key registration, so a failing
+        account must not re-read it on every batch: a broken decryption would
+        otherwise keep the budget at zero and every key setup would fail with a
+        429. Reads resume on the first attempt after the backoff, and
+        immediately when the key material is reconfigured (which clears the
+        stamp).
+        """
+        failed_at = self.account.x_chat_key_fetch_failed_at
+        if not failed_at:
+            return False
+        return fields.Datetime.now() < failed_at + timedelta(
+            seconds=self._PUBLIC_KEY_FETCH_BACKOFF_SECONDS)
+
+    def _note_public_key_fetch_failure(self):
+        self.account.sudo().write(
+            {'x_chat_key_fetch_failed_at': fields.Datetime.now()})
+
+    def _clear_public_key_fetch_backoff(self):
+        if self.account.x_chat_key_fetch_failed_at:
+            self.account.sudo().write({'x_chat_key_fetch_failed_at': False})
 
     @staticmethod
     def _map_public_key_record(record, user_id):

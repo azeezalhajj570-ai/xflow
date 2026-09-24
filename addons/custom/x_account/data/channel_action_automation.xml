@@ -5,20 +5,32 @@
             Per-chat engagement automation.
 
             One rule per action (like/repost/comment/bookmark/follow) on
-            x.message. Each rule fires one minute after an inbound message is
-            created and delegates to a shared server action
+            x.message. Each rule fires as soon as an inbound message is created
+            and delegates to a shared server action
             (ir_actions_server_x_message_*). The rule only matches messages
             whose conversation has the matching toggle enabled
             (discuss.channel.x_auto_*), so every chat opts in/out of each
             action on its own form. Nothing runs until an operator turns a
             toggle on, so engagement stays opt-in by default.
+
+            The trigger is ``on_create``, not ``on_time_created``. The latter is
+            a 10-second cron scan over ``create_date >= last_run AND
+            create_date < now()``, and ``create_date`` is stamped with the
+            creating transaction's start time (``cr.now()``), not the commit
+            time. A message whose transaction commits after the cron has already
+            advanced past that timestamp is never selected again, so it is
+            silently dropped — that lost ~9% of link messages. ``on_create``
+            runs inside the message's own transaction, so every message is
+            evaluated exactly once.
+
+            These records live in a ``noupdate`` block, so an existing database
+            picks the trigger up through ``migrations/19.0.1.17.0`` rather than
+            from this file.
         -->
         <record id="base_automation_x_chat_auto_like" model="base.automation">
             <field name="name">X: Chat Auto Like</field>
             <field name="model_id" ref="model_x_message"/>
-            <field name="trigger">on_time_created</field>
-            <field name="trg_date_range">10</field>
-            <field name="trg_date_range_type">seconds</field>
+            <field name="trigger">on_create</field>
             <field name="active" eval="True"/>
             <field name="filter_domain">[('direction', '=', 'inbound'), ('body_plain', '!=', False), ('channel_id.channel_type', 'in', ['x', 'x_group']), ('channel_id.x_auto_like', '=', True)]</field>
             <field name="action_server_ids" eval="[(6, 0, [ref('ir_actions_server_x_message_like')])]"/>
@@ -27,9 +39,7 @@
         <record id="base_automation_x_chat_auto_repost" model="base.automation">
             <field name="name">X: Chat Auto Repost</field>
             <field name="model_id" ref="model_x_message"/>
-            <field name="trigger">on_time_created</field>
-            <field name="trg_date_range">10</field>
-            <field name="trg_date_range_type">seconds</field>
+            <field name="trigger">on_create</field>
             <field name="active" eval="True"/>
             <field name="filter_domain">[('direction', '=', 'inbound'), ('body_plain', '!=', False), ('channel_id.channel_type', 'in', ['x', 'x_group']), ('channel_id.x_auto_repost', '=', True)]</field>
             <field name="action_server_ids" eval="[(6, 0, [ref('ir_actions_server_x_message_repost')])]"/>
@@ -38,9 +48,7 @@
         <record id="base_automation_x_chat_auto_comment" model="base.automation">
             <field name="name">X: Chat Auto Comment</field>
             <field name="model_id" ref="model_x_message"/>
-            <field name="trigger">on_time_created</field>
-            <field name="trg_date_range">10</field>
-            <field name="trg_date_range_type">seconds</field>
+            <field name="trigger">on_create</field>
             <field name="active" eval="True"/>
             <field name="filter_domain">[('direction', '=', 'inbound'), ('body_plain', '!=', False), ('channel_id.channel_type', 'in', ['x', 'x_group']), ('channel_id.x_auto_comment', '=', True)]</field>
             <field name="action_server_ids" eval="[(6, 0, [ref('ir_actions_server_x_message_comment')])]"/>
@@ -49,9 +57,7 @@
         <record id="base_automation_x_chat_auto_bookmark" model="base.automation">
             <field name="name">X: Chat Auto Bookmark</field>
             <field name="model_id" ref="model_x_message"/>
-            <field name="trigger">on_time_created</field>
-            <field name="trg_date_range">10</field>
-            <field name="trg_date_range_type">seconds</field>
+            <field name="trigger">on_create</field>
             <field name="active" eval="True"/>
             <field name="filter_domain">[('direction', '=', 'inbound'), ('body_plain', '!=', False), ('channel_id.channel_type', 'in', ['x', 'x_group']), ('channel_id.x_auto_bookmark', '=', True)]</field>
             <field name="action_server_ids" eval="[(6, 0, [ref('ir_actions_server_x_message_bookmark')])]"/>
@@ -60,9 +66,7 @@
         <record id="base_automation_x_chat_auto_follow" model="base.automation">
             <field name="name">X: Chat Auto Follow</field>
             <field name="model_id" ref="model_x_message"/>
-            <field name="trigger">on_time_created</field>
-            <field name="trg_date_range">10</field>
-            <field name="trg_date_range_type">seconds</field>
+            <field name="trigger">on_create</field>
             <field name="active" eval="True"/>
             <field name="filter_domain">[('direction', '=', 'inbound'), ('body_plain', '!=', False), ('channel_id.channel_type', 'in', ['x', 'x_group']), ('channel_id.x_auto_follow', '=', True)]</field>
             <field name="action_server_ids" eval="[(6, 0, [ref('ir_actions_server_x_message_follow')])]"/>

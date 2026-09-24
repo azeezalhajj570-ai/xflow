@@ -45,6 +45,14 @@ def _in_daily_window(now_minute, start, end):
     return now_minute >= start or now_minute <= end
 
 
+# Fields whose change means the operator reconfigured the account's chat key
+# material: writing any of them clears the chat-decryption alert, so a fixed
+# account can alert again later instead of staying flagged forever.
+_CHAT_KEY_FIELDS = frozenset({
+    'x_encryption_code', 'x_chat_key_blob', 'x_chat_key_mode',
+    'x_chat_initialized',
+})
+
 _EVENT_PROVIDER_REGISTRY_MAP = {
     'official': 'twitter',
 }
@@ -72,6 +80,13 @@ _ACTION_OPERATIONS = frozenset({
 class SocialAccount(models.Model):
     _name = 'social.account'
     _inherit = ['social.account', 'mail.thread', 'mail.activity.mixin']
+
+    # Consecutive encrypted chat deliveries that can be read as nothing before
+    # the account is considered to have stopped decrypting and its users are
+    # told. A working account stores a message long before this; an account
+    # whose key material is wrong (missing secure-backup config, throttled
+    # public-key fetch, rejected PIN) crosses it within a minute of traffic.
+    _CHAT_DECRYPT_ALERT_THRESHOLD = 50
 
     active = fields.Boolean(
         string='Active',
@@ -241,6 +256,45 @@ class SocialAccount(models.Model):
              'are paused until a different PIN is entered — each wrong attempt '
              'consumes one of the limited guesses X allows before locking the '
              'secure backup permanently.',
+    )
+    x_chat_decrypt_fail_streak = fields.Integer(
+        string='X Chat Unread Deliveries',
+        copy=False,
+        readonly=True,
+        groups='social.group_social_user',
+        help='Consecutive encrypted chat deliveries that produced no readable '
+             'text since the last stored message. Restarts whenever a message '
+             'is stored, or when the key configuration changes.',
+    )
+    x_chat_decrypt_stopped = fields.Boolean(
+        string='X Chat Decryption Stopped',
+        copy=False,
+        readonly=True,
+        tracking=True,
+        groups='social.group_social_user',
+        help='Set when the account stopped turning inbound encrypted chats '
+             'into messages (the unread streak crossed the alert threshold), so '
+             'its conversations silently receive nothing. Cleared by a stored '
+             'message or a key reconfiguration.',
+    )
+    x_chat_decrypt_notified_at = fields.Datetime(
+        string='X Chat Decryption Alert Sent At',
+        copy=False,
+        readonly=True,
+        groups='social.group_social_user',
+        help='When the "decryption stopped" notice was last sent for this '
+             'account.',
+    )
+    x_chat_key_fetch_failed_at = fields.Datetime(
+        string='X Chat Key Fetch Failed At',
+        copy=False,
+        readonly=True,
+        groups='social.group_social_user',
+        help='When reading the account\'s registered Chat public keys last '
+             'failed. The read is held back briefly after a failure instead of '
+             're-hitting the endpoint on every batch, because that endpoint\'s '
+             '24h budget is shared with key registration. Cleared by a '
+             'successful read or a key reconfiguration.',
     )
 
     x_migration_status = fields.Selection(
@@ -692,6 +746,17 @@ class SocialAccount(models.Model):
                 lambda a: a.x_chat_pin_locked and a.x_encryption_code != new_pin)
             if to_unlock:
                 super(SocialAccount, to_unlock).write({'x_chat_pin_locked': False})
+        if _CHAT_KEY_FIELDS & set(vals):
+            # Reconfiguring the key material is the operator's fix for an
+            # account that stopped decrypting: clear the health counters so the
+            # alert is armed again and fires if the new key still reads nothing.
+            vals = dict(vals)
+            vals.update({
+                'x_chat_decrypt_fail_streak': 0,
+                'x_chat_decrypt_stopped': False,
+                'x_chat_decrypt_notified_at': False,
+                'x_chat_key_fetch_failed_at': False,
+            })
         if vals.get('active') in (False, 0):
             # Archiving an account turns its task queue off: cancel queued work
             # so nothing (like/repost/comment/bookmark/DM/webhook ...) runs for
@@ -727,28 +792,32 @@ class SocialAccount(models.Model):
             'subtype_id': self.env['ir.model.data']._xmlid_to_res_id('mail.mt_comment'),
         })
 
-    def _notify_reauth_required(self, message):
-        """Push a system notification when the account needs reauthentication.
+    def _x_notify_users(self):
+        """Internal users who manage X accounts in this account's company.
 
-        social.account is a plain model (not a mail.thread), so an inbox
-        notification is generated explicitly from the recorded mail.message for
-        every internal user who manages X accounts in the account's company.
-        The bell badge in Odoo shows it immediately. Those same users are also
-        emailed, so the request reaches someone who is not currently logged in.
+        The recipients of every account lifecycle notice: reauthentication and
+        stopped chat decryption are addressed to whoever can act on the account,
+        in the company that owns it.
         """
         self.ensure_one()
-        body = (
-            'This X account requires reauthentication. Open it and complete the '
-            'OAuth 2.0 flow before its automation (webhooks, likes, reposts, '
-            'DMs...) can run again.<br/><br/><pre>%s</pre>'
-            % escape(message)
-        )
-        message = self._post_lifecycle_message(body)
         group = self.env.ref('social.group_social_user')
-        users = self.env['res.users'].sudo().search([
+        return self.env['res.users'].sudo().search([
             ('group_ids', 'in', group.id),
             ('company_ids', 'in', self.company_id.id),
         ])
+
+    def _notify_x_users(self, body, template_xmlid):
+        """Post a lifecycle note, notify the account's users in-app and by mail.
+
+        social.account is a plain model (not a mail.thread), so the mail.message
+        and its inbox notifications are created explicitly: the bell badge in
+        Odoo shows it immediately. Those same users are also emailed, so the
+        notice reaches someone who is not currently logged in. Returns the
+        recorded ``mail.message``.
+        """
+        self.ensure_one()
+        message = self._post_lifecycle_message(body)
+        users = self._x_notify_users()
         for user in users:
             if user.partner_id:
                 self.env['mail.notification'].sudo().create({
@@ -758,24 +827,23 @@ class SocialAccount(models.Model):
                     'notification_type': 'inbox',
                     'notification_status': 'ready',
                 })
-        self._email_reauth_required(users)
+        self._email_x_users(users, template_xmlid)
         return message
 
-    def _email_reauth_required(self, users):
+    def _email_x_users(self, users, template_xmlid):
         """Email the users who manage X accounts for this account's company.
 
-        Only partners carrying an email address are targeted. This runs from the
-        token-refresh failure path, so a mail problem (no outgoing server, SMTP
-        refused) is logged instead of raised: it must not roll back the
-        ``reauth_required`` status write or surface as an RPC_ERROR.
+        Only partners carrying an email address are targeted. These notices run
+        from processing paths (token refresh, webhook processing), so a mail
+        problem (no outgoing server, SMTP refused) is logged instead of raised:
+        it must not roll back the state change that triggered it or surface as
+        an RPC_ERROR.
         """
         self.ensure_one()
         partners = users.partner_id.filtered('email')
         if not partners:
             return
-        template = self.env.ref(
-            'x_account.mail_template_x_account_reauth_required',
-            raise_if_not_found=False)
+        template = self.env.ref(template_xmlid, raise_if_not_found=False)
         if not template:
             return
         try:
@@ -786,8 +854,79 @@ class SocialAccount(models.Model):
             )
         except Exception as exc:
             _logger.warning(
-                'x_account: could not email the reauthentication notice for '
-                'account %s: %s', self.id, exc)
+                'x_account: could not email %s for account %s: %s',
+                template_xmlid, self.id, exc)
+
+    def _notify_reauth_required(self, message):
+        """Push a system notification when the account needs reauthentication.
+
+        Open the account and complete the OAuth 2.0 flow before its automation
+        (webhooks, likes, reposts, DMs...) can run again.
+        """
+        self.ensure_one()
+        body = (
+            'This X account requires reauthentication. Open it and complete the '
+            'OAuth 2.0 flow before its automation (webhooks, likes, reposts, '
+            'DMs...) can run again.<br/><br/><pre>%s</pre>'
+            % escape(message)
+        )
+        return self._notify_x_users(
+            body, 'x_account.mail_template_x_account_reauth_required')
+
+    def _record_chat_decrypt_outcome(self, stored=0, dropped=0):
+        """Track this account's chat-decryption health and alert once.
+
+        Called by the webhook processor once per batch with how many encrypted
+        chat deliveries it turned into messages (``stored``) and how many it had
+        to drop for lack of readable text (``dropped``). A stored message proves
+        decryption works, so the streak restarts from this batch's drops;
+        dropped deliveries only grow it. At
+        ``_CHAT_DECRYPT_ALERT_THRESHOLD`` the account is flagged and its users
+        are told — once per episode, re-armed when a message is stored again or
+        the key material is reconfigured.
+        """
+        for account in self:
+            streak = dropped + (
+                0 if stored else account.x_chat_decrypt_fail_streak)
+            vals = {'x_chat_decrypt_fail_streak': streak}
+            if stored and account.x_chat_decrypt_stopped:
+                vals.update({
+                    'x_chat_decrypt_stopped': False,
+                    'x_chat_decrypt_notified_at': False,
+                })
+            account.write(vals)
+            if (not stored
+                    and streak >= self._CHAT_DECRYPT_ALERT_THRESHOLD
+                    and not account.x_chat_decrypt_stopped):
+                account.write({
+                    'x_chat_decrypt_stopped': True,
+                    'x_chat_decrypt_notified_at': fields.Datetime.now(),
+                })
+                account._notify_chat_decrypt_stopped(streak)
+
+    def _notify_chat_decrypt_stopped(self, dropped):
+        """Tell the account's users its inbound chats stopped decrypting.
+
+        The events keep arriving — the account just cannot read them, so its
+        conversations silently stop growing. Flagged on the account next to the
+        key source, with the same in-app + email notice the reauthentication
+        flow uses.
+        """
+        self.ensure_one()
+        mode = self.x_chat_key_mode or 'unset'
+        source = dict(self._fields['x_chat_key_mode'].selection).get(mode, mode)
+        body = (
+            'This X account stopped decrypting incoming chats: %s consecutive '
+            'encrypted deliveries could not be read, so no new message is '
+            'being stored in its conversations. The events are arriving '
+            'normally — the key material is the problem.'
+            '<br/><br/>Key source: %s<br/>'
+            'Re-run the encryption key setup on the account (or fix its PIN / '
+            'imported key blob) to resume.'
+            % (dropped, escape(source))
+        )
+        return self._notify_x_users(
+            body, 'x_account.mail_template_x_account_decrypt_stopped')
 
     @api.constrains('x_auto_archive', 'x_auto_archive_start', 'x_auto_archive_end')
     def _check_auto_archive_window(self):

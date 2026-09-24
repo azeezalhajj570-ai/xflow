@@ -29,6 +29,7 @@ class TestAccountTracking(XAccountTestBase):
         'x_chat_key_mode',
         'x_chat_initialized',
         'x_chat_pin_locked',
+        'x_chat_decrypt_stopped',
         'x_migration_status',
     ]
 
