@@ -878,16 +878,24 @@ class SocialAccount(models.Model):
         return 'not_configured'
 
     def _sync_x_connection_status(self):
-        """Recompute the aggregated status and persist it when it changed.
+        """Recompute the aggregated status, persist it when it changed, and tell
+        the account's users.
 
         Called after any write that can move it, so the status bar and its
         chatter trail follow the detailed state without every caller having to
-        know the aggregation rules.
+        know the aggregation rules. A move to "error" (a required component is
+        failing) or back to "connected" (recovered) also notifies the account's
+        users, in-app and by mail, once per transition.
         """
         for account in self:
             status = account._x_overall_connection_status()
-            if account.x_connection_status != status:
-                account.write({'x_connection_status': status})
+            if account.x_connection_status == status:
+                continue
+            account.write({'x_connection_status': status})
+            if status == 'error':
+                account._notify_x_status_failed()
+            elif status == 'active':
+                account._notify_x_status_connected()
 
     def _transition(self, status):
         self.write({'x_connection_state': status})
@@ -990,6 +998,36 @@ class SocialAccount(models.Model):
         )
         return self._notify_x_users(
             body, 'x_account.mail_template_x_account_reauth_required')
+
+    def _notify_x_status_failed(self):
+        """Tell the account's users the overall connection status turned to
+        "error".
+
+        The connection status collapsed the connection lifecycle and the Chat
+        Encryption state into one value, so this is the single notice for any
+        failure that does not already have its own: the detailed cause is in
+        ``last_error``.
+        """
+        self.ensure_one()
+        body = (
+            'This X account connection is failing: a required X connection or '
+            'Chat Encryption component stopped working, so its automation is '
+            'suspended until it is fixed.'
+            '<br/><br/><pre>%s</pre>'
+            % escape(self.last_error or '')
+        )
+        return self._notify_x_users(
+            body, 'x_account.mail_template_x_account_status_failed')
+
+    def _notify_x_status_connected(self):
+        """Tell the account's users the overall connection status recovered."""
+        self.ensure_one()
+        body = (
+            'This X account is connected again: X authentication is valid and '
+            'Chat Encryption is ready, so its automation can run.'
+        )
+        return self._notify_x_users(
+            body, 'x_account.mail_template_x_account_status_connected')
 
     def _record_chat_decrypt_outcome(self, stored=0, dropped=0):
         """Track this account's chat-decryption health and alert once.

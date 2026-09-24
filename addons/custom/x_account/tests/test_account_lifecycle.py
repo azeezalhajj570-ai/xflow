@@ -61,6 +61,20 @@ class TestXAccountLifecycle(XAccountTestBase):
         self.account.write({'x_chat_decrypt_stopped': False})
         self.assertEqual(self.account.x_connection_status, 'active')
 
+    def test_status_change_emails_on_failure_and_recovery(self):
+        """A move to error (or back to connected) notifies the account's users,
+        in-app and by mail, once per transition."""
+        self._notify_user('x_status_alert', 'x_status_alert@example.com')
+        self.account.write({'x_chat_initialized': True})
+        with self.mock_mail_gateway():
+            self.account._transition('active')
+            self.assertTrue(self._new_mails, 'no mail on connected')
+            self.assertIn('connected', self._new_mails.subject)
+        with self.mock_mail_gateway():
+            self.account._transition('reauth_required')
+            self.assertTrue(self._new_mails, 'no mail on failure')
+            self.assertIn('failed', self._new_mails.subject)
+
     def test_lifecycle_message_posted(self):
         self.account._post_lifecycle_message('Account connected')
         messages = self.env['mail.message'].sudo().search([
