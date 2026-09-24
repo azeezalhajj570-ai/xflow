@@ -86,7 +86,7 @@ class XMessage(models.Model):
         help='X tasks created from this message by the message automation.',
     )
     task_count = fields.Integer(
-        string='Tasks',
+        string='Task Count',
         compute='_compute_task_count',
         help='Number of X tasks created from this message.',
     )
