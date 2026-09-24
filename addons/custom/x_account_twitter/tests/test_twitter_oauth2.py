@@ -219,7 +219,7 @@ class TestTwitterOAuth2Account(XAccountTwitterTestBase):
                 side_effect=twitter_errors.TwitterError('http_400', 'Invalid or expired refresh token')):
             token = account._x_oauth2_ensure_access_token()
         self.assertIsNone(token)
-        self.assertEqual(account.x_connection_status, 'reauth_required')
+        self.assertEqual(account.x_connection_state, 'reauth_required')
         self.assertEqual(account.last_error, 'Invalid or expired refresh token')
 
     def test_reauth_pushes_system_notification_to_social_users(self):
@@ -240,7 +240,7 @@ class TestTwitterOAuth2Account(XAccountTwitterTestBase):
                 side_effect=twitter_errors.TwitterError('http_400', 'Invalid or expired refresh token')):
             token = account._x_oauth2_ensure_access_token()
         self.assertIsNone(token)
-        self.assertEqual(account.x_connection_status, 'reauth_required')
+        self.assertEqual(account.x_connection_state, 'reauth_required')
         msg = self.env['mail.message'].search([
             ('model', '=', 'social.account'),
             ('res_id', '=', account.id),
@@ -266,7 +266,7 @@ class TestTwitterOAuth2Account(XAccountTwitterTestBase):
                     'invalid_grant: Value passed for the token was invalid.')):
             token = account._x_oauth2_ensure_access_token()
         self.assertIsNone(token)
-        self.assertEqual(account.x_connection_status, 'reauth_required')
+        self.assertEqual(account.x_connection_state, 'reauth_required')
         self.assertIn('re-authorization required', account.last_error)
         self.assertIn('invalid_grant', account.last_error)
 
@@ -282,7 +282,7 @@ class TestTwitterOAuth2Account(XAccountTwitterTestBase):
             'x_oauth2_access_token': 'stale',
             'x_oauth2_refresh_token': 'dead-rt',
             'x_oauth2_token_expires_at': fields.Datetime.now() - timedelta(minutes=5),
-            'x_connection_status': 'reauth_required',
+            'x_connection_state': 'reauth_required',
             'last_error': 'dead',
         })
         with patch.object(TwitterOAuth2Client, 'refresh') as mocked:
@@ -301,7 +301,7 @@ class TestTwitterOAuth2Account(XAccountTwitterTestBase):
             'x_oauth2_access_token': 'stale-at',
             'x_oauth2_refresh_token': 'dead-rt',
             'x_oauth2_token_expires_at': fields.Datetime.now() - timedelta(minutes=5),
-            'x_connection_status': 'reauth_required',
+            'x_connection_state': 'reauth_required',
             'last_error': 'invalid_grant: dead',
         })
         # Re-authorization through the OAuth 2.0 callback.
@@ -312,7 +312,7 @@ class TestTwitterOAuth2Account(XAccountTwitterTestBase):
             7200,
         )
         self.assertEqual(relinked.id, account.id)
-        self.assertEqual(relinked.x_connection_status, 'active')
+        self.assertEqual(relinked.x_connection_state, 'active')
         self.assertFalse(relinked.last_error)
         # The refreshed account can now rotate tokens again.
         relinked.write({'x_oauth2_token_expires_at':
@@ -327,7 +327,7 @@ class TestTwitterOAuth2Account(XAccountTwitterTestBase):
         mocked.assert_called_once()
         relinked.invalidate_recordset()
         self.assertEqual(relinked.x_oauth2_refresh_token, 'rotated-rt')
-        self.assertEqual(relinked.x_connection_status, 'active')
+        self.assertEqual(relinked.x_connection_state, 'active')
 
     def test_create_or_update_creates_oauth2_account(self):
         account = self.env['social.account']._create_or_update_twitter_oauth2(
@@ -344,7 +344,7 @@ class TestTwitterOAuth2Account(XAccountTwitterTestBase):
         # The callback just proved the credentials work (token exchange +
         # /users/me), so the account must be live — not left on the 'new'
         # default that nothing later promotes for OAuth2 accounts.
-        self.assertEqual(account.x_connection_status, 'active')
+        self.assertEqual(account.x_connection_state, 'active')
         self.assertTrue(account.last_connected)
 
     def test_create_or_update_updates_existing(self):
@@ -376,7 +376,7 @@ class TestTwitterOAuth2Account(XAccountTwitterTestBase):
             'twitter_user_id': '1000',
             'x_oauth2_access_token': 'old-at',
             'x_oauth2_refresh_token': 'old-rt',
-            'x_connection_status': 'reauth_required',
+            'x_connection_state': 'reauth_required',
             'last_error': 'http_400',
         })
         relinked = self.env['social.account']._create_or_update_twitter_oauth2(
@@ -386,7 +386,7 @@ class TestTwitterOAuth2Account(XAccountTwitterTestBase):
             7200,
         )
         self.assertEqual(relinked.id, stale.id)
-        self.assertEqual(relinked.x_connection_status, 'active')
+        self.assertEqual(relinked.x_connection_state, 'active')
         self.assertFalse(relinked.last_error)
 
     def test_relink_reuses_canonical_medium_when_orphan_exists(self):

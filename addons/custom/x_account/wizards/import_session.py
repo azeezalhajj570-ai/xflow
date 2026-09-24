@@ -70,7 +70,7 @@ class XImportSession(models.TransientModel):
                 'media_id': twitter_media.id,
                 'x_provider': self.provider,
                 'x_auth_method': 'session_cookie',
-                'x_connection_status': 'authenticating',
+                'x_connection_state': 'authenticating',
             })
 
         # Validate before persisting: if invalid, rollback a newly created account.
@@ -88,7 +88,7 @@ class XImportSession(models.TransientModel):
             'name': user.get('name') or account.name,
             'x_provider': self.provider,
             'x_auth_method': 'session_cookie',
-            'x_connection_status': 'active',
+            'x_connection_state': 'active',
             'last_connected': fields.Datetime.now(),
             'last_validated': fields.Datetime.now(),
         })

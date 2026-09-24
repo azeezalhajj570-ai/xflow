@@ -22,7 +22,7 @@ class TestChannelAutomationArchivedScope(XAccountTestBase):
             'social_account_handle': handle,
             'x_provider': 'session_web',
             'x_auth_method': 'session_cookie',
-            'x_connection_status': status,
+            'x_connection_state': status,
         })
 
     def _make_channel(self, account):
@@ -110,7 +110,7 @@ class TestChannelAutomationDedup(XAccountTestBase):
             'social_account_handle': handle,
             'x_provider': 'session_web',
             'x_auth_method': 'session_cookie',
-            'x_connection_status': 'active',
+            'x_connection_state': 'active',
         })
 
     def _make_channel(self, account, suffix='1'):

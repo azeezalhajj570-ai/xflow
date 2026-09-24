@@ -14,18 +14,52 @@ class TestXAccountLifecycle(XAccountTestBase):
             'media_id': cls.twitter_media.id,
         })
 
-    def test_initial_status_new(self):
-        self.assertEqual(self.account.x_connection_status, 'new')
+    def test_initial_status_not_configured(self):
+        # A fresh account has no X auth and no chat keys, so the aggregated
+        # status the form shows is "not configured".
+        self.assertEqual(self.account.x_connection_state, 'new')
+        self.assertEqual(self.account.x_connection_status, 'not_configured')
 
     def test_transition_active(self):
         self.account._transition('active')
-        self.assertEqual(self.account.x_connection_status, 'active')
+        self.assertEqual(self.account.x_connection_state, 'active')
 
     def test_transition_all_states(self):
         for state in ('new', 'authenticating', 'active', 'disconnected',
                       'invalid', 'reauth_required', 'error', 'disabled'):
             self.account._transition(state)
-            self.assertEqual(self.account.x_connection_status, state)
+            self.assertEqual(self.account.x_connection_state, state)
+
+    def test_aggregated_status_requires_chat_encryption(self):
+        """Valid X authentication alone is not "connected": the required Chat
+        Encryption setup must be complete too."""
+        self.account._transition('active')
+        self.assertEqual(self.account.x_connection_status, 'not_configured')
+        self.account.write({'x_chat_initialized': True})
+        self.assertEqual(self.account.x_connection_status, 'active')
+
+    def test_aggregated_status_maps_connection_failures_to_error(self):
+        self.account.write({'x_chat_initialized': True})
+        self.account._transition('active')
+        self.assertEqual(self.account.x_connection_status, 'active')
+        for state in ('reauth_required', 'disconnected', 'invalid', 'error'):
+            with self.subTest(state=state):
+                self.account._transition(state)
+                self.assertEqual(self.account.x_connection_status, 'error')
+
+    def test_aggregated_status_maps_chat_failures_to_error(self):
+        self.account.write({'x_chat_initialized': True})
+        self.account._transition('active')
+        self.assertEqual(self.account.x_chat_status, 'ready')
+        self.account.write({'x_chat_pin_locked': True})
+        self.assertEqual(self.account.x_connection_status, 'error')
+        self.account.write({
+            'x_chat_pin_locked': False,
+            'x_chat_decrypt_stopped': True,
+        })
+        self.assertEqual(self.account.x_connection_status, 'error')
+        self.account.write({'x_chat_decrypt_stopped': False})
+        self.assertEqual(self.account.x_connection_status, 'active')
 
     def test_lifecycle_message_posted(self):
         self.account._post_lifecycle_message('Account connected')

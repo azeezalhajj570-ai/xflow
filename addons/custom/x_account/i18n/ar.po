@@ -77,7 +77,7 @@ msgstr "الإجراء المؤتمت للمجموعة."
 #. module: x_account
 #: model:ir.model.fields,field_description:x_account.field_social_account__active
 #: model:ir.model.fields,field_description:x_account.field_x_account_group__active
-#: model:ir.model.fields.selection,name:x_account.selection__social_account__x_connection_status__active
+#: model:ir.model.fields.selection,name:x_account.selection__social_account__x_connection_state__active
 #: model_terms:ir.ui.view,arch_db:x_account.view_discuss_channel_search_inherit_x_account
 #: model_terms:ir.ui.view,arch_db:x_account.view_social_account_search_inherit_x_account
 msgid "Active"
@@ -165,7 +165,7 @@ msgid "Attachment Count"
 msgstr "عدد المرفقات"
 
 #. module: x_account
-#: model:ir.model.fields.selection,name:x_account.selection__social_account__x_connection_status__authenticating
+#: model:ir.model.fields.selection,name:x_account.selection__social_account__x_connection_state__authenticating
 msgid "Authenticating"
 msgstr "جاري المصادقة"
 
@@ -530,12 +530,12 @@ msgid "Direction"
 msgstr "الاتجاه"
 
 #. module: x_account
-#: model:ir.model.fields.selection,name:x_account.selection__social_account__x_connection_status__disabled
+#: model:ir.model.fields.selection,name:x_account.selection__social_account__x_connection_state__disabled
 msgid "Disabled"
 msgstr "معطل"
 
 #. module: x_account
-#: model:ir.model.fields.selection,name:x_account.selection__social_account__x_connection_status__disconnected
+#: model:ir.model.fields.selection,name:x_account.selection__social_account__x_connection_state__disconnected
 msgid "Disconnected"
 msgstr "غير متصل"
 
@@ -639,7 +639,7 @@ msgstr "تم إدراج %s من طلبات المتابعة."
 
 #. module: x_account
 #: model:ir.model.fields,field_description:x_account.field_x_account_task__error
-#: model:ir.model.fields.selection,name:x_account.selection__social_account__x_connection_status__error
+#: model:ir.model.fields.selection,name:x_account.selection__social_account__x_connection_state__error
 msgid "Error"
 msgstr "خطأ"
 
@@ -857,7 +857,7 @@ msgid "Initialize X Chat encryption using the configured key source?"
 msgstr "هل تريد تهيئة تشفير دردشة X باستخدام مصدر المفتاح المُهيّأ؟"
 
 #. module: x_account
-#: model:ir.model.fields.selection,name:x_account.selection__social_account__x_connection_status__invalid
+#: model:ir.model.fields.selection,name:x_account.selection__social_account__x_connection_state__invalid
 msgid "Invalid"
 msgstr "غير صالح"
 
@@ -955,9 +955,26 @@ msgstr "علامة قديمة لحدث يكون نصه مشفّرًا من ال�
 "ذلك."
 
 #. module: x_account
+#: model:ir.model.fields,help:x_account.field_social_account__x_connection_state
+msgid ""
+"Detailed X connection lifecycle, kept for diagnosis and for the automation "
+"guards. It is never shown in a view: the account form reports the aggregated "
+"\"X Connection Status\" instead."
+msgstr ""
+"دورة حياة اتصال X التفصيلية، محفوظة للتشخيص ولحواجز الأتمتة. لا تظهر في أي "
+"واجهة: يعرض نموذج الحساب \"حالة اتصال X\" المجمّعة بدلًا منها."
+
+#. module: x_account
 #: model:ir.model.fields,help:x_account.field_social_account__x_connection_status
-msgid "Lifecycle state of the X account connection."
-msgstr "حالة دورة حياة اتصال حساب X."
+msgid ""
+"Overall X account health, in one value: not configured until the X account "
+"setup and the required Chat Encryption setup are complete, connected while X "
+"authentication is valid and Chat Encryption is ready, and error when a "
+"required X connection/encryption component is failing. System-controlled."
+msgstr ""
+"صحة حساب X الإجمالية في قيمة واحدة: غير مُهيأ حتى يكتمل إعداد حساب X وإعداد "
+"تشفير المحادثات المطلوب، ومتصل عندما تكون مصادقة X صالحة ويكون تشفير المحادثات "
+"جاهزًا، وخطأ عند فشل أحد مكوّنات الاتصال/التشفير المطلوبة. يتحكم به النظام."
 
 #. module: x_account
 #: model:ir.model.fields.selection,name:x_account.selection__x_account_group__actions__like
@@ -1118,7 +1135,7 @@ msgid "Name"
 msgstr "الاسم"
 
 #. module: x_account
-#: model:ir.model.fields.selection,name:x_account.selection__social_account__x_connection_status__new
+#: model:ir.model.fields.selection,name:x_account.selection__social_account__x_connection_state__new
 msgid "New"
 msgstr "جديد"
 
@@ -1414,7 +1431,7 @@ msgid "Ratings"
 msgstr "التقييمات"
 
 #. module: x_account
-#: model:ir.model.fields.selection,name:x_account.selection__social_account__x_connection_status__reauth_required
+#: model:ir.model.fields.selection,name:x_account.selection__social_account__x_connection_state__reauth_required
 msgid "Reauthentication Required"
 msgstr "مطلوب إعادة المصادقة"
 
@@ -2059,10 +2076,30 @@ msgid "X Company"
 msgstr "شركة X"
 
 #. module: x_account
+#: model:ir.model.fields,field_description:x_account.field_social_account__x_connection_state
+msgid "X Connection State"
+msgstr "حالة اتصال X التفصيلية"
+
+#. module: x_account
 #: model:ir.model.fields,field_description:x_account.field_social_account__x_connection_status
 #: model_terms:ir.ui.view,arch_db:x_account.view_social_account_search_inherit_x_account
 msgid "X Connection Status"
 msgstr "حالة اتصال X"
+
+#. module: x_account
+#: model:ir.model.fields.selection,name:x_account.selection__social_account__x_connection_status__not_configured
+msgid "غير مُهيأ"
+msgstr "غير مُهيأ"
+
+#. module: x_account
+#: model:ir.model.fields.selection,name:x_account.selection__social_account__x_connection_status__active
+msgid "متصل"
+msgstr "متصل"
+
+#. module: x_account
+#: model:ir.model.fields.selection,name:x_account.selection__social_account__x_connection_status__error
+msgid "خطأ"
+msgstr "خطأ"
 
 #. module: x_account
 #: model:ir.model.fields.selection,name:x_account.selection__discuss_channel__channel_type__x
@@ -2217,8 +2254,8 @@ msgstr "X: فردية"
 
 #. module: x_account
 #: model_terms:ir.ui.view,arch_db:x_account.view_social_account_search_inherit_x_account
-msgid "X: Active"
-msgstr "X: نشط"
+msgid "X: Connected"
+msgstr "X: متصل"
 
 #. module: x_account
 #: model_terms:ir.actions.server,name:x_account.ir_actions_server_x_dm_auto_reply_group
@@ -2277,13 +2314,8 @@ msgstr "X: الأرشفة اليومية التلقائية للحسابات ا�
 
 #. module: x_account
 #: model_terms:ir.ui.view,arch_db:x_account.view_social_account_search_inherit_x_account
-msgid "X: Disabled"
-msgstr "X: معطّل"
-
-#. module: x_account
-#: model_terms:ir.ui.view,arch_db:x_account.view_social_account_search_inherit_x_account
-msgid "X: Disconnected / Invalid"
-msgstr "X: غير متصل / غير صالح"
+msgid "X: Error"
+msgstr "X: خطأ"
 
 #. module: x_account
 #: model_terms:ir.ui.view,arch_db:x_account.view_discuss_channel_search_inherit_x_account
@@ -2312,8 +2344,8 @@ msgstr "X: حساب مفقود"
 
 #. module: x_account
 #: model_terms:ir.ui.view,arch_db:x_account.view_social_account_search_inherit_x_account
-msgid "X: Needs Reauthentication"
-msgstr "X: يتطلب إعادة مصادقة"
+msgid "X: Not Configured"
+msgstr "X: غير مُهيأ"
 
 #. module: x_account
 #: model_terms:ir.ui.view,arch_db:x_account.view_social_account_search_inherit_x_account

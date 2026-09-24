@@ -88,7 +88,7 @@ class TestXGroupAutomation(XAccountTestBase):
     def test_disabled_account_skipped(self):
         acc_ok = self._make_account('user_e')
         acc_off = self._make_account('user_f')
-        acc_off.write({'x_connection_status': 'disabled'})
+        acc_off.write({'x_connection_state': 'disabled'})
         group = self._make_group(acc_ok | acc_off)
         group._enqueue_group_operation(target_id='1')
         tasks = self.env['x.account.task'].search([('group_id', '=', group.id)])

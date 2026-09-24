@@ -920,5 +920,5 @@ class TwitterActivity:
                 ('twitter_user_id', '=', str(user_id)),
             ], limit=1)
         if account:
-            account.write({'x_connection_status': 'disconnected'})
+            account.write({'x_connection_state': 'disconnected'})
             _logger.info('x_account_twitter: user %s revoked app access', user_id)

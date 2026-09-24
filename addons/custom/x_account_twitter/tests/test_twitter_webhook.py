@@ -1893,7 +1893,7 @@ class TestTwitterOAuthHeaderFallback(XAccountTwitterTestBase):
             except twitter_errors.TwitterAuthenticationError as exc:
                 caught = exc
         self.assertIsNotNone(caught)
-        self.assertEqual(self.account.x_connection_status, 'reauth_required')
+        self.assertEqual(self.account.x_connection_state, 'reauth_required')
         self.assertEqual(self.account.last_error, 'http_400')
 
     def test_oauth1_credentials_still_use_legacy_signing(self):

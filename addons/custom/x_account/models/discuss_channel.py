@@ -998,7 +998,7 @@ class DiscussChannel(models.Model):
             text = ('Thanks for your message!' if self.channel_type == 'x'
                     else 'Thanks for the update in our group!')
         account = self.x_account_id
-        if not account or not account.active or account.x_connection_status == 'disabled':
+        if not account or not account.active or account.x_connection_state == 'disabled':
             raise ValueError(
                 'No valid X account for channel id=%s (account_id=%s)'
                 % (self.id, self.x_account_id.id if self.x_account_id else None))

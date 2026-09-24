@@ -77,7 +77,7 @@ class TestXSession(XAccountTestBase):
             from odoo.addons.x_account.services.x_service import XService
             outcome = XService.validate(self.account)
         self.assertTrue(outcome['valid'])
-        self.assertEqual(self.account.x_connection_status, 'active')
+        self.assertEqual(self.account.x_connection_state, 'active')
         self.assertTrue(self.account.last_validated)
 
     def test_validate_invalid_session_without_invalidation(self):

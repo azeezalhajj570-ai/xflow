@@ -26,7 +26,7 @@ class TestXMessageAgeMinutes(XAccountTestBase):
             'social_account_handle': 'age_filter',
             'x_provider': 'session_web',
             'x_auth_method': 'session_cookie',
-            'x_connection_status': 'new',
+            'x_connection_state': 'new',
         })
         cls.channel = cls.env['discuss.channel'].create({
             'channel_type': 'x',

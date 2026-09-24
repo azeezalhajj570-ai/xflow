@@ -3,7 +3,7 @@
 """GetXAPI error classification.
 
 Maps HTTP status codes to the lifecycle error taxonomy used by `x_account`
-(see `social.account.x_connection_status` / `last_error`). Keeping this in
+(see `social.account.x_connection_state` / `last_error`). Keeping this in
 one place (SRP) means the account lifecycle and the provider agree on what
 a given HTTP response means without either knowing the other's internals.
 

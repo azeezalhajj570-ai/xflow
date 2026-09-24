@@ -427,7 +427,7 @@ class TwitterProvider:
             ('active', '=', True),
             ('media_type', '=', 'twitter'),
             ('twitter_user_id', '!=', False),
-            ('x_connection_status', 'in', ('active', 'reauth_required',
+            ('x_connection_state', 'in', ('active', 'reauth_required',
                                            'error', False)),
         ])
         subs_model = self.env['x.twitter.subscription'].sudo()
