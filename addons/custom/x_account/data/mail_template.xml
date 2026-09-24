@@ -21,4 +21,29 @@
             </div>
         </field>
     </record>
+
+    <record id="mail_template_x_account_decrypt_stopped" model="mail.template">
+        <field name="name">X Account: Chat Decryption Stopped</field>
+        <field name="model_id" ref="social.model_social_account"/>
+        <field name="subject">X account stopped decrypting incoming messages: {{ object.name }}</field>
+        <field name="use_default_to" eval="False"/>
+        <field name="body_html" type="html">
+            <div style="margin: 0px; padding: 0px;">
+                <p style="margin: 0px;">
+                    <span>This X account is receiving encrypted chats but can no
+                        longer decrypt them, so no new message is being stored
+                        in its conversations. Re-run the encryption key setup on
+                        the account (or fix its PIN / imported key blob) to
+                        resume.
+                    </span>
+                </p>
+                <p style="margin: 8px 0px 0px 0px;">
+                    <span>Account: <b t-out="object.name"/><br/>
+                        Key source: <t t-out="object.x_chat_key_mode"/><br/>
+                        Unread deliveries: <t t-out="object.x_chat_decrypt_fail_streak"/>
+                    </span>
+                </p>
+            </div>
+        </field>
+    </record>
 </odoo>

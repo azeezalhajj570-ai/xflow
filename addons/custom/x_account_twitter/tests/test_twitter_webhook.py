@@ -463,6 +463,50 @@ class TestTwitterActivityProcess(XAccountTwitterTestBase):
         self.assertFalse(self.env['x.message'].sudo().search(
             [('external_id', '=', 'chat-1')], limit=1))
 
+    def test_undecryptable_chat_event_grows_the_unread_streak(self):
+        """A delivery that cannot be read is counted on the account, so a
+        silently stopped account becomes visible instead of merely empty."""
+        payload = _chat_payload('g111222333', '111', 'chat-streak-1', group=True)
+        self._process('chat.received', 'uuid-streak-1', payload)
+        self.assertEqual(self.account.x_chat_decrypt_fail_streak, 1)
+        self.assertFalse(self.account.x_chat_decrypt_stopped)
+
+    def test_stored_chat_message_restarts_the_unread_streak(self):
+        """A message that decrypts proves the key works: the streak restarts,
+        so only an uninterrupted run of unreadable deliveries can alert."""
+        self.account.write({'x_chat_decrypt_fail_streak': 12})
+        activity = TwitterActivity(self.env)
+        activity._note_chat_decrypt_outcome(self.account, stored=True)
+        activity._note_chat_decrypt_outcome(self.account, stored=False)
+        activity._flush_chat_decrypt_outcomes()
+        # The stored delivery restarts the streak; only the drop after it counts.
+        self.assertEqual(self.account.x_chat_decrypt_fail_streak, 1)
+
+    def test_stopped_decryption_emails_the_account_users(self):
+        """Crossing the threshold from real deliveries emails the users who
+        manage X accounts for the company — once per episode."""
+        user = self.env['res.users'].with_context(
+            no_reset_password=True).create({
+                'name': 'X Decrypt Receiver',
+                'login': 'x_decrypt_receiver_tw',
+                'email': 'x_decrypt_receiver_tw@example.com',
+                'group_ids': [(6, 0, [
+                    self.env.ref('social.group_social_user').id])],
+                'company_ids': [(6, 0, self.account.company_id.ids)],
+            })
+        self.account.write({'x_chat_decrypt_fail_streak':
+                            self.account._CHAT_DECRYPT_ALERT_THRESHOLD - 1})
+        with self.mock_mail_gateway():
+            self._process('chat.received', 'uuid-alert-1',
+                          _chat_payload('g111222333', '111', 'chat-alert-1'))
+        self.assertTrue(self.account.x_chat_decrypt_stopped)
+        self.assertTrue(self._new_mails)
+        self.assertIn(user.partner_id, self._new_mails.recipient_ids)
+        with self.mock_mail_gateway():
+            self._process('chat.received', 'uuid-alert-2',
+                          _chat_payload('g111222333', '111', 'chat-alert-2'))
+        self.assertFalse(self._new_mails)
+
     def test_process_chat_event_adds_members_to_channel(self):
         """A webhook chat event must add the owner + counterparty as channel
         members so the conversation surfaces in the right Discuss view."""
@@ -622,6 +666,72 @@ class TestTwitterActivityProcess(XAccountTwitterTestBase):
         self.assertFalse(self.env['x.message'].sudo().search([
             ('external_id', 'in', ['chat-seed-once-1', 'chat-seed-once-2'])],
             limit=1))
+
+    def _queued_chat_events(self, prefix, count):
+        return self.env['x.twitter.event'].sudo().create([
+            {
+                'event_uuid': 'uuid-%s-%s' % (prefix, idx),
+                'account_id': self.account.id,
+                'event_type': 'chat.received',
+                'state': 'queued',
+                'payload': json.dumps({
+                    'event_uuid': 'uuid-%s-%s' % (prefix, idx),
+                    'event_type': 'chat.received',
+                    'user_id': OWNER_ID,
+                    'payload': _chat_payload(
+                        'g111222333', '111', 'chat-%s-%s' % (prefix, idx)),
+                }),
+            }
+            for idx in range(1, count + 1)
+        ])
+
+    def _undecryptable_decryptor(self):
+        """A decryptor whose every event fails on a non-key crypto error (so
+        the diagnostic is the only API call the failure path can make)."""
+        decryptor = Mock()
+        decryptor.available = True
+        decryptor.client = Mock()
+        decryptor.client.request.return_value = {
+            'data': [{'public_key_version': '1'}]}
+        decryptor.decrypt_events.return_value = {
+            'messages': [], 'errors': {'e': 'signature missing'}}
+        return decryptor
+
+    def _public_key_calls(self, decryptor):
+        return [call for call in decryptor.client.request.call_args_list
+                if 'public_keys' in call.args[1]]
+
+    def test_public_key_diagnostic_fetch_runs_once_per_batch(self):
+        """The failure log line's public-keys GET shares the endpoint whose 24h
+        budget key registration needs, so it must run at most once per account
+        per batch. One fetch per undecryptable event exhausted that budget and
+        made every "Setup Chat Keys" fail with a 429."""
+        decryptor = self._undecryptable_decryptor()
+        with patch.object(TwitterActivity, '_chat_decryptor_for',
+                          return_value=decryptor):
+            TwitterActivity(self.env).process_events_batch(
+                self._queued_chat_events('diag', 3))
+        self.assertEqual(len(self._public_key_calls(decryptor)), 1)
+
+    def test_public_key_diagnostic_pauses_until_decryption_succeeds(self):
+        """A failing account must not keep retrying the diagnostic: the read
+        resumes only once decryption succeeds again (the unread streak the
+        failed batch recorded restarts on a stored message)."""
+        decryptor = self._undecryptable_decryptor()
+        with patch.object(TwitterActivity, '_chat_decryptor_for',
+                          return_value=decryptor):
+            TwitterActivity(self.env).process_events_batch(
+                self._queued_chat_events('pause', 1))
+            # The batch recorded a failed delivery: the next one must not read.
+            self.assertEqual(self.account.x_chat_decrypt_fail_streak, 1)
+            TwitterActivity(self.env).process_events_batch(
+                self._queued_chat_events('pause2', 2))
+            self.assertEqual(len(self._public_key_calls(decryptor)), 1)
+            # Decryption succeeding again re-arms the read.
+            self.account.write({'x_chat_decrypt_fail_streak': 0})
+            TwitterActivity(self.env).process_events_batch(
+                self._queued_chat_events('pause3', 1))
+        self.assertEqual(len(self._public_key_calls(decryptor)), 2)
 
     def test_process_chat_event_survives_a_failing_key_fetch(self):
         """A Chat API failure while seeding keys must keep the encrypted marker
@@ -907,6 +1017,57 @@ class TestXChatKeyModes(XAccountTwitterTestBase):
                             'x_chat_key_blob': False})
         with self.assertRaises(ValueError):
             XChatDecryptor(self.env, self.account).initialize()
+
+    def test_public_key_fetch_backs_off_after_a_failure(self):
+        """A failed public-keys read must hold the next one back instead of
+        re-hitting the endpoint on every batch: its 24h budget is shared with
+        key registration, and a broken decryption that re-reads it on every
+        batch leaves no budget for the setup that would fix it."""
+        client = Mock()
+        client.request.side_effect = twitter_errors.TwitterRateLimitError(
+            'Too Many Requests')
+        XChatDecryptor(self.env, self.account,
+                       client=client)._public_key_records_for(OWNER_ID)
+        self.assertEqual(client.request.call_count, 1)
+        self.account.invalidate_recordset()
+        self.assertTrue(self.account.x_chat_key_fetch_failed_at)
+        # The next batch (a fresh decryptor) reads nothing, without any HTTP.
+        XChatDecryptor(self.env, self.account,
+                       client=client)._public_key_records_for(OWNER_ID)
+        self.assertEqual(client.request.call_count, 1)
+
+    def test_explicit_setup_bypasses_the_backoff_and_clears_it(self):
+        """The operator's own key setup is a deliberate spend, so it must not
+        be held back — and its successful read clears the backoff."""
+        client = Mock()
+        client.request.side_effect = [
+            twitter_errors.TwitterRateLimitError('Too Many Requests'),
+            {'data': [{'public_key_version': '1'}]},
+        ]
+        XChatDecryptor(self.env, self.account,
+                       client=client)._public_key_records_for(OWNER_ID)
+        self.account.invalidate_recordset()
+        self.assertTrue(self.account.x_chat_key_fetch_failed_at)
+        records = XChatDecryptor(self.env, self.account,
+                                 client=client)._public_key_records_for(
+                                     OWNER_ID, force=True)
+        self.assertEqual(len(records), 1)
+        self.account.invalidate_recordset()
+        self.assertFalse(self.account.x_chat_key_fetch_failed_at)
+
+    def test_key_reconfiguration_clears_the_fetch_backoff(self):
+        """Fixing the key material must let reads resume immediately, instead
+        of waiting out the backoff the broken key left behind."""
+        client = Mock()
+        client.request.side_effect = twitter_errors.TwitterRateLimitError(
+            'Too Many Requests')
+        XChatDecryptor(self.env, self.account,
+                       client=client)._public_key_records_for(OWNER_ID)
+        self.account.invalidate_recordset()
+        self.assertTrue(self.account.x_chat_key_fetch_failed_at)
+        self.account.write({'x_encryption_code': 'fresh-pin'})
+        self.account.invalidate_recordset()
+        self.assertFalse(self.account.x_chat_key_fetch_failed_at)
 
     def test_decrypt_events_fetches_foreign_sender_signing_key(self):
         """A message from a *different* X user (group chat) must pull that

@@ -54,6 +54,16 @@ class TwitterActivity:
         # pulled from the Chat API in this batch, so an unrecoverable
         # conversation cannot turn every event of the batch into an API call.
         self._key_seed_attempted = set()
+        # Chat decrypt outcomes for this batch, per account id: how many
+        # encrypted deliveries were stored vs dropped for lack of plaintext.
+        # Accumulated in memory and flushed once per batch — a write per
+        # delivery would add a row lock to every event of a busy account.
+        self._chat_decrypt_outcomes = {}
+        # Registered public-key versions per account id, fetched for the
+        # decrypt-failure log line at most once per batch. The GET shares the
+        # ``public_keys`` endpoint whose 24h budget key registration needs, so a
+        # fetch per undecryptable event is what starved registration.
+        self._public_key_versions_cache = {}
 
     # ---------------------------------------------------------------- ingress
     def ingest_webhook(self, envelope):
@@ -229,6 +239,7 @@ class TwitterActivity:
                 return {'processed': False, 'reason': 'no_account'}
             result = self._handle(event_type, account, payload)
             self._close_event(event, 'done')
+            self._flush_chat_decrypt_outcomes()
             return {'processed': True, 'event_type': event_type, **result}
         except twitter_errors.TwitterTemporaryError as exc:
             # Retryable: let the task queue back off and retry.
@@ -289,6 +300,7 @@ class TwitterActivity:
                     pass
                 processed += 1
                 errors.append({'event_uuid': event_uuid, 'error': str(exc)})
+        self._flush_chat_decrypt_outcomes()
         return {
             'processed': processed,
             'skipped': skipped,
@@ -401,6 +413,7 @@ class TwitterActivity:
                     'x_account_twitter: chat event %s has no plaintext '
                     '(account_id=%s, channel_id=%s); not stored',
                     message_id, account.id, channel.id)
+                self._note_chat_decrypt_outcome(account, stored=False)
                 return {'messages': 0, 'encrypted': not decrypted,
                         'skipped': 'no_plaintext', 'channel': channel.id}
             channel._save_x_message(
@@ -412,9 +425,34 @@ class TwitterActivity:
                 author_x_id=sender_id,
                 no_mail=True,
             )
+            self._note_chat_decrypt_outcome(account, stored=True)
             return {'messages': 1, 'encrypted': False, 'channel': channel.id}
         return {'messages': 0, 'skipped': 'missing_ids',
                 'channel': channel.id if channel else 0}
+
+    def _note_chat_decrypt_outcome(self, account, stored):
+        """Accumulate one chat delivery's decrypt outcome for this batch."""
+        counts = self._chat_decrypt_outcomes.setdefault(
+            account.id, {'stored': 0, 'dropped': 0})
+        counts['stored' if stored else 'dropped'] += 1
+
+    def _flush_chat_decrypt_outcomes(self):
+        """Push this batch's decrypt outcomes onto the accounts.
+
+        The account turns them into a consecutive-unread streak and raises the
+        "stopped decrypting" notice when it crosses the alert threshold, so an
+        account whose key material broke (no secure-backup config, throttled
+        public-key fetch, rejected PIN) tells its users instead of silently
+        storing nothing.
+        """
+        if not self._chat_decrypt_outcomes:
+            return
+        outcomes, self._chat_decrypt_outcomes = self._chat_decrypt_outcomes, {}
+        accounts = self.env['social.account'].sudo().browse(list(outcomes))
+        for account in accounts.exists():
+            counts = outcomes[account.id]
+            account._record_chat_decrypt_outcome(
+                stored=counts['stored'], dropped=counts['dropped'])
 
     # ------------------------------------------------------------ chat helpers
     def _sync_channel_members(self, channel, account, conversation_id='',
@@ -594,6 +632,49 @@ class TwitterActivity:
             self._chat_decryptors[account.id] = decryptor
         return decryptor
 
+    def _registered_public_key_versions(self, account, decryptor):
+        """X's registered public-key versions, for the decrypt-failure log line.
+
+        Deliberately hard to trigger. The GET shares the ``public_keys``
+        endpoint whose 24h budget the key registration needs, and it used to
+        run for *every* undecryptable event: when decryption broke, the
+        diagnostic alone drained the budget (one account logged 650+ throttled
+        fetches in two hours) and every "Setup Chat Keys" click then failed with
+        a 429 for lack of budget. So it is:
+
+        - skipped entirely while the account is known to be failing (its last
+          decrypt outcome was a failure) — retrying it cannot fix decryption and
+          only starves the registration that can. Reading resumes once a message
+          decrypts again or the key material is reconfigured, both of which
+          restart the streak;
+        - fetched at most once per account per batch, failures included, so a
+          throttled read is not retried per event either.
+
+        Returns the version list, ``None`` when it could not be read, or the
+        string ``'paused'`` when it was skipped on purpose.
+        """
+        if account.id in self._public_key_versions_cache:
+            return self._public_key_versions_cache[account.id]
+        if account.x_chat_decrypt_fail_streak:
+            versions = 'paused'
+        else:
+            versions = None
+            try:
+                if decryptor.client and account.twitter_user_id:
+                    data = decryptor.client.request(
+                        'GET',
+                        '/2/users/%s/public_keys' % account.twitter_user_id,
+                        params={'public_key.fields': 'public_key_version'})
+                    records = (data or {}).get('data') or []
+                    versions = [str(record.get('public_key_version'))
+                                for record in records
+                                if record.get('public_key_version')]
+            except Exception:
+                # Diagnostic only: never break the decryption flow over it.
+                versions = None
+        self._public_key_versions_cache[account.id] = versions
+        return versions
+
     def _decrypt_chat_event(self, account, payload):
         """Attempt to decrypt a webhook ``encoded_event`` blob.
 
@@ -683,18 +764,11 @@ class TwitterActivity:
                         webhook_key_version = match.group(1)
                         break
                 
-                # Get API available versions for diagnostic logging
-                api_versions = []
-                try:
-                    if decryptor.client and account.twitter_user_id:
-                        api_data = decryptor.client.request(
-                            'GET', '/2/users/%s/public_keys' % account.twitter_user_id,
-                            params={'public_key.fields': 'public_key_version'})
-                        api_records = (api_data or {}).get('data') or []
-                        api_versions = [str(r.get('public_key_version')) for r in api_records if r.get('public_key_version')]
-                except Exception:
-                    pass  # Diagnostic logging should not break decryption flow
-                
+                # Registered key versions, for the "local vs X" comparison
+                # below — fetched at most once per account per batch.
+                api_versions = self._registered_public_key_versions(
+                    account, decryptor)
+
                 _logger.warning(
                     'x_account_twitter: Chat XDK rejected webhook event '
                     'account_id=%s event_id=%s sender_id=%s key_mode=%s '

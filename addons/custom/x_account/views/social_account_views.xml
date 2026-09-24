@@ -28,8 +28,31 @@
                         <field name="x_chat_key_blob" widget="text"
                             invisible="x_chat_key_mode != 'key_blob'"/>
                         <field name="x_chat_initialized" readonly="1" widget="boolean_toggle"/>
+                        <field name="x_chat_decrypt_stopped" readonly="1" widget="boolean_toggle"
+                            invisible="not x_chat_decrypt_stopped"/>
+                        <field name="x_chat_decrypt_fail_streak" readonly="1"
+                            invisible="not x_chat_decrypt_fail_streak"/>
                     </group>
                 </group>
+            </xpath>
+            <xpath expr="//header" position="inside">
+                <button name="action_initialize_x_chat_encryption" type="object"
+                    string="Initialize Encryption"
+                    class="btn-secondary"
+                    groups="social.group_social_user"
+                    confirm="Initialize X Chat encryption using the configured key source?"/>
+                <button name="action_register_x_chat_public_keys" type="object"
+                    string="Setup Chat Keys"
+                    class="btn-secondary"
+                    groups="social.group_social_user"
+                    invisible="x_chat_initialized"
+                    confirm="Register a fresh X Chat identity? This is a one-time, rate-limited write that generates keys, registers them with X and backs them up (PIN mode)."/>
+                <button name="action_register_x_chat_public_keys" type="object"
+                    string="Reconfigure Encryption Key"
+                    class="btn-primary"
+                    groups="social.group_social_user"
+                    invisible="not x_chat_initialized"
+                    confirm="Re-register this account's X Chat encryption keys? This writes a fresh identity to X and consumes one of the limited daily registration slots. Use it when the account stopped decrypting messages."/>
             </xpath>
             <xpath expr="//form" position="inside">
                 <chatter/>
@@ -54,6 +77,12 @@
                         confirm="Register a fresh X Chat identity? This is a one-time, rate-limited write that generates keys, registers them with X and backs them up (PIN mode)."
                         groups="social.group_social_user"
                         invisible="x_chat_initialized"/>
+                    <button name="action_register_x_chat_public_keys" type="object"
+                        string="Reconfigure Encryption Key"
+                        class="btn-primary"
+                        confirm="Re-register this account's X Chat encryption keys? This writes a fresh identity to X and consumes one of the limited daily registration slots. Use it when the account stopped decrypting messages."
+                        groups="social.group_social_user"
+                        invisible="not x_chat_initialized"/>
                     <button name="action_delete_x_subscriptions" type="object"
                         string="Delete X Subscriptions"
                         class="btn-secondary"
@@ -104,6 +133,10 @@
                             <field name="x_chat_signing_key_version" readonly="1"
                                 invisible="not x_chat_signing_key_version"/>
                             <field name="x_chat_initialized" readonly="1" widget="boolean_toggle"/>
+                            <field name="x_chat_decrypt_stopped" readonly="1" widget="boolean_toggle"
+                                invisible="not x_chat_decrypt_stopped"/>
+                            <field name="x_chat_decrypt_fail_streak" readonly="1"
+                                invisible="not x_chat_decrypt_fail_streak"/>
                         </group>
                     </group>
                 </sheet>
@@ -152,6 +185,8 @@
                     domain="[('x_chat_initialized', '=', False)]"/>
                 <filter string="X: PIN Rejected" name="x_chat_pin_locked"
                     domain="[('x_chat_pin_locked', '=', True)]"/>
+                <filter string="X: Chat Decryption Stopped" name="x_chat_decrypt_stopped"
+                    domain="[('x_chat_decrypt_stopped', '=', True)]"/>
                 <group>
                     <filter string="X Connection Status" name="x_groupby_connection_status" domain="[]"
                         context="{'group_by': 'x_connection_status'}"/>
