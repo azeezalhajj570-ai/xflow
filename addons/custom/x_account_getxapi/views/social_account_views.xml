@@ -5,12 +5,14 @@
         <field name="model">social.account</field>
         <field name="inherit_id" ref="x_account.x_account_social_account_view_form"/>
         <field name="arch" type="xml">
-            <xpath expr="//group[@name='x_account_api']" position="inside">
-                <field name="x_provider" invisible="x_provider != 'getxapi'"/>
+            <xpath expr="//field[@name='twitter_user_id']" position="after">
                 <field name="authtoken" password="True"
                     invisible="x_action_provider != 'getxapi'"/>
                 <field name="ct0" password="True"
                     invisible="x_action_provider != 'getxapi'"/>
+            </xpath>
+            <xpath expr="//group[@name='x_account_api']" position="inside">
+                <field name="x_provider" invisible="x_provider != 'getxapi'"/>
                 <field name="x_getxapi_credit_blocked"
                     invisible="not x_getxapi_credit_blocked"/>
                 <field name="x_getxapi_credit_blocked_at"
@@ -28,7 +30,7 @@
         <field name="model">social.account</field>
         <field name="inherit_id" ref="x_account.x_account_social_account_view_form_standalone"/>
         <field name="arch" type="xml">
-            <xpath expr="//group[@name='x_account_api']" position="inside">
+            <xpath expr="//field[@name='twitter_user_id']" position="after">
                 <field name="authtoken" password="True"
                     invisible="x_action_provider != 'getxapi'"/>
                 <field name="ct0" password="True"

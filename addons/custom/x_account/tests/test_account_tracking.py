@@ -85,7 +85,7 @@ class TestAccountTracking(XAccountTestBase):
         self.account.write({'x_connection_state': 'active'})
         value = self._tracking_value('x_connection_status')
         self.assertTrue(value, 'x_connection_status change was not logged')
-        self.assertEqual(value.new_value_char, 'متصل')
+        self.assertEqual(value.new_value_char, 'Connected')
 
     def test_archive_window_changes_are_logged(self):
         self.account.write({

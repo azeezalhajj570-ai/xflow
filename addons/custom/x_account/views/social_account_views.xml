@@ -5,29 +5,37 @@
         <field name="model">social.account</field>
         <field name="inherit_id" ref="social.social_account_view_form"/>
         <field name="arch" type="xml">
+            <xpath expr="//field[@name='social_account_handle']" position="attributes">
+                <attribute name="readonly">1</attribute>
+            </xpath>
             <xpath expr="//group[@name='social_account_global']" position="after">
                 <notebook>
-                    <page string="Account Info" name="x_account_info">
-                        <group>
-                            <group name="x_account_connection">
-                                <field name="twitter_user_id" readonly="1"/>
-                            </group>
-                            <!-- Providers add their own connection settings here
-                                 (provider credentials, OmniX webhook fields). -->
-                            <group name="x_account_api"/>
-                        </group>
-                    </page>
-                    <page string="Archiving" name="x_account_archiving">
-                        <group name="x_account_archiving_group">
+                    <page string="Additional Info" name="x_account_info">
+                        <group name="x_account_connection" col="1">
+                            <field name="twitter_user_id" readonly="1"/>
+                            <!-- Providers inject their credentials just under the
+                                 X user id (auth token, ct0, ...). -->
+                            <field name="x_encryption_code" password="True"
+                                placeholder="Your XChat PIN"
+                                invisible="x_chat_key_mode != 'juicebox'"/>
+                            <field name="x_chat_key_mode" widget="radio"/>
                             <field name="x_auto_archive" help="Archive this account automatically once a day inside the window below."/>
                             <field name="x_auto_archive_start" widget="float_time" options="{'type': 'time'}" required="x_auto_archive" invisible="not x_auto_archive"/>
                             <field name="x_auto_archive_end" widget="float_time" options="{'type': 'time'}" required="x_auto_archive" invisible="not x_auto_archive"/>
+                            <field name="x_chat_key_blob" widget="text"
+                                invisible="x_chat_key_mode != 'key_blob'"/>
                         </group>
+                        <!-- Filled by the provider modules: the subscription
+                             state lives in x_account_twitter. -->
+                        <group name="x_account_status_subscription" string="Subscriptions"/>
+                        <!-- Providers add their own connection settings here
+                             (provider credentials, OmniX webhook fields). -->
+                        <group name="x_account_api"/>
                     </page>
-                    <!-- Everything needed to tell WHY an account is not working:
-                         nothing here is hidden when it is empty, so a blank
-                         field reads as "never happened" rather than unnoticed. -->
-                    <page string="Status" name="x_account_status">
+                    <!-- Hidden: the account health is reported by the status bar
+                         (aggregated x_connection_status). Kept for the provider
+                         xpaths and for deep diagnosis. -->
+                    <page string="Status" name="x_account_status" invisible="1">
                         <group>
                             <group name="x_account_status_connection" string="Authentication">
                                 <field name="x_auth_method" readonly="1"/>
@@ -48,24 +56,12 @@
                                 <field name="x_chat_decrypt_notified_at" readonly="1"/>
                                 <field name="x_chat_key_fetch_failed_at" readonly="1"/>
                             </group>
-                            <!-- Filled by the provider modules: the subscription
-                                 state lives in x_account_twitter. -->
-                            <group name="x_account_status_subscription" string="Subscriptions"/>
                         </group>
                         <group>
                             <group name="x_account_status_error">
                                 <field name="last_error" readonly="1" nolabel="1" colspan="2"
                                     placeholder="No error recorded"/>
                             </group>
-                        </group>
-                    </page>
-                    <page string="X Chat Encryption" name="x_chat_encryption">
-                        <group name="x_account_chat_encryption" groups="social.group_social_user">
-                            <field name="x_chat_key_mode" widget="radio"/>
-                            <field name="x_encryption_code" password="True" placeholder="Your XChat PIN"
-                                invisible="x_chat_key_mode != 'juicebox'"/>
-                            <field name="x_chat_key_blob" widget="text"
-                                invisible="x_chat_key_mode != 'key_blob'"/>
                         </group>
                     </page>
                 </notebook>
@@ -107,28 +103,33 @@
                         <h1><field name="name" placeholder="Account name"/></h1>
                     </div>
                     <notebook>
-                        <page string="Account Info" name="x_account_info">
-                            <group>
-                                <group name="x_account_connection">
-                                    <field name="social_account_handle" placeholder="@handle"/>
-                                    <field name="twitter_user_id" readonly="1"/>
-                                </group>
-                                <!-- Providers add their own connection settings here
-                                     (provider credentials, OmniX webhook fields). -->
-                                <group name="x_account_api"/>
-                            </group>
-                        </page>
-                        <page string="Archiving" name="x_account_archiving">
-                            <group name="x_account_archiving_group">
+                        <page string="Additional Info" name="x_account_info">
+                            <group name="x_account_connection" col="1">
+                                <field name="social_account_handle" placeholder="@handle" readonly="1"/>
+                                <field name="twitter_user_id" readonly="1"/>
+                                <!-- Providers inject their credentials just under the
+                                     X user id (auth token, ct0, ...). -->
+                                <field name="x_encryption_code" password="True"
+                                    placeholder="Your XChat PIN"
+                                    invisible="x_chat_key_mode != 'juicebox'"/>
+                                <field name="x_chat_key_mode" widget="radio"/>
                                 <field name="x_auto_archive" help="Archive this account automatically once a day inside the window below."/>
                                 <field name="x_auto_archive_start" widget="float_time" options="{'type': 'time'}" required="x_auto_archive" invisible="not x_auto_archive"/>
                                 <field name="x_auto_archive_end" widget="float_time" options="{'type': 'time'}" required="x_auto_archive" invisible="not x_auto_archive"/>
+                                <field name="x_chat_key_blob" widget="text" placeholder="Paste key blob here..."
+                                    invisible="x_chat_key_mode != 'key_blob'"/>
                             </group>
+                            <!-- Filled by the provider modules: the subscription
+                                 state lives in x_account_twitter. -->
+                            <group name="x_account_status_subscription" string="Subscriptions"/>
+                            <!-- Providers add their own connection settings here
+                                 (provider credentials, OmniX webhook fields). -->
+                            <group name="x_account_api"/>
                         </page>
-                        <!-- Everything needed to tell WHY an account is not working:
-                             nothing here is hidden when it is empty, so a blank
-                             field reads as "never happened" rather than unnoticed. -->
-                        <page string="Status" name="x_account_status">
+                        <!-- Hidden: the account health is reported by the status bar
+                             (aggregated x_connection_status). Kept for the provider
+                             xpaths and for deep diagnosis. -->
+                        <page string="Status" name="x_account_status" invisible="1">
                             <group>
                                 <group name="x_account_status_connection" string="Authentication">
                                     <field name="x_auth_method" readonly="1"/>
@@ -149,24 +150,12 @@
                                     <field name="x_chat_decrypt_notified_at" readonly="1"/>
                                     <field name="x_chat_key_fetch_failed_at" readonly="1"/>
                                 </group>
-                                <!-- Filled by the provider modules: the subscription
-                                     state lives in x_account_twitter. -->
-                                <group name="x_account_status_subscription" string="Subscriptions"/>
                             </group>
                             <group>
                                 <group name="x_account_status_error">
                                     <field name="last_error" readonly="1" nolabel="1" colspan="2"
                                         placeholder="No error recorded"/>
                                 </group>
-                            </group>
-                        </page>
-                        <page string="X Chat Encryption" name="x_chat_encryption">
-                            <group name="x_account_chat_encryption" groups="social.group_social_user">
-                                <field name="x_chat_key_mode" widget="radio"/>
-                                <field name="x_encryption_code" password="True" placeholder="Your XChat PIN"
-                                    invisible="x_chat_key_mode != 'juicebox'"/>
-                                <field name="x_chat_key_blob" widget="text" placeholder="Paste key blob here..."
-                                    invisible="x_chat_key_mode != 'key_blob'"/>
                             </group>
                         </page>
                     </notebook>

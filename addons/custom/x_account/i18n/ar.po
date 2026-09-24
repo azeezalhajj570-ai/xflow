@@ -47,6 +47,18 @@ msgid "Account Info"
 msgstr "معلومات الحساب"
 
 #. module: x_account
+#: model_terms:ir.ui.view,arch_db:x_account.x_account_social_account_view_form
+#: model_terms:ir.ui.view,arch_db:x_account.x_account_social_account_view_form_standalone
+msgid "Additional Info"
+msgstr "معلومات إضافية"
+
+#. module: x_account
+#: model_terms:ir.ui.view,arch_db:x_account.x_account_social_account_view_form
+#: model_terms:ir.ui.view,arch_db:x_account.x_account_social_account_view_form_standalone
+msgid "Subscriptions"
+msgstr "الاشتراكات"
+
+#. module: x_account
 #: model_terms:ir.ui.view,name:x_account.x_account_social_account_view_form_standalone
 msgid "Account name"
 msgstr "اسم الحساب"
@@ -640,6 +652,7 @@ msgstr "تم إدراج %s من طلبات المتابعة."
 #. module: x_account
 #: model:ir.model.fields,field_description:x_account.field_x_account_task__error
 #: model:ir.model.fields.selection,name:x_account.selection__social_account__x_connection_state__error
+#: model:ir.model.fields.selection,name:x_account.selection__social_account__x_connection_status__error
 msgid "Error"
 msgstr "خطأ"
 
@@ -2087,19 +2100,9 @@ msgid "X Connection Status"
 msgstr "حالة اتصال X"
 
 #. module: x_account
-#: model:ir.model.fields.selection,name:x_account.selection__social_account__x_connection_status__not_configured
-msgid "غير مُهيأ"
-msgstr "غير مُهيأ"
-
-#. module: x_account
 #: model:ir.model.fields.selection,name:x_account.selection__social_account__x_connection_status__active
-msgid "متصل"
+msgid "Connected"
 msgstr "متصل"
-
-#. module: x_account
-#: model:ir.model.fields.selection,name:x_account.selection__social_account__x_connection_status__error
-msgid "خطأ"
-msgstr "خطأ"
 
 #. module: x_account
 #: model:ir.model.fields.selection,name:x_account.selection__discuss_channel__channel_type__x
@@ -3056,10 +3059,11 @@ msgstr ""
 
 #. module: x_account
 #: model:ir.model.fields.selection,name:x_account.selection__social_account__x_chat_status__not_configured
+#: model:ir.model.fields.selection,name:x_account.selection__social_account__x_connection_status__not_configured
 msgid ""
 "Not Configured"
 msgstr ""
-"غير مُعدّ"
+"غير مُهيأ"
 
 #. module: x_account
 #: model:ir.model.fields.selection,name:x_account.selection__social_account__x_chat_status__pin_locked

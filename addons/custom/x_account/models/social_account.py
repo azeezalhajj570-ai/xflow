@@ -134,9 +134,9 @@ class SocialAccount(models.Model):
     )
     x_connection_status = fields.Selection(
         [
-            ('not_configured', 'غير مُهيأ'),
-            ('active', 'متصل'),
-            ('error', 'خطأ'),
+            ('not_configured', 'Not Configured'),
+            ('active', 'Connected'),
+            ('error', 'Error'),
         ],
         string='X Connection Status',
         default='not_configured',
