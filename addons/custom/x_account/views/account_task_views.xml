@@ -8,6 +8,7 @@
                 decoration-warning="result_warning != False">
                 <field name="account_id"/>
                 <field name="operation"/>
+                <field name="message_id" optional="show"/>
                 <field name="status"/>
                 <field name="result_warning" widget="badge" optional="show"
                     decoration-warning="result_warning != False"/>
