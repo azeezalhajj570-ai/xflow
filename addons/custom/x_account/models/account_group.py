@@ -79,7 +79,7 @@ class XAccountGroup(models.Model):
                 **ctx,
             }
             for account in group.account_ids:
-                if not account.active or account.x_connection_status == 'disabled':
+                if not account.active or account.x_connection_state == 'disabled':
                     continue
                 if recent.get(account.id, 0):
                     continue

@@ -9,7 +9,9 @@
                 <field name="channel_link" string="Chat" widget="html"/>
                 <field name="channel_id" optional="hide"/>
                 <field name="account_id"/>
-                <field name="operation" widget="badge"/>
+                <field name="operation_color" column_invisible="1"/>
+                <field name="operation" widget="badge"
+                    options="{'color_field': 'operation_color'}"/>
                 <field name="author_link" string="Author" widget="html"/>
                 <field name="tweet_url" widget="url" string="Tweet"/>
                 <field name="tweet_screen_name" optional="hide"/>

@@ -239,7 +239,7 @@ class TestGetXAPIProvider(XAccountGetXAPITestBase):
         }):
             result = XService.validate(self.account)
         self.assertTrue(result['valid'])
-        self.assertEqual(self.account.x_connection_status, 'active')
+        self.assertEqual(self.account.x_connection_state, 'active')
 
     def test_credit_blocked_account_tasks_not_claimed(self):
         task = self.env['x.account.task'].create({

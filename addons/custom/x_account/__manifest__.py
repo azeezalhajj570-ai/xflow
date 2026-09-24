@@ -3,7 +3,7 @@
     'name': 'X Account & Session Platform',
     'category': 'Marketing/Social Marketing',
     'summary': 'Native X account & session management replacing XAction',
-    'version': '19.0.1.18.0',
+    'version': '19.0.1.20.0',
     'author': 'Azeez Tech',
     'description': """
 X Account & Session Platform for Odoo
@@ -39,6 +39,7 @@ Highlights:
         # Server actions first: base_automation.xml rules reference
         # action_server_fetch_group_info, and a ref must resolve at load time.
         'data/server_actions.xml',
+        'data/server_actions_form.xml',
         'data/base_automation.xml',
         'data/channel_automation.xml',
         'data/channel_action_automation.xml',

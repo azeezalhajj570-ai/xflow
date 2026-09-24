@@ -5,7 +5,7 @@
         <field name="model">social.account</field>
         <field name="inherit_id" ref="x_account.x_account_social_account_view_form"/>
         <field name="arch" type="xml">
-            <xpath expr="//group[@name='x_account']" position="inside">
+            <xpath expr="//group[@name='x_account_api']" position="inside">
                 <field name="x_webhook_url"/>
                 <field name="x_webhook_id"/>
                 <field name="x_webhook_valid"/>

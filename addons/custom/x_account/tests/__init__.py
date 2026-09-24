@@ -22,3 +22,4 @@ from . import test_message_task_stat
 from . import test_channel_action_toggles
 from . import test_daily_archive
 from . import test_account_tracking
+from . import test_account_status_bar

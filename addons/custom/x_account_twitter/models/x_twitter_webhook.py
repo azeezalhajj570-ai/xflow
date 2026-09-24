@@ -143,6 +143,7 @@ class XTwitterEvent(models.Model):
         'x.account.task',
         string='Task',
         readonly=True,
+        index=True,
         ondelete='set null',
     )
     payload = fields.Text(

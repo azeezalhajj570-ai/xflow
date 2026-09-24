@@ -127,7 +127,7 @@ class XFollowComposer(models.TransientModel):
                 _('Bulk follow is only available on X conversations, got %r')
                 % channel.channel_type)
         account = channel.x_account_id
-        if not account or not account.active or account.x_connection_status == 'disabled':
+        if not account or not account.active or account.x_connection_state == 'disabled':
             return self._follow_result(
                 _('No valid X account for conversation %s.') % channel.name,
                 kind='danger')

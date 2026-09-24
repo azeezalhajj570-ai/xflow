@@ -79,10 +79,13 @@ class TestAccountTracking(XAccountTestBase):
                     '%s is not tracked' % name)
 
     def test_connection_status_change_is_logged(self):
-        self.account.write({'x_connection_status': 'active'})
+        """The aggregated status is system-controlled but still tracked: when it
+        moves, the chatter records it."""
+        self.account.write({'x_chat_initialized': True})
+        self.account.write({'x_connection_state': 'active'})
         value = self._tracking_value('x_connection_status')
         self.assertTrue(value, 'x_connection_status change was not logged')
-        self.assertEqual(value.new_value_char, 'Active')
+        self.assertEqual(value.new_value_char, 'Connected')
 
     def test_archive_window_changes_are_logged(self):
         self.account.write({

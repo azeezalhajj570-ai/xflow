@@ -62,9 +62,53 @@
         </field>
     </record>
 
+    <record id="x_account_group_view_kanban" model="ir.ui.view">
+        <field name="name">x.account.group.view.kanban</field>
+        <field name="model">x.account.group</field>
+        <field name="arch" type="xml">
+            <!-- Grouped by the automation action, so each column is one action
+                 (Like, Repost, Bookmark, Comment, Follow). -->
+            <kanban default_group_by="actions" class="o_kanban_small_column">
+                <field name="name"/>
+                <field name="description"/>
+                <field name="account_ids"/>
+                <field name="actions"/>
+                <field name="auto_execute"/>
+                <field name="paused"/>
+                <field name="cooldown_sec"/>
+                <field name="last_executed_at"/>
+                <templates>
+                    <t t-name="card">
+                        <div class="oe_kanban_global_click">
+                            <div class="o_kanban_record_top">
+                                <div class="o_kanban_record_headings">
+                                    <strong class="o_kanban_record_title"><field name="name"/></strong>
+                                </div>
+                                <field name="paused" widget="boolean_toggle"
+                                    invisible="not paused" readonly="1"/>
+                            </div>
+                            <div class="o_kanban_record_body">
+                                <field name="description" placeholder="No description"/>
+                                <field name="account_ids" widget="many2many_tags" readonly="1"/>
+                            </div>
+                            <div class="o_kanban_record_bottom">
+                                <div class="oe_kanban_bottom_left">
+                                    <field name="actions" widget="badge"/>
+                                </div>
+                                <div class="oe_kanban_bottom_right">
+                                    <field name="auto_execute" widget="boolean_toggle" readonly="1"/>
+                                </div>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
     <record id="action_x_account_group" model="ir.actions.act_window">
         <field name="name">X Account Groups</field>
         <field name="res_model">x.account.group</field>
-        <field name="view_mode">list,form</field>
+        <field name="view_mode">kanban,list,form</field>
     </record>
 </odoo>

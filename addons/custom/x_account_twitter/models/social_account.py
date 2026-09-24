@@ -441,7 +441,7 @@ class SocialAccount(models.Model):
         # it to X until the account is re-authorized. Webhook/API traffic may
         # call this many times a second; short-circuit so we never resubmit the
         # same revoked token.
-        if self.x_connection_status == 'reauth_required':
+        if self.x_connection_state == 'reauth_required':
             return None
         if not self.x_oauth2_access_token:
             if not self.x_oauth2_refresh_token:
@@ -478,7 +478,7 @@ class SocialAccount(models.Model):
         # refresh token), do not resubmit it to X.  The status could only be
         # reset to 'active' by a successful re-authorization, at which point
         # the fresh tokens make refresh viable again.
-        if self.x_connection_status == 'reauth_required':
+        if self.x_connection_state == 'reauth_required':
             return None
         if not self.x_oauth2_refresh_token:
             raise twitter_errors.TwitterAuthenticationError(
@@ -520,7 +520,7 @@ class SocialAccount(models.Model):
             'x_oauth2_refresh_token': tokens.get('refresh_token', self.x_oauth2_refresh_token),
             'x_oauth2_token_expires_at': fields.Datetime.now() + timedelta(
                 seconds=int(tokens.get('expires_in') or 7200)),
-            'x_connection_status': 'active',
+            'x_connection_state': 'active',
         })
         return access_token
 
@@ -533,7 +533,7 @@ class SocialAccount(models.Model):
         """
         self.ensure_one()
         self.write({
-            'x_connection_status': 'reauth_required',
+            'x_connection_state': 'reauth_required',
             'last_error': message,
         })
         _logger.warning(
@@ -613,7 +613,7 @@ class SocialAccount(models.Model):
             # OAuth2 accounts (the session-validation cron only handles
             # session-cookie accounts), so without this a re-link that ends up
             # creating a new record would stay 'new' forever.
-            'x_connection_status': 'active',
+            'x_connection_state': 'active',
             'last_connected': fields.Datetime.now(),
             'last_error': False,
         }

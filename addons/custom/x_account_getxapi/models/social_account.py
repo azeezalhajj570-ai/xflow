@@ -14,31 +14,31 @@ class SocialAccount(models.Model):
 
     x_provider = fields.Selection(
         selection_add=[
-            ('getxapi', 'GetXAPI REST API'),
+            ('getxapi', 'REST API'),
         ],
         ondelete={'getxapi': 'cascade'},
     )
 
     authtoken = fields.Char(
-        string='GetXAPI Auth Token',
-        help='Twitter session auth_token for GetXAPI write operations.',
+        string='Auth Token',
+        help='Twitter session auth_token for this provider\'s write operations.',
     )
     ct0 = fields.Char(
-        string='GetXAPI ct0',
+        string='ct0',
         help='Twitter session ct0 (CSRF) cookie, sent alongside the auth '
-             'token when set. Leave empty for accounts whose GetXAPI calls '
+             'token when set. Leave empty for accounts whose provider calls '
              'only need the auth token.',
     )
     x_getxapi_credit_blocked = fields.Boolean(
-        string='GetXAPI Credit Exhausted',
+        string='API Credit Exhausted',
         default=False,
         copy=False,
         readonly=True,
-        help='Set automatically when GetXAPI reports the account has no '
+        help='Set automatically when the provider reports the account has no '
              'credit (HTTP 402 or a credit-related 429). While set, the paid '
-             'task queue for this account is halted and no paid GetXAPI call '
-             'is sent, so the balance is not burned on doomed requests. Add '
-             'credit, then use "Resume GetXAPI" to lift the block.',
+             'task queue for this account is halted and no paid call is sent, '
+             'so the balance is not burned on doomed requests. Add credit, '
+             'then use "Resume API Usage" to lift the block.',
     )
     x_getxapi_credit_blocked_at = fields.Datetime(
         string='Credit Blocked At',
@@ -49,7 +49,7 @@ class SocialAccount(models.Model):
         string='Credit Error',
         readonly=True,
         copy=False,
-        help='Last credit-exhaustion error reported by GetXAPI.',
+        help='Last credit-exhaustion error reported by the provider.',
     )
 
     def _x_action_blocked_reason(self):
@@ -58,8 +58,8 @@ class SocialAccount(models.Model):
         if reason:
             return reason
         if self.filtered('x_getxapi_credit_blocked'):
-            return ('GetXAPI credit exhausted — add credit, then use '
-                    '"Resume GetXAPI" on the account.')
+            return ('API credit exhausted — add credit, then use '
+                    '"Resume API Usage" on the account.')
         return False
 
     def action_resume_getxapi_credit(self):
@@ -74,7 +74,7 @@ class SocialAccount(models.Model):
             'type': 'ir.actions.client',
             'tag': 'display_notification',
             'params': {
-                'title': 'GetXAPI Resumed',
+                'title': 'API Usage Resumed',
                 'message': 'Credit block lifted; the paid task queue will '
                            'resume on the next sweep.',
                 'type': 'success',

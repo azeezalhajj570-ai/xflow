@@ -46,4 +46,39 @@
             </div>
         </field>
     </record>
+    <record id="mail_template_x_account_status_failed" model="mail.template">
+        <field name="name">X Account: Connection Failed</field>
+        <field name="model_id" ref="social.model_social_account"/>
+        <field name="subject">X account connection failed: {{ object.name }}</field>
+        <field name="use_default_to" eval="False"/>
+        <field name="body_html" type="html">
+            <div style="margin: 0px; padding: 0px;">
+                <p style="margin: 0px;">
+                    <span>This X account connection is failing: a required X connection or Chat Encryption component stopped working, so its automation is suspended until it is fixed.</span>
+                </p>
+                <p style="margin: 8px 0px 0px 0px;">
+                    <span>Account: <b t-out="object.name"/><br/>
+                        Reason: <t t-out="object.last_error"/>
+                    </span>
+                </p>
+            </div>
+        </field>
+    </record>
+
+    <record id="mail_template_x_account_status_connected" model="mail.template">
+        <field name="name">X Account: Connected</field>
+        <field name="model_id" ref="social.model_social_account"/>
+        <field name="subject">X account connected: {{ object.name }}</field>
+        <field name="use_default_to" eval="False"/>
+        <field name="body_html" type="html">
+            <div style="margin: 0px; padding: 0px;">
+                <p style="margin: 0px;">
+                    <span>This X account is connected again: X authentication is valid and Chat Encryption is ready, so its automation can run.</span>
+                </p>
+                <p style="margin: 8px 0px 0px 0px;">
+                    <span>Account: <b t-out="object.name"/></span>
+                </p>
+            </div>
+        </field>
+    </record>
 </odoo>

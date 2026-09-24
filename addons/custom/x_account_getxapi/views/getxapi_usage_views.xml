@@ -9,7 +9,7 @@
             <field name="domain">[('account_id.company_id', 'in', allowed_company_ids)]</field>
             <field name="help" type="html">
                 <p class="o_view_nocontent_smiling_face">No API usage recorded yet.</p>
-                <p>GetXAPI API calls will appear here automatically when the GetXAPI provider is used.</p>
+                <p>API calls will appear here automatically when the REST provider is used.</p>
             </field>
         </record>
 
@@ -80,7 +80,7 @@
             <field name="name">getxapi.api.usage.search</field>
             <field name="model">getxapi.api.usage</field>
             <field name="arch" type="xml">
-                <search string="GetXAPI Usage">
+                <search string="API Usage">
                     <field name="endpoint"/>
                     <field name="account_id"/>
                     <field name="task_id"/>
@@ -98,6 +98,10 @@
                     <filter string="Rate Limited" name="filter_rate_limit" domain="[('error_type', '=', 'rate_limit')]"/>
                     <filter string="Daily DM Limit" name="filter_daily_dm_limit" domain="[('twitter_error_code', '=', 502)]"/>
                     <separator/>
+                    <filter string="Today" name="filter_today"
+                        domain="[('timestamp', '&gt;=', context_today().strftime('%Y-%m-%d')), ('timestamp', '&lt;', (context_today() + datetime.timedelta(days=1)).strftime('%Y-%m-%d'))]"/>
+                    <filter string="Last Hour" name="filter_last_hour"
+                        domain="[('timestamp', '&gt;=', (datetime.datetime.now().to_utc() - datetime.timedelta(hours=1)).strftime('%Y-%m-%d %H:%M:%S'))]"/>
                     <filter string="Timestamp" name="filter_timestamp" date="timestamp"/>
                     <separator/>
                     <group>
@@ -119,7 +123,7 @@
             <field name="name">getxapi.api.usage.pivot</field>
             <field name="model">getxapi.api.usage</field>
             <field name="arch" type="xml">
-                <pivot string="GetXAPI Usage">
+                <pivot string="API Usage">
                     <field name="account_id" type="row"/>
                     <field name="endpoint" type="row"/>
                     <field name="method" type="col"/>

@@ -188,26 +188,44 @@ Examples:
 
 ### Workflow
 
-1. **Create feature branch from main:**
+**Start on a branch, finish with a PR.** Every change gets its own issue and its
+own feature branch, and it is not finished until the pull request is open. Write
+no implementation before steps 1 and 2 are done: no edits on `main`, none on a
+previous feature branch, none in an unnamed tree.
+
+1. **Open the issue** describing the change and what "done" means for it:
+   ```bash
+   gh issue create --title "feat: add subscription event configuration" \
+       --body "Scope, acceptance criteria, affected modules"
+   ```
+   Done when the issue number exists.
+
+2. **Create the feature branch from an up-to-date main:**
    ```bash
    git checkout main
    git pull origin main
    git checkout -b feat/your-feature-name
    ```
+   Done when `git branch --show-current` prints the new branch name.
 
-2. **Make changes and commit:**
+3. **Implement and commit**, naming the paths to add — this tree carries
+   untracked build artifacts, so `git add .` would commit them:
    ```bash
-   git add .
+   git add addons/custom/<module>/<paths>
    git commit -m "feat: add subscription event configuration"
    ```
+   Done when `git status` shows no modified file that belongs to the change.
 
-3. **Push and create PR:**
+4. **Push the branch and open the PR.** This is the end state of every
+   implementation: work sitting only in a local tree is unfinished.
    ```bash
    git push -u origin feat/your-feature-name
-   gh pr create --title "feat: add subscription event configuration" --body "Description of changes"
+   gh pr create --base main --title "feat: add subscription event configuration" \
+       --body "Closes #<issue>. What changed, why, and how it was verified."
    ```
+   Done when `gh pr view --json url` returns the PR URL. Report that URL.
 
-4. **After PR approval and merge:**
+5. **After PR approval and merge:**
    ```bash
    git checkout main
    git pull origin main

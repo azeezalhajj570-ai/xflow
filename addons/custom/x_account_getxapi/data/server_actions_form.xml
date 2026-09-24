@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Resume API Usage was a button next to the credit-blocked fields; it is
+         now a server action bound to social.account and shown only in the
+         form.  The button only appeared while the account was blocked
+         (invisible="not x_getxapi_credit_blocked"); the method is a no-op that
+         clears the flags, so the action is always offered. -->
+    <data>
+        <record id="action_form_resume_api_usage" model="ir.actions.server">
+            <field name="name">Resume API Usage</field>
+            <field name="model_id" ref="social.model_social_account"/>
+            <field name="binding_model_id" ref="social.model_social_account"/>
+            <field name="binding_type">action</field>
+            <field name="binding_view_types">form</field>
+            <field name="group_ids" eval="[(6, 0, [ref('x_account.group_x_account_manager')])]"/>
+            <field name="sequence">90</field>
+            <field name="state">code</field>
+            <field name="code">action = (records or record)[:1].action_resume_getxapi_credit()</field>
+        </record>
+    </data>
+</odoo>

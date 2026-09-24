@@ -36,7 +36,7 @@ class ResConfigSettings(models.TransientModel):
     )
     x_action_provider = fields.Selection(
         [
-            ('getxapi', 'GetXAPI'),
+            ('getxapi', 'REST API'),
             ('official', 'Official X API'),
         ],
         string='Action Provider',

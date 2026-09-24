@@ -1,0 +1,174 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+# 	* x_account_omnix
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 19.0+e-20260402\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-09-24 00:00+0000\n"
+"PO-Revision-Date: 2026-09-24 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: \n"
+"Plural-Forms: \n"
+
+#. module: x_account_omnix
+#: code:addons/x_account_omnix/models/import_session.py:37
+#: code:addons/x_account_omnix/models/import_session.py:44
+msgid ""
+"auth_token is required."
+msgstr ""
+"رمز auth_token مطلوب."
+
+#. module: x_account_omnix
+#: code:addons/x_account_omnix/models/import_session.py:61
+msgid ""
+"Session validation failed: %s"
+msgstr ""
+"فشل التحقق من الجلسة: %s"
+
+#. module: x_account_omnix
+#: model:ir.model.fields,field_description:x_account_omnix.field_res_config_settings__x_omnix_api_key
+#: model_terms:ir.ui.view,arch_db:x_account_omnix.x_account_omnix_res_config_settings_view_form
+msgid ""
+"OmniX API Key"
+msgstr ""
+"مفتاح واجهة OmniX"
+
+#. module: x_account_omnix
+#: model:ir.model.fields,field_description:x_account_omnix.field_res_config_settings__x_webhook_base_url
+msgid ""
+"X Webhook Base URL"
+msgstr ""
+"رابط الويب هوك الأساسي"
+
+#. module: x_account_omnix
+#: model:ir.model.fields,field_description:x_account_omnix.field_social_account__x_webhook_id
+msgid ""
+"X Webhook ID"
+msgstr ""
+"معرّف ويب هوك X"
+
+#. module: x_account_omnix
+#: model:ir.model.fields,field_description:x_account_omnix.field_social_account__x_webhook_secret
+msgid ""
+"X Webhook Secret"
+msgstr ""
+"سر ويب هوك X"
+
+#. module: x_account_omnix
+#: model:ir.model.fields,field_description:x_account_omnix.field_social_account__x_webhook_url
+msgid ""
+"X Webhook URL"
+msgstr ""
+"رابط ويب هوك X"
+
+#. module: x_account_omnix
+#: model:ir.model.fields,field_description:x_account_omnix.field_social_account__x_webhook_valid
+msgid ""
+"X Webhook Valid"
+msgstr ""
+"ويب هوك X صالح"
+
+#. module: x_account_omnix
+#: model:ir.model.fields,help:x_account_omnix.field_res_config_settings__x_omnix_api_key
+msgid ""
+"OmniX API key (Authorization: Bearer). Used only by the optional OmniX provider; never stored in x.session.store."
+msgstr ""
+"مفتاح واجهة OmniX (Authorization: Bearer). يُستخدم فقط بواسطة مزود OmniX الاختياري، ولا يُخزَّن في x.session.store."
+
+#. module: x_account_omnix
+#: model:ir.model.fields,help:x_account_omnix.field_res_config_settings__x_webhook_base_url
+msgid ""
+"Public https base URL of this Odoo instance, e.g. https://azeez-tech.com. OmniX webhooks are registered at <base>/x_account/webhook."
+msgstr ""
+"الرابط الأساسي العام (https) لنسخة Odoo هذه، مثل https://azeez-tech.com. تُسجَّل ويب هوك OmniX على <base>/x_account/webhook."
+
+#. module: x_account_omnix
+#: model:ir.model.fields,help:x_account_omnix.field_social_account__x_webhook_id
+msgid ""
+"OmniX webhook id registered for this account."
+msgstr ""
+"معرّف ويب هوك OmniX المسجَّل لهذا الحساب."
+
+#. module: x_account_omnix
+#: model:ir.model.fields,help:x_account_omnix.field_social_account__x_webhook_secret
+msgid ""
+"HMAC secret used to verify OmniX webhook deliveries. Returned once by OmniX at registration."
+msgstr ""
+"سر HMAC المستخدم للتحقق من تسليمات ويب هوك OmniX. يُعاد مرة واحدة من OmniX عند التسجيل."
+
+#. module: x_account_omnix
+#: model:ir.model.fields,help:x_account_omnix.field_social_account__x_webhook_url
+msgid ""
+"Receiver URL this account's OmniX webhook posts to."
+msgstr ""
+"رابط الاستقبال الذي يرسل إليه ويب هوك OmniX لهذا الحساب."
+
+#. module: x_account_omnix
+#: model:ir.model.fields,help:x_account_omnix.field_social_account__x_webhook_valid
+msgid ""
+"True once the OmniX webhook passed the CRC handshake."
+msgstr ""
+"يصبح صحيحًا بعد اجتياز ويب هوك OmniX مصافحة CRC."
+
+#. module: x_account_omnix
+#: model:ir.model.fields.selection,name:x_account_omnix.selection__x_import_session__provider__omnix
+#: model:ir.model.fields.selection,name:x_account_omnix.selection__res_config_settings__x_provider__omnix
+#: model:ir.model.fields.selection,name:x_account_omnix.selection__social_account__x_provider__omnix
+msgid ""
+"OmniX REST API"
+msgstr ""
+"واجهة OmniX REST API"
+
+#. module: x_account_omnix
+#: model_terms:ir.actions.server,name:x_account_omnix.action_server_delete_webhook
+msgid ""
+"Delete Webhook"
+msgstr ""
+"حذف الويب هوك"
+
+#. module: x_account_omnix
+#: model_terms:ir.actions.server,name:x_account_omnix.action_server_register_webhook
+msgid ""
+"Register Webhook"
+msgstr ""
+"تسجيل الويب هوك"
+
+#. module: x_account_omnix
+#: model_terms:ir.actions.server,name:x_account_omnix.action_server_validate_webhook
+msgid ""
+"Validate Webhook"
+msgstr ""
+"التحقق من الويب هوك"
+
+#. module: x_account_omnix
+#: model_terms:ir.ui.view,arch_db:x_account_omnix.x_account_omnix_res_config_settings_view_form
+msgid ""
+"OmniX Provider"
+msgstr ""
+"مزود OmniX"
+
+#. module: x_account_omnix
+#: model_terms:ir.ui.view,arch_db:x_account_omnix.x_account_omnix_res_config_settings_view_form
+msgid ""
+"OmniX API key (Authorization: Bearer). Used only by the optional OmniX provider."
+msgstr ""
+"مفتاح واجهة OmniX (Authorization: Bearer). يُستخدم فقط بواسطة مزود OmniX الاختياري."
+
+#. module: x_account_omnix
+#: model_terms:ir.ui.view,arch_db:x_account_omnix.x_account_omnix_res_config_settings_view_form
+msgid ""
+"Webhook Base URL"
+msgstr ""
+"رابط الويب هوك الأساسي"
+
+#. module: x_account_omnix
+#: model_terms:ir.ui.view,arch_db:x_account_omnix.x_account_omnix_res_config_settings_view_form
+msgid ""
+"Public https base URL of this Odoo instance. OmniX webhooks are registered at <base>/x_account/webhook/<account>."
+msgstr ""
+"الرابط الأساسي العام (https) لنسخة Odoo هذه. تُسجَّل ويب هوك OmniX على <base>/x_account/webhook/<account>."

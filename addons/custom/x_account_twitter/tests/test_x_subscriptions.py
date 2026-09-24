@@ -104,7 +104,7 @@ class TestPruneXSubscriptionsOnArchive(XAccountTwitterTestBase):
             'media_id': cls.media.id,
             'social_account_handle': 'prune_acc',
             'twitter_user_id': '1234567890',
-            'x_connection_status': 'active',
+            'x_connection_state': 'active',
             'x_oauth2_access_token': 'fake-at',
             'x_oauth2_refresh_token': 'fake-rt',
         })
@@ -163,7 +163,7 @@ class TestPruneXSubscriptionsOnArchive(XAccountTwitterTestBase):
                 'media_id': self.media.id,
                 'social_account_handle': 'drift_acc',
                 'twitter_user_id': '555000555000555000',
-                'x_connection_status': 'active',
+                'x_connection_state': 'active',
                 'x_oauth2_access_token': 'fake-at',
             })
         drift.with_context(x_skip_subscription_sync=True).write(
@@ -192,7 +192,7 @@ class TestPruneXSubscriptionsOnArchive(XAccountTwitterTestBase):
                 'media_id': self.media.id,
                 'social_account_handle': 'skip_acc',
                 'twitter_user_id': '111222333444555666',
-                'x_connection_status': 'active',
+                'x_connection_state': 'active',
                 'x_oauth2_access_token': 'fake-at',
             })
         archived.with_context(x_skip_subscription_sync=True).write(
@@ -219,7 +219,7 @@ class TestPruneXSubscriptionsOnArchive(XAccountTwitterTestBase):
                 'media_id': self.media.id,
                 'social_account_handle': 'cron_prune_acc',
                 'twitter_user_id': '777000777000777000',
-                'x_connection_status': 'active',
+                'x_connection_state': 'active',
                 'x_oauth2_access_token': 'fake-at',
             })
         cron_target.with_context(x_skip_subscription_sync=True).write(
@@ -294,7 +294,7 @@ class TestResubscribeOnUnarchive(XAccountTwitterTestBase):
                 'media_id': self.media.id,
                 'social_account_handle': handle,
                 'twitter_user_id': user_id,
-                'x_connection_status': 'active',
+                'x_connection_state': 'active',
                 'x_oauth2_access_token': 'fake-at',
             })
         return self.env['social.account'].browse(account.id)
@@ -376,7 +376,7 @@ class TestSubscribeRecordsXSubscriptionId(XAccountTwitterTestBase):
             'media_id': self.media.id,
             'social_account_handle': 'dup_sub_acc',
             'twitter_user_id': '666000666000666000',
-            'x_connection_status': 'active',
+            'x_connection_state': 'active',
             'x_oauth2_access_token': 'fake-at',
         })
 

@@ -283,6 +283,10 @@ class TwitterActivity:
                 self._close_event(event, 'done')
                 processed += 1
                 messages += result.get('messages', 0)
+                # A delivery with nothing readable is skipped, not failed, so
+                # counting it is what lets the task show it stored nothing.
+                if result.get('skipped'):
+                    skipped += 1
             except twitter_errors.TwitterTemporaryError as exc:
                 event.write({'state': 'failed', 'error': str(exc)})
                 errors.append({'event_uuid': event_uuid, 'error': str(exc)})
@@ -916,5 +920,5 @@ class TwitterActivity:
                 ('twitter_user_id', '=', str(user_id)),
             ], limit=1)
         if account:
-            account.write({'x_connection_status': 'disconnected'})
+            account.write({'x_connection_state': 'disconnected'})
             _logger.info('x_account_twitter: user %s revoked app access', user_id)

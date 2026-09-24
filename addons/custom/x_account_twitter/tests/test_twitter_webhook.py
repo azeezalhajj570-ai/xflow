@@ -713,6 +713,17 @@ class TestTwitterActivityProcess(XAccountTwitterTestBase):
                 self._queued_chat_events('diag', 3))
         self.assertEqual(len(self._public_key_calls(decryptor)), 1)
 
+    def test_batch_reports_the_deliveries_it_skipped(self):
+        """A delivery with nothing readable is skipped, not failed. Counting it
+        is what lets the task show it stored nothing while reporting success."""
+        events = self._queued_chat_events('skips', 3)
+        with patch.object(TwitterActivity, '_chat_decryptor_for',
+                          return_value=self._undecryptable_decryptor()):
+            result = TwitterActivity(self.env).process_events_batch(events)
+        self.assertEqual(result['messages'], 0)
+        self.assertEqual(result['skipped'], 3)
+        self.assertEqual(result['processed'], 3)
+
     def test_public_key_diagnostic_pauses_until_decryption_succeeds(self):
         """A failing account must not keep retrying the diagnostic: the read
         resumes only once decryption succeeds again (the unread streak the
@@ -1882,7 +1893,7 @@ class TestTwitterOAuthHeaderFallback(XAccountTwitterTestBase):
             except twitter_errors.TwitterAuthenticationError as exc:
                 caught = exc
         self.assertIsNotNone(caught)
-        self.assertEqual(self.account.x_connection_status, 'reauth_required')
+        self.assertEqual(self.account.x_connection_state, 'reauth_required')
         self.assertEqual(self.account.last_error, 'http_400')
 
     def test_oauth1_credentials_still_use_legacy_signing(self):

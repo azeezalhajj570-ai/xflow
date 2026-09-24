@@ -528,3 +528,77 @@ class TestTaskTargetsAndDuplicateCleanup(XAccountTestBase):
             operations=['repost'])
         failed_like.invalidate_recordset()
         self.assertEqual(failed_like.status, 'failed')
+
+
+class TestTaskResultWarning(XAccountTestBase):
+    """A webhook task that stored nothing must say so.
+
+    An undecryptable delivery is skipped, not failed, so a batch ends
+    ``success`` with ``messages: 0`` — which is how a broken decryption stayed
+    invisible behind a green task list.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.twitter_media = cls.env.ref('social_twitter.social_media_twitter')
+        cls.account = cls.env['social.account'].create({
+            'name': 'Warning Account',
+            'media_id': cls.twitter_media.id,
+        })
+
+    def _task(self, result, operation='process_webhook_event',
+              status='success'):
+        return self.env['x.account.task'].create({
+            'account_id': self.account.id,
+            'operation': operation,
+            'status': status,
+            'done_at': fields.Datetime.now(),
+            'result': json.dumps(result),
+        })
+
+    def test_warns_when_a_batch_stored_nothing(self):
+        task = self._task({'processed': 8, 'skipped': 8, 'messages': 0,
+                           'errors': 0})
+        self.assertEqual(task.result_warning,
+                         'Nothing stored (8 processed, 8 skipped)')
+
+    def test_no_warning_when_a_message_was_stored(self):
+        task = self._task({'processed': 8, 'skipped': 2, 'messages': 6,
+                           'errors': 0})
+        self.assertFalse(task.result_warning)
+
+    def test_no_warning_on_failure_or_other_operations(self):
+        """Only a succeeded webhook batch is flagged: a failed task already
+        shows its error, and other operations do not report message counts."""
+        self.assertFalse(self._task({'processed': 1, 'messages': 0},
+                                    status='failed').result_warning)
+        self.assertFalse(self._task({'processed': 1, 'messages': 0},
+                                    operation='like').result_warning)
+
+    def test_single_delivery_skip_warns_with_its_reason(self):
+        """The single-event path reports a boolean ``processed`` and a string
+        skip reason, which must not be read as a count."""
+        task = self._task({'processed': True, 'messages': 0,
+                           'encrypted': True, 'skipped': 'no_plaintext'})
+        self.assertEqual(task.result_warning,
+                         'Nothing stored (skipped: no_plaintext)')
+
+    def test_python_repr_result_is_parsed(self):
+        """The queue often stores a dict repr rather than JSON."""
+        task = self.env['x.account.task'].create({
+            'account_id': self.account.id,
+            'operation': 'process_webhook_event',
+            'status': 'success',
+            'result': str({'processed': 4, 'skipped': 4, 'messages': 0}),
+        })
+        self.assertEqual(task.result_warning,
+                         'Nothing stored (4 processed, 4 skipped)')
+
+    def test_unreadable_result_is_not_a_warning(self):
+        task = self._task({})
+        self.env.cr.execute(
+            'UPDATE x_account_task SET result = %s WHERE id = %s',
+            ('not a mapping', task.id))
+        task.invalidate_recordset()
+        self.assertFalse(task.result_warning)

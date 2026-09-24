@@ -16,7 +16,7 @@ class XImportSession(models.TransientModel):
 
     provider = fields.Selection(
         selection_add=[
-            ('getxapi', 'GetXAPI REST API'),
+            ('getxapi', 'REST API'),
         ],
         ondelete={'getxapi': 'cascade'},
     )
@@ -41,7 +41,7 @@ class XImportSession(models.TransientModel):
         self.ensure_one()
         handle = self.username.strip() if self.username else ''
         if not handle:
-            raise ValidationError(_('Username / Handle is required for GetXAPI.'))
+            raise ValidationError(_('Username / Handle is required for the REST provider.'))
 
         auth_token = self.auth_token.strip() if self.auth_token else ''
         ct0 = self.ct0.strip() if self.ct0 else ''
@@ -53,7 +53,7 @@ class XImportSession(models.TransientModel):
                 'media_id': self.media_id.id,
                 'x_provider': 'getxapi',
                 'x_auth_method': 'session_cookie',
-                'x_connection_status': 'authenticating',
+                'x_connection_state': 'authenticating',
                 'authtoken': auth_token,
                 'ct0': ct0,
             })
@@ -70,7 +70,7 @@ class XImportSession(models.TransientModel):
             'twitter_user_id': user.get('id') or account.twitter_user_id,
             'social_account_handle': user.get('username') or account.social_account_handle,
             'name': user.get('name') or account.name,
-            'x_connection_status': 'active',
+            'x_connection_state': 'active',
             'last_connected': fields.Datetime.now(),
             'last_validated': fields.Datetime.now(),
         })

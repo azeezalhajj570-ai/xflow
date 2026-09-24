@@ -76,8 +76,8 @@ class TestXSearchViews(XAccountTestBase):
         self.assertEqual(
             view.inherit_id, self.env.ref('social.social_account_view_search'))
         self._assert_arch_has(self._search_arch('social.account'), (
-            'x_connection_active', 'x_connection_reauth', 'x_connection_broken',
-            'x_connection_disabled', 'x_chat_not_initialized',
+            'x_connection_active', 'x_connection_not_configured',
+            'x_connection_error', 'x_chat_not_initialized',
             'x_chat_pin_locked',
             'x_groupby_connection_status', 'x_groupby_chat_key_mode',
             'x_groupby_chat_initialized',

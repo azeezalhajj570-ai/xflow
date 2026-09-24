@@ -53,6 +53,24 @@ _CHAT_KEY_FIELDS = frozenset({
     'x_chat_initialized',
 })
 
+# Detailed connection states that mean a required X component is failing. They
+# all collapse into the 'error' value of the aggregated x_connection_status.
+_X_CONNECTION_FAILED_STATES = frozenset({
+    'reauth_required', 'disconnected', 'invalid', 'error',
+})
+
+# Chat encryption states that mean a required component is failing. Kept next to
+# the connection failures because the account form reports one overall status.
+_X_CHAT_FAILED_STATES = frozenset({'pin_locked', 'stopped'})
+
+# Writing any of these can move the aggregated x_connection_status, so the write
+# hook resyncs it after the change is applied.
+_X_STATUS_TRIGGER_FIELDS = frozenset({
+    'x_connection_state', 'x_chat_initialized', 'x_chat_pin_locked',
+    'x_chat_decrypt_stopped', 'x_encryption_code', 'x_chat_key_blob',
+    'x_chat_key_mode',
+})
+
 _EVENT_PROVIDER_REGISTRY_MAP = {
     'official': 'twitter',
 }
@@ -96,21 +114,39 @@ class SocialAccount(models.Model):
              'its queued tasks are cancelled and no automation runs for it '
              'until it is unarchived.',
     )
-    x_connection_status = fields.Selection(
+    x_connection_state = fields.Selection(
         [
             ('new', 'New'),
             ('authenticating', 'Authenticating'),
             ('active', 'Active'),
+            ('reauth_required', 'Reauthentication Required'),
             ('disconnected', 'Disconnected'),
             ('invalid', 'Invalid'),
-            ('reauth_required', 'Reauthentication Required'),
             ('error', 'Error'),
             ('disabled', 'Disabled'),
         ],
-        string='X Connection Status',
+        string='X Connection State',
         default='new',
+        copy=False,
+        help='Detailed X connection lifecycle, kept for diagnosis and for the '
+             'automation guards. It is never shown in a view: the account form '
+             'reports the aggregated "X Connection Status" instead.',
+    )
+    x_connection_status = fields.Selection(
+        [
+            ('not_configured', 'Not Configured'),
+            ('active', 'Connected'),
+            ('error', 'Error'),
+        ],
+        string='X Connection Status',
+        default='not_configured',
         tracking=True,
-        help='Lifecycle state of the X account connection.',
+        readonly=True,
+        help='Overall X account health, in one value: not configured until the X '
+             'account setup and the required Chat Encryption setup are complete, '
+             'connected while X authentication is valid and Chat Encryption is '
+             'ready, and error when a required X connection/encryption component '
+             'is failing. System-controlled.',
     )
     last_connected = fields.Datetime(string='Last Connected', readonly=True)
     last_validated = fields.Datetime(string='Last Validated', readonly=True)
@@ -166,7 +202,7 @@ class SocialAccount(models.Model):
     )
     x_action_provider = fields.Selection(
         [
-            ('getxapi', 'GetXAPI'),
+            ('getxapi', 'REST API'),
             ('official', 'Official X API'),
         ],
         string='Action Provider',
@@ -277,6 +313,35 @@ class SocialAccount(models.Model):
              'its conversations silently receive nothing. Cleared by a stored '
              'message or a key reconfiguration.',
     )
+    x_chat_status = fields.Selection(
+        [
+            ('not_configured', 'Not Configured'),
+            ('ready', 'Ready'),
+            ('pin_locked', 'PIN Rejected'),
+            ('stopped', 'Decryption Stopped'),
+        ],
+        string='X Chat Status',
+        compute='_compute_x_chat_status',
+        groups='social.group_social_user',
+        help='Where this account stands with X Chat encryption, in one value: '
+             'not configured until its keys are registered, ready while '
+             'encrypted messages are being read, PIN rejected when X refused '
+             'the configured PIN, and decryption stopped when the account kept '
+             'receiving encrypted chats it could no longer read.',
+    )
+
+    @api.depends('x_chat_initialized', 'x_chat_pin_locked',
+                 'x_chat_decrypt_stopped')
+    def _compute_x_chat_status(self):
+        for account in self:
+            if not account.x_chat_initialized:
+                account.x_chat_status = 'not_configured'
+            elif account.x_chat_decrypt_stopped:
+                account.x_chat_status = 'stopped'
+            elif account.x_chat_pin_locked:
+                account.x_chat_status = 'pin_locked'
+            else:
+                account.x_chat_status = 'ready'
     x_chat_decrypt_notified_at = fields.Datetime(
         string='X Chat Decryption Alert Sent At',
         copy=False,
@@ -603,6 +668,26 @@ class SocialAccount(models.Model):
         return self._display_notification(
             'Sync Chat Names', message, kind=kind)
 
+    def _check_chat_key_setup_state(self, expect_initialized):
+        """Refuse a Chat key registration that does not match the account state.
+
+        The form used to hide the wrong half of the pair (Setup Chat Keys vs
+        Reconfigure Encryption Key) behind an invisible condition. A bound
+        server action cannot express that condition, and registering again
+        writes a fresh identity to X and consumes one of the limited daily
+        slots, so the state is checked here instead of trusted to the view.
+        """
+        self.ensure_one()
+        if self.x_chat_initialized == expect_initialized:
+            return
+        if expect_initialized:
+            raise UserError(_(
+                'Chat keys are not set up yet. Use "Setup Chat Keys" to '
+                'register the first identity.'))
+        raise UserError(_(
+            'Chat keys are already registered. Use "Reconfigure Encryption '
+            'Key" to register a new identity.'))
+
     def action_initialize_x_chat_encryption(self):
         """Initialize the account's XChat encryption via its provider.
 
@@ -732,7 +817,8 @@ class SocialAccount(models.Model):
         return super().create(vals_list)
 
     def write(self, vals):
-        """Clear the PIN-lock flag when the operator changes the PIN.
+        """Clear the PIN-lock flag when the operator changes the PIN, and keep
+        the aggregated connection status in sync with the detailed state.
 
         Each wrong PIN attempt consumes one of X's limited guesses before the
         secure backup is permanently locked. When X rejects the PIN we stamp
@@ -769,10 +855,50 @@ class SocialAccount(models.Model):
                 'status': 'cancelled',
                 'error': 'Skipped: account archived',
             })
-        return super().write(vals)
+        res = super().write(vals)
+        # The detailed state moved: refresh the aggregated status the form shows.
+        # The resync writes x_connection_status only, which is not a trigger, so
+        # this cannot recurse.
+        if _X_STATUS_TRIGGER_FIELDS & set(vals) and 'x_connection_status' not in vals:
+            self._sync_x_connection_status()
+        return res
+
+    def _x_overall_connection_status(self):
+        """Aggregate the detailed connection state and the chat state.
+
+        One value for the account form: a failing component wins over an
+        incomplete setup, which wins over a healthy account.
+        """
+        self.ensure_one()
+        if (self.x_connection_state in _X_CONNECTION_FAILED_STATES
+                or self.x_chat_status in _X_CHAT_FAILED_STATES):
+            return 'error'
+        if self.x_connection_state == 'active' and self.x_chat_status == 'ready':
+            return 'active'
+        return 'not_configured'
+
+    def _sync_x_connection_status(self):
+        """Recompute the aggregated status, persist it when it changed, and tell
+        the account's users.
+
+        Called after any write that can move it, so the status bar and its
+        chatter trail follow the detailed state without every caller having to
+        know the aggregation rules. A move to "error" (a required component is
+        failing) or back to "connected" (recovered) also notifies the account's
+        users, in-app and by mail, once per transition.
+        """
+        for account in self:
+            status = account._x_overall_connection_status()
+            if account.x_connection_status == status:
+                continue
+            account.write({'x_connection_status': status})
+            if status == 'error':
+                account._notify_x_status_failed()
+            elif status == 'active':
+                account._notify_x_status_connected()
 
     def _transition(self, status):
-        self.write({'x_connection_status': status})
+        self.write({'x_connection_state': status})
 
     def _set_last_error(self, message):
         self.write({'last_error': message})
@@ -872,6 +998,36 @@ class SocialAccount(models.Model):
         )
         return self._notify_x_users(
             body, 'x_account.mail_template_x_account_reauth_required')
+
+    def _notify_x_status_failed(self):
+        """Tell the account's users the overall connection status turned to
+        "error".
+
+        The connection status collapsed the connection lifecycle and the Chat
+        Encryption state into one value, so this is the single notice for any
+        failure that does not already have its own: the detailed cause is in
+        ``last_error``.
+        """
+        self.ensure_one()
+        body = (
+            'This X account connection is failing: a required X connection or '
+            'Chat Encryption component stopped working, so its automation is '
+            'suspended until it is fixed.'
+            '<br/><br/><pre>%s</pre>'
+            % escape(self.last_error or '')
+        )
+        return self._notify_x_users(
+            body, 'x_account.mail_template_x_account_status_failed')
+
+    def _notify_x_status_connected(self):
+        """Tell the account's users the overall connection status recovered."""
+        self.ensure_one()
+        body = (
+            'This X account is connected again: X authentication is valid and '
+            'Chat Encryption is ready, so its automation can run.'
+        )
+        return self._notify_x_users(
+            body, 'x_account.mail_template_x_account_status_connected')
 
     def _record_chat_decrypt_outcome(self, stored=0, dropped=0):
         """Track this account's chat-decryption health and alert once.
@@ -991,7 +1147,7 @@ class SocialAccount(models.Model):
             ('media_type', '=', 'twitter'),
             ('active', '=', True),
             ('x_session_store_id', '!=', False),
-            ('x_connection_status', 'in', ('active', 'reauth_required', 'error')),
+            ('x_connection_state', 'in', ('active', 'reauth_required', 'error')),
         ])
         from odoo.addons.x_account.services.x_service import XService
         for account in accounts:

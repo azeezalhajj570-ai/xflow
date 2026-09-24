@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- The account form's header buttons, declared as server actions bound to
+         social.account.  binding_view_types="form" keeps them out of the list
+         view's Action menu for now: drop the field (or set "list,form") to make
+         them available there too.
+
+         A view button can carry confirm="..." and invisible="..."; a bound
+         server action cannot.  The confirmation prompts are therefore gone,
+         and X Chat key registration is a rate-limited write, so use the
+         encryption pair deliberately.  The state checks those invisible
+         conditions made are done in code instead, below.
+
+         action_form_fetch_groups and action_form_delete_x_subscriptions replace
+         the unbound action_server_fetch_groups and
+         action_server_delete_x_subscriptions that used to live in
+         data/server_actions.xml.  They take new xml ids on purpose: a record
+         declared inside a noupdate="1" block keeps its ir.model.data.noupdate
+         flag, and the loader never rewrites that column on update, so reusing
+         the old ids would leave the binding unwritten.  The two old records are
+         deleted by migrations/19.0.1.19.0/post-migrate.py.
+    -->
+    <data>
+        <record id="action_form_initialize_encryption" model="ir.actions.server">
+            <field name="name">Initialize Encryption</field>
+            <field name="model_id" ref="social.model_social_account"/>
+            <field name="binding_model_id" ref="social.model_social_account"/>
+            <field name="binding_type">action</field>
+            <field name="binding_view_types">form</field>
+            <field name="group_ids" eval="[(6, 0, [ref('social.group_social_user')])]"/>
+            <field name="sequence">10</field>
+            <field name="state">code</field>
+            <field name="code">action = (records or record)[:1].action_initialize_x_chat_encryption()</field>
+        </record>
+
+        <!-- Setup and Reconfigure call the same method: which one applies
+             depends on x_chat_initialized, which used to be an invisible
+             condition.  _check_chat_key_setup_state refuses the wrong one in
+             code, so the wrong one cannot burn a rate-limited slot. -->
+        <record id="action_form_setup_chat_keys" model="ir.actions.server">
+            <field name="name">Setup Chat Keys</field>
+            <field name="model_id" ref="social.model_social_account"/>
+            <field name="binding_model_id" ref="social.model_social_account"/>
+            <field name="binding_type">action</field>
+            <field name="binding_view_types">form</field>
+            <field name="group_ids" eval="[(6, 0, [ref('social.group_social_user')])]"/>
+            <field name="sequence">20</field>
+            <field name="state">code</field>
+            <field name="code">account = (records or record)[:1]
+account._check_chat_key_setup_state(False)
+action = account.action_register_x_chat_public_keys()</field>
+        </record>
+
+        <record id="action_form_reconfigure_chat_keys" model="ir.actions.server">
+            <field name="name">Reconfigure Encryption Key</field>
+            <field name="model_id" ref="social.model_social_account"/>
+            <field name="binding_model_id" ref="social.model_social_account"/>
+            <field name="binding_type">action</field>
+            <field name="binding_view_types">form</field>
+            <field name="group_ids" eval="[(6, 0, [ref('social.group_social_user')])]"/>
+            <field name="sequence">30</field>
+            <field name="state">code</field>
+            <field name="code">account = (records or record)[:1]
+account._check_chat_key_setup_state(True)
+action = account.action_register_x_chat_public_keys()</field>
+        </record>
+
+        <record id="action_form_delete_x_subscriptions" model="ir.actions.server">
+            <field name="name">Delete X Subscriptions</field>
+            <field name="model_id" ref="social.model_social_account"/>
+            <field name="binding_model_id" ref="social.model_social_account"/>
+            <field name="binding_type">action</field>
+            <field name="binding_view_types">form</field>
+            <field name="sequence">40</field>
+            <field name="state">code</field>
+            <field name="code">results = []
+for rec in records:
+    if rec.x_provider == 'twitter' and rec.twitter_user_id:
+        try:
+            result = rec.action_delete_x_subscriptions()
+            results.append({'account': rec.name, 'deleted': result.get('deleted', 0)})
+        except Exception as e:
+            results.append({'account': rec.name, 'error': str(e)})
+action = {'type': 'ir.actions.client', 'tag': 'display_notification', 'params': {'title': 'Delete X Subscriptions', 'message': str(results), 'type': 'info', 'sticky': True}}</field>
+        </record>
+
+        <record id="action_form_resubscribe_x_subscriptions" model="ir.actions.server">
+            <field name="name">Resubscribe</field>
+            <field name="model_id" ref="social.model_social_account"/>
+            <field name="binding_model_id" ref="social.model_social_account"/>
+            <field name="binding_type">action</field>
+            <field name="binding_view_types">form</field>
+            <field name="sequence">50</field>
+            <field name="state">code</field>
+            <field name="code">action = (records or record)[:1].action_resubscribe_x_subscriptions()</field>
+        </record>
+
+        <record id="action_form_sync_chat_names" model="ir.actions.server">
+            <field name="name">Sync Chat Names</field>
+            <field name="model_id" ref="social.model_social_account"/>
+            <field name="binding_model_id" ref="social.model_social_account"/>
+            <field name="binding_type">action</field>
+            <field name="binding_view_types">form</field>
+            <field name="group_ids" eval="[(6, 0, [ref('social.group_social_user')])]"/>
+            <field name="sequence">60</field>
+            <field name="state">code</field>
+            <field name="code">action = False
+for rec in records:
+    action = rec.with_context(dialog=True).action_sync_chat_names()</field>
+        </record>
+
+        <record id="action_form_fetch_groups" model="ir.actions.server">
+            <field name="name">Fetch Groups</field>
+            <field name="model_id" ref="social.model_social_account"/>
+            <field name="binding_model_id" ref="social.model_social_account"/>
+            <field name="binding_type">action</field>
+            <field name="binding_view_types">form</field>
+            <field name="group_ids" eval="[(6, 0, [ref('social.group_social_user')])]"/>
+            <field name="sequence">70</field>
+            <field name="state">code</field>
+            <field name="code">action = False
+for rec in records:
+    action = rec.with_context(dialog=True).action_fetch_groups()</field>
+        </record>
+    </data>
+</odoo>

@@ -25,10 +25,22 @@ therefore never come out negative, which it did when a later repost of the same
 link was picked up as the receipt.
 """
 
-from odoo import fields, models, tools
+from odoo import api, fields, models, tools
 
 _ENGAGEMENT_OPERATIONS = (
     'like', 'repost', 'bookmark', 'comment', 'follow', 'unbookmark')
+
+# Index in Odoo's own badge palette ($o-colors, secondary_variables.scss),
+# used through the badge's ``color_field`` option so the report reuses the
+# existing colors instead of defining new ones.
+_OPERATION_COLORS = {
+    'like': 9,         # pink
+    'repost': 10,      # green
+    'bookmark': 4,     # blue
+    'comment': 3,      # yellow
+    'follow': 7,       # teal
+    'unbookmark': 1,   # red
+}
 
 
 class XAccountOperationReport(models.Model):
@@ -51,6 +63,11 @@ class XAccountOperationReport(models.Model):
     operation = fields.Selection(
         [(op, op.replace('_', ' ').title()) for op in _ENGAGEMENT_OPERATIONS],
         string='Operation', readonly=True)
+    operation_color = fields.Integer(
+        string='Operation Color',
+        compute='_compute_operation_color',
+        help='Index in the Odoo badge palette used to color the operation '
+             'badge on the report.')
     tweet_id = fields.Char(string='Tweet ID', readonly=True)
     tweet_screen_name = fields.Char(string='Tweet Author', readonly=True)
     author_x_id = fields.Char(string='Author X ID', readonly=True)
@@ -78,6 +95,11 @@ class XAccountOperationReport(models.Model):
     )
     operation_count = fields.Integer(
         string='Operations', readonly=True, aggregator='sum')
+
+    @api.depends('operation')
+    def _compute_operation_color(self):
+        for record in self:
+            record.operation_color = _OPERATION_COLORS.get(record.operation, 0)
 
     def init(self):
         tools.drop_view_if_exists(self.env.cr, self._table)
