@@ -98,6 +98,10 @@
                     <filter string="Rate Limited" name="filter_rate_limit" domain="[('error_type', '=', 'rate_limit')]"/>
                     <filter string="Daily DM Limit" name="filter_daily_dm_limit" domain="[('twitter_error_code', '=', 502)]"/>
                     <separator/>
+                    <filter string="Today" name="filter_today"
+                        domain="[('timestamp', '&gt;=', context_today().strftime('%Y-%m-%d')), ('timestamp', '&lt;', (context_today() + datetime.timedelta(days=1)).strftime('%Y-%m-%d'))]"/>
+                    <filter string="Last Hour" name="filter_last_hour"
+                        domain="[('timestamp', '&gt;=', (datetime.datetime.now().to_utc() - datetime.timedelta(hours=1)).strftime('%Y-%m-%d %H:%M:%S'))]"/>
                     <filter string="Timestamp" name="filter_timestamp" date="timestamp"/>
                     <separator/>
                     <group>
