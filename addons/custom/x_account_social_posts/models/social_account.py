@@ -9,10 +9,7 @@ type and creates the stream lazily when the operator fetches posts.
 
 from odoo import api, fields, models
 
-from .social_stream import (
-    X_ACCOUNT_POSTS_STREAM_TYPE,
-    provider_supports_post_reads,
-)
+from .social_stream import X_ACCOUNT_POSTS_STREAM_TYPE
 
 
 class SocialAccount(models.Model):
@@ -20,8 +17,6 @@ class SocialAccount(models.Model):
 
     x_social_stream_post_count = fields.Integer(
         'X Posts', compute='_compute_x_social_stream_post_count')
-    x_can_fetch_posts = fields.Boolean(
-        'Can Fetch X Posts', compute='_compute_x_can_fetch_posts')
 
     @api.depends('media_type')
     def _compute_x_social_stream_post_count(self):
@@ -29,14 +24,6 @@ class SocialAccount(models.Model):
         for account in self:
             account.x_social_stream_post_count = Post.search_count(
                 [('account_id', '=', account.id)])
-
-    @api.depends('media_type', 'x_provider')
-    def _compute_x_can_fetch_posts(self):
-        """True when the account's provider implements the timeline read."""
-        for account in self:
-            account.x_can_fetch_posts = (
-                account.media_type == 'twitter'
-                and provider_supports_post_reads(account))
 
     def _get_or_create_x_posts_stream(self):
         """Return the account's 'X Account Posts' stream, creating it once."""
