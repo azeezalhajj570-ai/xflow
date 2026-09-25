@@ -74,13 +74,18 @@ class SocialAccount(models.Model):
         }
 
     def action_open_x_posts(self):
-        """Open the account's fetched X posts."""
+        """Open the account's fetched X posts (kanban first)."""
         self.ensure_one()
+        kanban = self.env.ref(
+            'social.social_stream_post_view_kanban', raise_if_not_found=False)
+        views = [(kanban.id, 'kanban')] if kanban else []
+        views += [(False, 'list'), (False, 'form')]
         return {
             'type': 'ir.actions.act_window',
             'name': 'X Posts',
             'res_model': 'social.stream.post',
-            'view_mode': 'list,form',
+            'view_mode': 'kanban,list,form',
             'domain': [('account_id', '=', self.id)],
+            'views': views,
             'context': {'search_default_group_by_stream': 1},
         }
