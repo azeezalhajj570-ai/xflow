@@ -18,6 +18,7 @@ refresh token and refreshes lazily before a call (or on 401).
 import logging
 from datetime import timedelta
 
+import psycopg2
 import requests
 
 from odoo import api, fields, models, _
@@ -175,6 +176,13 @@ class SocialAccount(models.Model):
                 if account.media_type == 'twitter' and account.twitter_user_id:
                     try:
                         account._sync_subscriptions()
+                    except psycopg2.Error:
+                        # A database failure (a SerializationFailure from a
+                        # concurrent writer, say) must reach service.retrying():
+                        # it rolls back and retries the request. Swallowing it
+                        # would leave the transaction aborted and break the rest
+                        # of the caller instead.
+                        raise
                     except Exception:
                         _logger.exception(
                             'x_account_twitter: subscription sync failed for account %s',
@@ -184,6 +192,12 @@ class SocialAccount(models.Model):
                 if account.media_type == 'twitter' and account.twitter_user_id:
                     try:
                         account._prune_x_subscriptions()
+                    except psycopg2.Error:
+                        # Pruning flushes the caller's pending writes, so a
+                        # concurrent writer (the task-queue cron) can raise a
+                        # SerializationFailure here. Let retrying() roll back
+                        # and retry; the X API failures below stay swallowed.
+                        raise
                     except Exception:
                         _logger.exception(
                             'x_account_twitter: failed to prune X subscriptions '
