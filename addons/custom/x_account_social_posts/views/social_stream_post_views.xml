@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- The stock Feed is kanban-only with a custom JS renderer, so this
+         module ships its own list/form to expose the fetched posts and their
+         interaction drill-down. -->
+    <record id="x_social_stream_post_view_list" model="ir.ui.view">
+        <field name="name">x.social.stream.post.view.list</field>
+        <field name="model">social.stream.post</field>
+        <field name="arch" type="xml">
+            <list string="X Posts" create="false" edit="false">
+                <field name="published_date"/>
+                <field name="author_name"/>
+                <field name="message"/>
+                <field name="x_favorite_count" string="Likes"/>
+                <field name="x_retweet_count" string="Retweets"/>
+                <field name="x_reply_count" string="Replies"/>
+                <field name="x_comment_count" string="Comments stored"/>
+                <field name="x_author_x_username" optional="hide"/>
+                <field name="stream_id" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="x_social_stream_post_view_form" model="ir.ui.view">
+        <field name="name">x.social.stream.post.view.form</field>
+        <field name="model">social.stream.post</field>
+        <field name="arch" type="xml">
+            <form string="X Post" create="false" edit="false">
+                <header>
+                    <button name="action_refresh_x_interactions" type="object"
+                        string="Refresh Interactions" class="btn-primary"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="author_name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="stream_id" readonly="1"/>
+                            <field name="published_date" readonly="1"/>
+                            <field name="x_tweet_id" readonly="1"/>
+                            <field name="x_source_provider" readonly="1"/>
+                            <field name="post_link" widget="url" readonly="1"/>
+                            <field name="x_interactions_fetched_at" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="x_favorite_count" readonly="1"/>
+                            <field name="x_retweet_count" readonly="1"/>
+                            <field name="x_reply_count" readonly="1"/>
+                            <field name="x_quote_count" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Message" name="x_message">
+                            <field name="message" readonly="1"/>
+                        </page>
+                        <page string="Comments" name="x_comments">
+                            <field name="x_interaction_ids" readonly="1"
+                                domain="[('kind', '=', 'comment')]">
+                                <list create="false" delete="false">
+                                    <field name="author_name"/>
+                                    <field name="author_x_username"/>
+                                    <field name="text"/>
+                                    <field name="like_count"/>
+                                    <field name="external_created_at"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Retweets" name="x_retweets">
+                            <field name="x_interaction_ids" readonly="1"
+                                domain="[('kind', '=', 'retweet')]">
+                                <list create="false" delete="false">
+                                    <field name="author_name"/>
+                                    <field name="author_x_username"/>
+                                    <field name="author_partner_id"/>
+                                    <field name="external_created_at"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Likes" name="x_likes">
+                            <field name="x_interaction_ids" readonly="1"
+                                domain="[('kind', '=', 'like')]">
+                                <list create="false" delete="false">
+                                    <field name="author_name"/>
+                                    <field name="author_x_username"/>
+                                    <field name="author_partner_id"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="x_social_stream_post_view_search" model="ir.ui.view">
+        <field name="name">x.social.stream.post.view.search</field>
+        <field name="model">social.stream.post</field>
+        <field name="arch" type="xml">
+            <search string="X Posts">
+                <field name="message"/>
+                <field name="author_name"/>
+                <field name="x_author_x_username"/>
+                <filter name="x_with_comments" string="With comments stored"
+                    domain="[('x_comment_count', '&gt;', 0)]"/>
+                <group expand="0" string="Group By">
+                    <filter name="group_by_stream" string="Stream"
+                        context="{'group_by': 'stream_id'}"/>
+                    <filter name="group_by_provider" string="Provider"
+                        context="{'group_by': 'x_source_provider'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_x_social_stream_posts" model="ir.actions.act_window">
+        <field name="name">X Posts</field>
+        <field name="res_model">social.stream.post</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('media_type', '=', 'twitter')]</field>
+        <field name="view_ids" eval="[(5, 0, 0),
+            (0, 0, {'view_mode': 'list', 'view_id': ref('x_social_stream_post_view_list')}),
+            (0, 0, {'view_mode': 'form', 'view_id': ref('x_social_stream_post_view_form')})]"/>
+    </record>
+
+    <menuitem id="menu_x_social_stream_posts" parent="social.menu_social_global"
+        action="action_x_social_stream_posts" sequence="15" name="X Posts"/>
+</odoo>

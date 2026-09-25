@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="x_account_xactions_social_account_view_form" model="ir.ui.view">
+        <field name="name">x.account.xactions.social.account.view.form</field>
+        <field name="model">social.account</field>
+        <field name="inherit_id" ref="x_account.x_account_social_account_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//group[@name='x_account_api']" position="inside">
+                <field name="x_xactions_account_id"
+                    invisible="x_provider != 'xactions'"
+                    placeholder="Linked XActions account id (optional)"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

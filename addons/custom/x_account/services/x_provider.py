@@ -57,12 +57,86 @@ class XProvider:
     # 'official_publish', or an external one like 'omnix').
     _provider_code = None
 
+    # The read capabilities this provider implements (a subset of the read
+    # methods below). Empty means "no timeline/interaction reads". Declared on
+    # the class so consumers can detect support *without instantiating* the
+    # provider or binding to a provider code, e.g.:
+    #   _read_operations = frozenset({'fetch_user_posts', 'fetch_post_comments'})
+    # `x_account_social_posts` uses this to decide which accounts it can fetch
+    # posts for.
+    _read_operations = frozenset()
+
     def __init__(self, env, account):
         self.env = env
         self.account = account
 
     def validate_session(self):
         raise NotImplementedError
+
+    # --- Read capabilities (timeline + interactions) ---------------------
+    #
+    # Providers that can read an account's own posts and the interactions on
+    # a post implement these. The defaults report the capability as
+    # unsupported (instead of raising) so a caller can degrade gracefully:
+    # e.g. `x_account_social_posts` still stores the post counters even when
+    # the provider cannot list individual engagers.
+    #
+    # Contract return shapes:
+    #   fetch_user_posts      -> {'posts': [post DTO], 'cursor': str, 'has_more': bool}
+    #   fetch_post_comments   -> {'comments': [post DTO], 'cursor': str, 'has_more': bool}
+    #   fetch_post_retweeters -> {'users': [user DTO], 'cursor': str, 'has_more': bool}
+    #   fetch_post_likers     -> {'users': [user DTO], 'cursor': str, 'has_more': bool}
+    # Each may additionally carry {'unsupported': True, 'reason': str}.
+    #
+    # post DTO:  {id, text, author_id, author_username, author_name,
+    #             created_at, favorite_count, retweet_count, reply_count,
+    #             quote_count, conversation_id, in_reply_to_tweet_id, raw,
+    #             audience?}
+    # user DTO:  {id, username, name, profile_image_url}
+    # comment DTO: a post DTO, or a person-shaped {id, author_id,
+    #             author_username, author_name, text?}
+    #
+    # A post DTO MAY carry `audience` — {'likers': [user DTO],
+    # 'commenters': [comment DTO], 'retweeters': [user DTO]} — for providers
+    # whose timeline read returns the engagers inline (e.g. XActions
+    # /api/posts/report). The sync stores these without a second round trip;
+    # providers that don't return them leave the key absent and the sync calls
+    # the fetch_post_* methods instead.
+
+    def fetch_user_posts(self, screen_name, limit=20, cursor=None,
+                         per_post_limit=None):
+        """Return the account owner's own posts (timeline).
+
+        ``per_post_limit`` caps the users read per interaction type per post
+        for providers that return engagers inline; providers that don't may
+        ignore it.
+        """
+        return self._unsupported('fetch_user_posts')
+
+    def fetch_post_comments(self, tweet_id, limit=50, cursor=None):
+        """Return the replies (comments) to a post."""
+        return self._unsupported('fetch_post_comments')
+
+    def fetch_post_retweeters(self, tweet_id, limit=100, cursor=None):
+        """Return the users who retweeted a post."""
+        return self._unsupported('fetch_post_retweeters')
+
+    def fetch_post_likers(self, tweet_id, limit=100, cursor=None):
+        """Return the users who liked a post.
+
+        X exposes no public 'who liked' endpoint (this is a platform
+        limitation, not a provider gap). Providers should keep this
+        unsupported until a source exists."""
+        return self._unsupported('fetch_post_likers')
+
+    @staticmethod
+    def _unsupported(operation, reason='provider_does_not_support_read'):
+        return {
+            'posts': [], 'comments': [], 'users': [],
+            'cursor': '', 'has_more': False,
+            'unsupported': True,
+            'reason': '%s:%s' % (operation, reason),
+        }
 
 
 # Built-in providers, keyed by the social.account.x_provider selection value.

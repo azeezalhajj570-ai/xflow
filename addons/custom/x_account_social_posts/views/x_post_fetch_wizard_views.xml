@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="x_post_fetch_wizard_view_form" model="ir.ui.view">
+        <field name="name">x.post.fetch.wizard.view.form</field>
+        <field name="model">x.post.fetch.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Fetch X Posts">
+                <group>
+                    <field name="account_id" readonly="1"/>
+                    <field name="limit"/>
+                </group>
+                <group string="Interactions">
+                    <group>
+                        <field name="fetch_comments"/>
+                        <field name="max_comments"
+                            invisible="not fetch_comments"/>
+                    </group>
+                    <group>
+                        <field name="fetch_retweeters"/>
+                        <field name="max_retweeters"
+                            invisible="not fetch_retweeters"/>
+                    </group>
+                </group>
+                <group string="Likes">
+                    <group>
+                        <field name="fetch_likers"/>
+                        <field name="max_likers" invisible="not fetch_likers"/>
+                    </group>
+                </group>
+                <footer>
+                    <button name="action_fetch" type="object"
+                        string="Fetch" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary"
+                        special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="x_post_interaction_view_list" model="ir.ui.view">
+        <field name="name">x.post.interaction.view.list</field>
+        <field name="model">x.post.interaction</field>
+        <field name="arch" type="xml">
+            <list string="X Interactions" create="false" edit="false">
+                <field name="kind"/>
+                <field name="author_name"/>
+                <field name="author_x_username"/>
+                <field name="text"/>
+                <field name="like_count" optional="hide"/>
+                <field name="reply_count" optional="hide"/>
+                <field name="retweet_count" optional="hide"/>
+                <field name="external_created_at"/>
+                <field name="stream_post_id"/>
+                <field name="provider" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="x_post_interaction_view_form" model="ir.ui.view">
+        <field name="name">x.post.interaction.view.form</field>
+        <field name="model">x.post.interaction</field>
+        <field name="arch" type="xml">
+            <form string="X Interaction" create="false" edit="false">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="kind"/>
+                            <field name="stream_post_id"/>
+                            <field name="author_partner_id"/>
+                            <field name="author_name"/>
+                            <field name="author_x_username"/>
+                            <field name="author_x_id"/>
+                        </group>
+                        <group>
+                            <field name="external_id"/>
+                            <field name="external_created_at"/>
+                            <field name="fetched_at"/>
+                            <field name="provider"/>
+                        </group>
+                    </group>
+                    <group string="Comment">
+                        <field name="text" nolabel="1"/>
+                    </group>
+                    <group string="Metadata">
+                        <group>
+                            <field name="like_count"/>
+                            <field name="reply_count"/>
+                            <field name="retweet_count"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Raw metadata" name="raw">
+                            <field name="raw_metadata" readonly="1"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="x_post_interaction_view_search" model="ir.ui.view">
+        <field name="name">x.post.interaction.view.search</field>
+        <field name="model">x.post.interaction</field>
+        <field name="arch" type="xml">
+            <search string="X Interactions">
+                <field name="author_name"/>
+                <field name="author_x_username"/>
+                <field name="text"/>
+                <field name="external_id"/>
+                <filter name="kind_comment" string="Comments"
+                    domain="[('kind', '=', 'comment')]"/>
+                <filter name="kind_retweet" string="Retweets"
+                    domain="[('kind', '=', 'retweet')]"/>
+                <filter name="kind_like" string="Likes"
+                    domain="[('kind', '=', 'like')]"/>
+                <group expand="0" string="Group By">
+                    <filter name="group_by_kind" string="Kind"
+                        context="{'group_by': 'kind'}"/>
+                    <filter name="group_by_author" string="Author"
+                        context="{'group_by': 'author_partner_id'}"/>
+                    <filter name="group_by_provider" string="Provider"
+                        context="{'group_by': 'provider'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_x_post_interactions" model="ir.actions.act_window">
+        <field name="name">X Interactions</field>
+        <field name="res_model">x.post.interaction</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <menuitem id="menu_x_post_interactions" parent="social.menu_social_global"
+        action="action_x_post_interactions" sequence="16" name="X Interactions"/>
+</odoo>

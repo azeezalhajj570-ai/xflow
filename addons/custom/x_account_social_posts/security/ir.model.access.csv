@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_x_post_interaction_user,x.post.interaction.user,model_x_post_interaction,social.group_social_user,1,0,0,0
+access_x_post_interaction_manager,x.post.interaction.manager,model_x_post_interaction,social.group_social_manager,1,1,1,1
+access_x_post_fetch_wizard_user,x.post.fetch.wizard.user,model_x_post_fetch_wizard,social.group_social_user,1,1,1,1
+access_x_post_fetch_wizard_manager,x.post.fetch.wizard.manager,model_x_post_fetch_wizard,social.group_social_manager,1,1,1,1
