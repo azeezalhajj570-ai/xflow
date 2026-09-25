@@ -919,16 +919,20 @@ class SocialAccount(models.Model):
         })
 
     def _x_notify_users(self):
-        """Internal users who manage X accounts in this account's company.
+        """Internal users who can act on this account.
 
-        The recipients of every account lifecycle notice: reauthentication and
-        stopped chat decryption are addressed to whoever can act on the account,
-        in the company that owns it.
+        The recipients of every account lifecycle notice: reauthentication,
+        stopped chat decryption and the aggregated connection status. They are
+        the internal users of the company that owns the account.
+
+        It used to intersect that with ``social.group_social_user``, which
+        silently dropped every company whose users do not carry the Social
+        group: the notice had no recipient at all and no mail was ever sent.
         """
         self.ensure_one()
-        group = self.env.ref('social.group_social_user')
         return self.env['res.users'].sudo().search([
-            ('group_ids', 'in', group.id),
+            ('share', '=', False),
+            ('active', '=', True),
             ('company_ids', 'in', self.company_id.id),
         ])
 
