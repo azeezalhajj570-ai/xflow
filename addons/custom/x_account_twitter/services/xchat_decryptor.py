@@ -49,6 +49,20 @@ _B64URL_RE = re.compile(r'^[A-Za-z0-9_-]+$')
 _BYTES_REPR_RE = re.compile(r"^(?:bytearray\()?b'(.*)'\)?$", re.DOTALL)
 
 
+class XChatKeyUnavailable(ValueError):
+    """The account's Chat key record could not be READ from X.
+
+    Distinct from the account genuinely having no secure-backup config: nothing
+    about its keys changed, the read was throttled (or failed), so the same
+    request succeeds once the rate-limit window resets. Callers must not treat
+    it as a decryption failure — the key material is not the problem, and
+    counting it as one is what made a 429 look like a lost connection.
+
+    Subclasses ``ValueError`` so existing ``except ValueError`` callers keep
+    working.
+    """
+
+
 class XChatDecryptor:
     """Lazy, per-account wrapper around the official Chat XDK."""
 
@@ -59,6 +73,14 @@ class XChatDecryptor:
     # as it is when the read fails, so a long pause would delay recovery from a
     # transient throttle for no gain.
     _PUBLIC_KEY_FETCH_BACKOFF_SECONDS = 300
+
+    # How long a successful public-keys read is reused before it is read again.
+    # A webhook batch builds a fresh decryptor, so without this the account's
+    # own keys are re-read once per batch and every conversation participant's
+    # keys once per batch they appear in — the same per-authenticated-user 24h
+    # budget key registration needs. Public keys only change on registration or
+    # rotation, so an hour bounds both the staleness and the spend.
+    _PUBLIC_KEY_CACHE_TTL_SECONDS = 3600
 
     def __init__(self, env, account, client=None):
         self.env = env
@@ -94,8 +116,10 @@ class XChatDecryptor:
 
         For ``key_blob`` this validates/imports the stored blob; for
         ``juicebox`` it recovers keys from X's secure key backup using the
-        account PIN. Raises ValueError when no key material is configured.
-        Returns the unlocked ``Chat`` instance.
+        account PIN. Raises ``XChatKeyUnavailable`` when the account's key
+        record could not be read (a throttle is not a missing config) and
+        ValueError when no key material is configured. Returns the unlocked
+        ``Chat`` instance.
         """
         account = self.account
         keys_record = self._public_keys_record()
@@ -112,11 +136,7 @@ class XChatDecryptor:
                     'attempts paused to protect the secure backup. Re-enter '
                     'the PIN to resume.' % account.id)
             if not (keys_record and keys_record.get('juicebox_config')):
-                raise ValueError(
-                    'Account %s has no X Chat secure-backup (Juicebox) config; '
-                    'it cannot unlock keys by PIN. Use an imported key blob, or '
-                    'run first-time setup (generate_keypairs + setup + register '
-                    'public keys).' % account.id)
+                raise self._keys_unavailable_error(account)
             from chat_xdk import Chat
             import json as _json
             chat = Chat(_json.dumps(keys_record['juicebox_config']))
@@ -132,9 +152,14 @@ class XChatDecryptor:
                 self._unlock_with_retry(chat, account.x_encryption_code)
                 if getattr(account, 'x_chat_pin_locked', False):
                     account.sudo().write({'x_chat_pin_locked': False})
-                # Always persist the selected version after successful unlock
-                # (handles key rotation: if X rotated keys, we now use the new version)
-                if selected_version:
+                # Persist the selected version after a successful unlock
+                # (handles key rotation: if X rotated keys, we now use the new
+                # version). Only when it actually differs: the value is stable
+                # for a healthy account, and rewriting it on every batch is a
+                # row lock on social_account per batch, which contends with the
+                # UI's own saves on the account.
+                if selected_version and str(selected_version) != (
+                        account.x_chat_signing_key_version or ''):
                     account.sudo().write({
                         'x_chat_signing_key_version': str(selected_version)
                     })
@@ -222,6 +247,21 @@ class XChatDecryptor:
         # force: an explicit setup is the operator spending budget on purpose,
         # so it must not be held back by the automatic read's backoff.
         existing = self._public_key_records_for(user_id, force=True)
+        if self._public_key_fetch_error is not None:
+            # The read failed (typically the same 24h budget), so we cannot tell
+            # whether this account already has registered keys. Continuing would
+            # generate a fresh identity and POST it — spending one of the few
+            # daily slots on a request that cannot even verify it is needed, and
+            # burying the real cause. Fail closed and say when to retry.
+            exc = self._public_key_fetch_error
+            hint = self._rate_limit_reset_hint(exc) \
+                if isinstance(exc, twitter_errors.TwitterRateLimitError) else ''
+            raise ValueError(
+                'Could not read the X Chat public keys already registered for '
+                'account %s, so no new identity was registered (registering now '
+                'would consume a daily slot without being able to check whether '
+                'it is needed).%s Retry once that read succeeds.'
+                % (account.id, hint)) from exc
         for record in existing:
             if record.get('juicebox_config'):
                 raise ValueError(
@@ -303,6 +343,9 @@ class XChatDecryptor:
             if exported:
                 exported[:] = b'\x00' * len(exported)
 
+        # The registration added a public-key row (and, for juicebox mode, the
+        # secure-backup config): drop the cached copy so the next read sees it.
+        self._drop_cached_records(user_id)
         account.sudo().write({
             'x_chat_signing_key_version': version,
             'x_chat_initialized': True,
@@ -558,7 +601,9 @@ class XChatDecryptor:
         This handles key rotation gracefully: when X rotates keys, the API
         returns the new version, and we use it immediately.
 
-        Returns the selected record dict, or {} if no records found.
+        Returns the selected record dict, or {} when no record could be read.
+        Callers tell "the read failed" from "the account has no keys" with
+        ``_keys_unavailable_error``.
         """
         if self.client is None or not self.account.twitter_user_id:
             return {}
@@ -594,12 +639,40 @@ class XChatDecryptor:
         
         return latest_record
 
+    def _keys_unavailable_error(self, account):
+        """Build the error for "the account's key record could not be read".
+
+        A throttled or failed read is transient and says nothing about the key
+        material, so it raises ``XChatKeyUnavailable`` — callers must not count
+        it as a decryption failure, and it carries the rate-limit reset window.
+        A read that *succeeded* but published no secure-backup config is a real
+        misconfiguration, so it keeps the actionable "run first-time setup"
+        error.
+        """
+        from . import twitter_errors
+        exc = self._public_key_fetch_error
+        if exc is not None or self._public_key_fetch_backoff_active(
+                account.twitter_user_id):
+            hint = self._rate_limit_reset_hint(exc) \
+                if isinstance(exc, twitter_errors.TwitterRateLimitError) else ''
+            return XChatKeyUnavailable(
+                'X Chat public keys for account %s could not be read from X, so '
+                'its encrypted chats cannot be decrypted right now. The key '
+                'material is unchanged: this is a read problem (throttling or a '
+                'temporary failure), not a missing setup.%s' % (account.id, hint))
+        return ValueError(
+            'Account %s has no X Chat secure-backup (Juicebox) config; '
+            'it cannot unlock keys by PIN. Use an imported key blob, or '
+            'run first-time setup (generate_keypairs + setup + register '
+            'public keys).' % account.id)
+
     def _public_keys_record(self):
-        """Fetch the account's Chat public-key record(s) from the X API.
+        """Return the account's own Chat public-key record.
 
         Includes the ``juicebox_config`` needed to construct a ``Chat`` instance
         that can recover keys via the secure key backup (``setup``/``unlock``).
-        Returns the selected record dict (latest or persisted version), or {} on failure.
+        Returns the selected record dict (the latest version), or {} when no
+        record could be read.
         """
         if self._public_keys_cache is not None:
             return self._public_keys_cache
@@ -616,21 +689,35 @@ class XChatDecryptor:
         version.  The XDK selects the matching version itself when it receives
         all rows.
 
+        Served from the account's persisted cache within
+        ``_PUBLIC_KEY_CACHE_TTL_SECONDS``: every webhook batch builds a fresh
+        decryptor, so an uncached read here is one read per batch for the
+        account's own keys plus one per distinct sender — all spending the same
+        per-authenticated-user budget that key registration needs.
+
         ``force`` is for the explicit key-setup flow, where the operator is
-        deliberately spending the endpoint's budget; every automatic read backs
-        off after a failure (see ``_public_key_fetch_backoff_active``).
+        deliberately spending the endpoint's budget: it bypasses both the cache
+        and the backoff, and refreshes the cache on success. Automatic reads
+        back off per user after a failure (see
+        ``_public_key_fetch_backoff_active``), so a participant's throttle never
+        stops the account from reading its own keys.
         """
         if not user_id or self.client is None:
             return []
         cache_key = str(user_id)
         if cache_key in self._public_key_records_cache:
             return self._public_key_records_cache[cache_key]
-        if not force and self._public_key_fetch_backoff_active():
-            # A read failed moments ago. X's budget for this endpoint is spent,
-            # so reading again now cannot succeed — it only starves the key
-            # registration that shares the budget.
-            self._public_key_records_cache[cache_key] = []
-            return []
+        if not force:
+            if self._public_key_fetch_backoff_active(cache_key):
+                # A read for this user failed moments ago. X's budget for this
+                # endpoint is spent, so reading again now cannot succeed — it
+                # only starves the key registration that shares the budget.
+                self._public_key_records_cache[cache_key] = []
+                return []
+            cached = self._cached_records(cache_key)
+            if cached is not None:
+                self._public_key_records_cache[cache_key] = cached
+                return cached
         try:
             data = self.client.request(
                 'GET', '/2/users/%s/public_keys' % user_id,
@@ -640,7 +727,8 @@ class XChatDecryptor:
             rows = (data or {}).get('data') or []
             records = [row for row in rows if isinstance(row, dict)]
             self._public_key_fetch_error = None
-            self._clear_public_key_fetch_backoff()
+            self._clear_public_key_fetch_backoff(cache_key)
+            self._store_records(cache_key, records)
             self._public_key_records_cache[cache_key] = records
             return records
         except Exception as exc:
@@ -651,37 +739,135 @@ class XChatDecryptor:
             # setup flow can tell "X throttled the fetch" apart from "X
             # returned no Juicebox config" and raise an actionable error.
             self._public_key_fetch_error = exc
-            self._note_public_key_fetch_failure()
+            self._note_public_key_fetch_failure(cache_key)
             _LOGGER.warning(
                 'Failed to fetch Chat public keys for user %s (account %s): '
                 '%s: %s', user_id, self.account.id, type(exc).__name__,
                 str(exc)[:200])
+            # Deliberately NOT persisted: caching a failed read would make the
+            # account look keyless for a whole TTL after the window resets.
             self._public_key_records_cache[cache_key] = []
             return []
 
-    def _public_key_fetch_backoff_active(self):
+    def _cached_records(self, user_id):
+        """Records for ``user_id`` from the account's persisted cache.
+
+        Returns None when absent, malformed, or older than the TTL. An empty
+        list is a valid cached value: the read succeeded and X published no
+        keys for that user.
+        """
+        entry = (self.account.x_chat_public_keys_cache or {}).get(str(user_id))
+        if not isinstance(entry, dict):
+            return None
+        try:
+            fetched_at = fields.Datetime.to_datetime(entry.get('fetched_at'))
+        except (TypeError, ValueError):
+            return None
+        if not fetched_at:
+            return None
+        if fields.Datetime.now() >= fetched_at + timedelta(
+                seconds=self._PUBLIC_KEY_CACHE_TTL_SECONDS):
+            return None
+        records = entry.get('records')
+        return records if isinstance(records, list) else None
+
+    def _store_records(self, user_id, records):
+        """Cache ``records`` for ``user_id`` on the account (best effort).
+
+        Reads-modifies-writes a single Json field, so two processes refreshing
+        different users at the same moment can drop one entry; that only costs
+        one extra API read, which is why a cache write failure is logged and
+        swallowed instead of failing the decryption path.
+        """
+        try:
+            self.account.invalidate_recordset(['x_chat_public_keys_cache'])
+            cache = dict(self.account.x_chat_public_keys_cache or {})
+            cache[str(user_id)] = {
+                'fetched_at': fields.Datetime.now().isoformat(),
+                'records': records,
+            }
+            self.account.sudo().write({'x_chat_public_keys_cache': cache})
+        except Exception as exc:
+            _LOGGER.warning(
+                'Could not cache Chat public keys for user %s (account %s): %s',
+                user_id, self.account.id, str(exc)[:200])
+
+    def _drop_cached_records(self, user_id):
+        """Forget the cached records for ``user_id`` so the next read is fresh.
+
+        Used after a successful key registration, which adds a public-key row
+        the cached copy cannot know about.
+        """
+        self._public_key_records_cache.pop(str(user_id), None)
+        try:
+            self.account.invalidate_recordset(['x_chat_public_keys_cache'])
+            cache = dict(self.account.x_chat_public_keys_cache or {})
+            if cache.pop(str(user_id), None) is not None:
+                self.account.sudo().write({'x_chat_public_keys_cache': cache})
+        except Exception as exc:
+            _LOGGER.warning(
+                'Could not drop the cached Chat public keys for user %s '
+                '(account %s): %s', user_id, self.account.id, str(exc)[:200])
+
+    def _backoff_stamp(self, user_id=None):
+        """The backoff stamp for ``user_id`` as a datetime, or None.
+
+        The account's own key read keeps its dedicated field (the one the
+        operator sees, and that a key reconfiguration clears); participants get
+        an entry in the per-user map.
+        """
+        own = str(self.account.twitter_user_id or '')
+        user_id = str(user_id) if user_id else own
+        if user_id and user_id == own:
+            return self.account.x_chat_key_fetch_failed_at
+        stamp = (self.account.x_chat_public_key_backoff or {}).get(user_id)
+        if not stamp:
+            return None
+        try:
+            return fields.Datetime.to_datetime(stamp)
+        except (TypeError, ValueError):
+            return None
+
+    def _public_key_fetch_backoff_active(self, user_id=None):
         """Whether a recent failed public-keys read holds further reads back.
 
-        The endpoint's 24h budget is shared with key registration, so a failing
-        account must not re-read it on every batch: a broken decryption would
-        otherwise keep the budget at zero and every key setup would fail with a
-        429. Reads resume on the first attempt after the backoff, and
-        immediately when the key material is reconfigured (which clears the
-        stamp).
+        Scoped per user: the endpoint's 24h budget is shared with key
+        registration, so a failing read must not be retried on every batch — but
+        a *sender's* failure must not stop the account from reading its own key
+        record either (that is what turned one participant's 429 into a whole
+        account's decryption outage). Reads resume on the first attempt after
+        the backoff, and immediately when the key material is reconfigured,
+        which clears both stamps.
         """
-        failed_at = self.account.x_chat_key_fetch_failed_at
+        failed_at = self._backoff_stamp(user_id)
         if not failed_at:
             return False
         return fields.Datetime.now() < failed_at + timedelta(
             seconds=self._PUBLIC_KEY_FETCH_BACKOFF_SECONDS)
 
-    def _note_public_key_fetch_failure(self):
-        self.account.sudo().write(
-            {'x_chat_key_fetch_failed_at': fields.Datetime.now()})
+    def _note_public_key_fetch_failure(self, user_id=None):
+        own = str(self.account.twitter_user_id or '')
+        user_id = str(user_id) if user_id else own
+        now = fields.Datetime.now()
+        if user_id and user_id == own:
+            self.account.sudo().write({'x_chat_key_fetch_failed_at': now})
+            return
+        self.account.invalidate_recordset(['x_chat_public_key_backoff'])
+        stamps = dict(self.account.x_chat_public_key_backoff or {})
+        stamps[user_id] = now.isoformat()
+        self.account.sudo().write({'x_chat_public_key_backoff': stamps})
 
-    def _clear_public_key_fetch_backoff(self):
-        if self.account.x_chat_key_fetch_failed_at:
-            self.account.sudo().write({'x_chat_key_fetch_failed_at': False})
+    def _clear_public_key_fetch_backoff(self, user_id=None):
+        own = str(self.account.twitter_user_id or '')
+        user_id = str(user_id) if user_id else own
+        if user_id and user_id == own:
+            if self.account.x_chat_key_fetch_failed_at:
+                self.account.sudo().write({'x_chat_key_fetch_failed_at': False})
+            return
+        self.account.invalidate_recordset(['x_chat_public_key_backoff'])
+        stamps = dict(self.account.x_chat_public_key_backoff or {})
+        if stamps.pop(user_id, None) is not None:
+            self.account.sudo().write({'x_chat_public_key_backoff': stamps})
 
     @staticmethod
     def _map_public_key_record(record, user_id):
@@ -917,8 +1103,15 @@ class XChatDecryptor:
             if not encoded:
                 return
             account_cache = self._stored_keys()
-            merged = dict(account_cache.get(str(conversation_id)) or {})
+            previous = dict(account_cache.get(str(conversation_id)) or {})
+            merged = dict(previous)
             merged.update(encoded)
+            if merged == previous:
+                # Nothing new was recovered (the bucket was seeded from the
+                # cache this delivery is re-persisting): writing the identical
+                # value would take a row lock on social_account per delivery for
+                # no change, contending with the UI's saves on the account.
+                return
             account_cache[str(conversation_id)] = merged
             self.account.sudo().write({'x_chat_conversation_keys': account_cache})
         except Exception as exc:

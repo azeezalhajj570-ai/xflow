@@ -69,6 +69,34 @@ class TestXChatConversationKeys(XAccountTwitterTestBase):
         stored = (self.account.x_chat_conversation_keys or {}).get('c1') or {}
         self.assertEqual(stored.get('100'), key)
 
+    def test_unchanged_seeded_keys_are_not_rewritten(self):
+        """Re-persisting identical keys on every delivery is a row lock on the
+        account per delivery, contending with the UI's own saves: only a change
+        is written."""
+        key = base64.b64encode(b'k').decode()
+        self.account.write({'x_chat_conversation_keys': {'c1': {'100': key}}})
+        decryptor = XChatDecryptor(self.env, self.account)
+        fake = _FakeChat()
+        writes = []
+        original = type(self.account).write
+
+        def _spy(records, vals):
+            writes.append(dict(vals))
+            return original(records, vals)
+
+        with patch.object(XChatDecryptor, '_chat_instance',
+                          return_value=fake), \
+             patch.object(XChatDecryptor, '_signing_keys',
+                          return_value=[]), \
+             patch.object(type(self.account), 'write', _spy):
+            result = decryptor.decrypt_events(
+                ['blob'], cached_keys={'100': key}, conversation_id='c1')
+        # The seeded key decrypted the message and was already stored.
+        self.assertEqual(len(result['messages']), 1)
+        self.assertFalse(
+            [vals for vals in writes if 'x_chat_conversation_keys' in vals],
+            'unchanged conversation keys must not be rewritten')
+
     def test_decrypt_events_without_keys_reports_missing_key(self):
         decryptor = XChatDecryptor(self.env, self.account)
         fake = _FakeChat()

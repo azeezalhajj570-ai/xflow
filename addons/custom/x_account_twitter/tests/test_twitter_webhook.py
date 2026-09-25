@@ -2,8 +2,10 @@ import hashlib
 import hmac
 import json
 from base64 import b64encode
+from datetime import timedelta
 from unittest.mock import Mock, patch
 
+from odoo import fields
 from odoo.tests import tagged
 
 from odoo.addons.x_account_twitter.services import twitter_errors
@@ -506,6 +508,62 @@ class TestTwitterActivityProcess(XAccountTwitterTestBase):
             self._process('chat.received', 'uuid-alert-2',
                           _chat_payload('g111222333', '111', 'chat-alert-2'))
         self.assertFalse(self._new_mails)
+
+    def test_unavailable_key_record_does_not_grow_the_unread_streak(self):
+        """A key record that could not be read is not a decryption failure.
+
+        The delivery keeps its encrypted marker, but the unread streak must not
+        move: counting these is what reported a throttled ``public_keys`` read
+        as "decryption stopped — the key material is the problem" and pushed the
+        account's connection status to Error.
+        """
+        from odoo.addons.x_account_twitter.services.xchat_decryptor import (
+            XChatKeyUnavailable)
+        decryptor = Mock()
+        decryptor.available = True
+        decryptor.decrypt_events.side_effect = XChatKeyUnavailable(
+            'X Chat public keys for account %s could not be read from X'
+            % self.account.id)
+        with patch.object(TwitterActivity, '_chat_decryptor_for',
+                          return_value=decryptor):
+            result = self._process(
+                'chat.received', 'uuid-unavailable',
+                _chat_payload('g111222333', '111', 'chat-unavailable-1'))
+        self.assertTrue(result['processed'])
+        self.assertTrue(result['encrypted'])
+        self.assertEqual(result['messages'], 0)
+        self.assertEqual(self.account.x_chat_decrypt_fail_streak, 0)
+        self.assertFalse(self.account.x_chat_decrypt_stopped)
+
+    def test_non_message_event_does_not_grow_the_unread_streak(self):
+        """A delivery that decrypts into a reaction is not an unread delivery.
+
+        Reactions, read receipts and group changes carry no message body by
+        design, yet they were counted as "could not be read": reactions are the
+        bulk of chat traffic, so a busy conversation crossed the alert threshold
+        within minutes and a healthy account was reported as having stopped
+        decrypting.
+        """
+        decryptor = Mock()
+        decryptor.available = True
+        decryptor.decrypt_events.return_value = {
+            'messages': [{
+                'type': 'Message',
+                'content': {'content_type': 'Reaction', 'emoji': '👍',
+                            'target_message_id': '1'},
+            }],
+            'errors': {},
+        }
+        with patch.object(TwitterActivity, '_chat_decryptor_for',
+                          return_value=decryptor):
+            result = self._process(
+                'chat.received', 'uuid-reaction',
+                _chat_payload('g111222333', '111', 'chat-reaction-1'))
+        self.assertTrue(result['processed'])
+        self.assertTrue(result['encrypted'])
+        self.assertEqual(result['messages'], 0)
+        self.assertEqual(self.account.x_chat_decrypt_fail_streak, 0)
+        self.assertFalse(self.account.x_chat_decrypt_stopped)
 
     def test_process_chat_event_adds_members_to_channel(self):
         """A webhook chat event must add the owner + counterparty as channel
@@ -1080,6 +1138,107 @@ class TestXChatKeyModes(XAccountTwitterTestBase):
         self.account.invalidate_recordset()
         self.assertFalse(self.account.x_chat_key_fetch_failed_at)
 
+    def test_public_keys_are_cached_across_batches(self):
+        """A successful read is reused instead of repeated on every batch.
+
+        Every webhook batch builds a fresh decryptor, so without this the
+        account's own keys (and each participant's) were read again per batch,
+        spending the same per-user budget key registration needs.
+        """
+        client = Mock()
+        client.request.return_value = {'data': [{'public_key_version': '1'}]}
+        first = XChatDecryptor(
+            self.env, self.account, client=client)._public_key_records_for(
+                OWNER_ID)
+        self.assertEqual(len(first), 1)
+        self.assertEqual(client.request.call_count, 1)
+        self.account.invalidate_recordset()
+        self.assertTrue(self.account.x_chat_public_keys_cache)
+        # A new batch builds a new decryptor: the persisted cache answers.
+        second = XChatDecryptor(
+            self.env, self.account, client=client)._public_key_records_for(
+                OWNER_ID)
+        self.assertEqual(len(second), 1)
+        self.assertEqual(client.request.call_count, 1)
+
+    def test_force_bypasses_the_cached_records(self):
+        """The explicit key setup must read live data, not the cache: it is
+        checking whether the account already has a registered identity, and
+        that is what decides whether registering is safe."""
+        client = Mock()
+        client.request.return_value = {'data': [{'public_key_version': '1'}]}
+        XChatDecryptor(
+            self.env, self.account, client=client)._public_key_records_for(
+                OWNER_ID)
+        self.assertEqual(client.request.call_count, 1)
+        XChatDecryptor(
+            self.env, self.account, client=client)._public_key_records_for(
+                OWNER_ID, force=True)
+        self.assertEqual(client.request.call_count, 2)
+
+    def test_an_expired_cache_entry_is_refreshed(self):
+        """The cache is bounded: a key rotated after the TTL is picked up
+        instead of being served from a stale copy forever."""
+        self.account.write({'x_chat_public_keys_cache': {
+            OWNER_ID: {
+                'fetched_at': (fields.Datetime.now() - timedelta(
+                    hours=2)).isoformat(),
+                'records': [{'public_key_version': 'old'}],
+            },
+        }})
+        client = Mock()
+        client.request.return_value = {'data': [{'public_key_version': 'new'}]}
+        records = XChatDecryptor(
+            self.env, self.account, client=client)._public_key_records_for(
+                OWNER_ID)
+        self.assertEqual(records[0]['public_key_version'], 'new')
+        self.assertEqual(client.request.call_count, 1)
+
+    def test_a_failed_read_is_not_cached(self):
+        """A throttle must not be remembered as "this user has no keys": the
+        next read after the backoff goes back to X rather than serving an empty
+        cached list for a whole TTL."""
+        client = Mock()
+        client.request.side_effect = [
+            twitter_errors.TwitterRateLimitError('Too Many Requests'),
+            {'data': [{'public_key_version': '1'}]},
+        ]
+        decryptor = XChatDecryptor(self.env, self.account, client=client)
+        self.assertEqual(decryptor._public_key_records_for(OWNER_ID), [])
+        self.account.invalidate_recordset()
+        self.assertFalse(self.account.x_chat_public_keys_cache)
+        # Reconfiguring the key material clears the backoff, so reads resume.
+        self.account.write({'x_encryption_code': 'fresh-pin'})
+        decryptor = XChatDecryptor(self.env, self.account, client=client)
+        self.assertEqual(len(decryptor._public_key_records_for(OWNER_ID)), 1)
+        self.assertEqual(client.request.call_count, 2)
+
+    def test_a_sender_throttle_does_not_block_the_account_own_keys(self):
+        """The backoff is per user.
+
+        A participant's 429 used to stamp the account, so the account could no
+        longer read its own key record and *every* event became undecryptable —
+        the outage this fix addresses.
+        """
+        sender = '1887734960703852544'
+
+        def _request(method, url, **kwargs):
+            if sender in url:
+                raise twitter_errors.TwitterRateLimitError('Too Many Requests')
+            return {'data': [{'public_key_version': '1'}]}
+
+        client = Mock()
+        client.request.side_effect = _request
+        decryptor = XChatDecryptor(self.env, self.account, client=client)
+        self.assertEqual(decryptor._public_key_records_for(sender), [])
+        self.account.invalidate_recordset()
+        # Recorded against the sender only, never against the account.
+        self.assertTrue(self.account.x_chat_public_key_backoff)
+        self.assertFalse(self.account.x_chat_key_fetch_failed_at)
+        # The account's own read is not held back by the sender's failure.
+        self.assertEqual(
+            len(decryptor._public_key_records_for(OWNER_ID)), 1)
+
     def test_decrypt_events_fetches_foreign_sender_signing_key(self):
         """A message from a *different* X user (group chat) must pull that
         sender's public keys into the signing-key store so the SDK can verify
@@ -1423,6 +1582,33 @@ class TestXChatFirstTimeSetup(XAccountTwitterTestBase):
         self.assertIn('rate limited', str(ctx.exception))
         self.assertFalse(account.x_chat_initialized)
         self.assertFalse(account.x_chat_key_blob)
+
+    def test_register_public_keys_refuses_when_the_precheck_read_fails(self):
+        """A throttled pre-check must not fall through to registering.
+
+        The guard that detects an existing secure-backup config reads the same
+        endpoint as the registration, so a 429 there used to make it silently
+        pass: the flow generated a fresh identity and POSTed it, spending a
+        daily slot on a request that could not even check whether it was
+        needed. It must fail closed instead, and say when to retry.
+        """
+        account = self._new_account()
+        client = Mock()
+        client.request.side_effect = twitter_errors.TwitterRateLimitError(
+            'Too Many Requests', reset_epoch=1790460180)
+        with patch('chat_xdk.Chat') as chat_cls:
+            with self.assertRaises(ValueError) as ctx:
+                XChatDecryptor(self.env, account,
+                               client=client).register_public_keys()
+        message = str(ctx.exception)
+        self.assertIn('no new identity was registered', message)
+        self.assertIn('X 24h limit resets at', message)
+        # Nothing was generated and nothing was POSTed to X.
+        chat_cls.return_value.generate_keypairs.assert_not_called()
+        posts = [call for call in client.request.call_args_list
+                 if call.args[0] == 'POST']
+        self.assertEqual(posts, [])
+        self.assertFalse(account.x_chat_initialized)
 
     @patch('time.sleep')
     def test_register_public_keys_retries_config_fetch_then_succeeds(
