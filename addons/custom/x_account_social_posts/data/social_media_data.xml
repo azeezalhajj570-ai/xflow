@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- Reuse the X media record created by social_twitter; add a stream
+             type for the account's own posts. -->
+        <record id="stream_type_x_account_posts" model="social.stream.type">
+            <field name="name">X Account Posts</field>
+            <field name="stream_type">x_account_posts</field>
+            <field name="media_id" ref="social_twitter.social_media_twitter"/>
+        </record>
+    </data>
+</odoo>
