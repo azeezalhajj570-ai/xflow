@@ -103,7 +103,7 @@
                 <field name="x_author_x_username"/>
                 <filter name="x_with_comments" string="With comments stored"
                     domain="[('x_comment_count', '&gt;', 0)]"/>
-                <group expand="0" string="Group By">
+                <group>
                     <filter name="group_by_stream" string="Stream"
                         context="{'group_by': 'stream_id'}"/>
                     <filter name="group_by_provider" string="Provider"
