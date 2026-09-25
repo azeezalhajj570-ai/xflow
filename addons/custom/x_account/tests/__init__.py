@@ -3,6 +3,7 @@ from . import test_session
 from . import test_group_automation
 from . import test_performance
 from . import test_account_lifecycle
+from . import test_status_notifications
 from . import test_task_queue
 from . import test_security
 from . import test_migration
