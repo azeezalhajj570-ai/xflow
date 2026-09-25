@@ -205,6 +205,13 @@ class TwitterProvider:
         return twitter_envelope.TwitterEnvelope.dm_sent(
             envelope, conv_id, text, 'send_group_dm')
 
+    # How many key versions one send walks before giving up. A cached version
+    # the Chat service will not accept is answered with a bare 503 -- the same
+    # status a real outage returns -- so falling back to an older one resolves
+    # it in a single call instead of surfacing "Service Unavailable" to the
+    # operator.
+    _CHAT_SEND_ATTEMPTS = 3
+
     def send_chat_message(self, conversation_id=None, text=None, **kwargs):
         """Send an end-to-end encrypted message into an XChat conversation.
 
@@ -221,14 +228,38 @@ class TwitterProvider:
             raise ValueError('conversation_id is required')
         if not text:
             raise ValueError('text must be non-empty')
-        body = self._xchat.encrypt_message(conv_id, text)
-        envelope = self._client.request(
-            'POST',
-            '/2/chat/conversations/%s/messages' % conv_id,
-            body=body,
-        )
-        return twitter_envelope.TwitterEnvelope.chat_message_sent(
-            envelope, conv_id, text, body.get('message_id'))
+        versions = self._xchat.candidate_send_versions(conv_id)
+        if not versions:
+            raise ValueError(
+                'No conversation key for conversation %s on account %s; a key '
+                'change for it has not been ingested yet.'
+                % (conv_id, self.account.id))
+        last_error = None
+        for index, version in enumerate(versions[:self._CHAT_SEND_ATTEMPTS]):
+            body = self._xchat.encrypt_message(conv_id, text, version=version)
+            try:
+                envelope = self._client.request(
+                    'POST',
+                    '/2/chat/conversations/%s/messages' % conv_id,
+                    body=body,
+                    retries=0,
+                )
+            except twitter_errors.TwitterTemporaryError as exc:
+                # The client cannot tell a refused key from an outage: X
+                # answers both with 503. Walk to the next candidate rather than
+                # reporting a service failure the operator cannot act on.
+                last_error = exc
+                _LOGGER.warning(
+                    'XChat send to %s rejected key version %s (%s); trying an '
+                    'older cached version', conv_id, version, exc)
+                continue
+            if index:
+                _LOGGER.info(
+                    'XChat send to %s succeeded with key version %s after %s '
+                    'newer version(s) were rejected', conv_id, version, index)
+            return twitter_envelope.TwitterEnvelope.chat_message_sent(
+                envelope, conv_id, text, body.get('message_id'))
+        raise last_error
 
     # --------------------------------------------------------------- groups
     def fetch_groups(self, account, limit=100):
@@ -625,7 +656,7 @@ class TwitterProvider:
 
     def supported_operations(self):
         return ('validate_session', 'like', 'comment', 'repost', 'follow',
-                'send_dm', 'send_group_dm',
+                'send_dm', 'send_group_dm', 'send_chat_message',
                 'fetch_groups', 'fetch_group_messages', 'get_dms',
                 'process_webhook_event', 'register_webhook',
                 'validate_webhook_registration', 'unsubscribe_all_events',
