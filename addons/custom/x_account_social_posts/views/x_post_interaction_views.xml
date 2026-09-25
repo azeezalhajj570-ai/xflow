@@ -76,7 +76,7 @@
                     domain="[('kind', '=', 'retweet')]"/>
                 <filter name="kind_like" string="Likes"
                     domain="[('kind', '=', 'like')]"/>
-                <group expand="0" string="Group By">
+                <group>
                     <filter name="group_by_kind" string="Kind"
                         context="{'group_by': 'kind'}"/>
                     <filter name="group_by_author" string="Author"
