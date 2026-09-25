@@ -47,16 +47,29 @@ class XPostSync:
 
     # --- timeline --------------------------------------------------------
 
-    def sync_timeline(self, stream, limit=_TIMELINE_LIMIT, per_post_limit=None):
+    def _resolve_provider(self, provider_code, operation):
+        """Resolve the provider for one run.
+
+        ``provider_code`` lets a caller pick a provider for a single operation
+        (the fetch wizard's Provider field); when empty, the account's own
+        provider/routing decides.
+        """
+        if provider_code:
+            from odoo.addons.x_account.services.x_service import XService
+            return XService.get_provider_by_code(self.account, provider_code)
+        return self.account.get_provider_for_operation(operation)
+
+    def sync_timeline(self, stream, limit=_TIMELINE_LIMIT, per_post_limit=None,
+                      provider_code=None):
         """Fetch the account's own posts into `stream` (social.stream).
 
         ``per_post_limit`` caps the users read per interaction type per post;
         providers that return engagers inline use it, per-call providers ignore
-        it.
+        it. ``provider_code`` overrides the account's provider for this run.
         """
         stream.ensure_one()
         account = stream.account_id
-        provider = account.get_provider_for_operation('fetch_user_posts')
+        provider = self._resolve_provider(provider_code, 'fetch_user_posts')
         fetch = getattr(provider, 'fetch_user_posts', None)
         if not fetch:
             return {'created': 0, 'updated': 0, 'posts': 0, 'unsupported': True}
@@ -154,17 +167,19 @@ class XPostSync:
     def sync_interactions(self, stream_post, kinds=('comment', 'retweet', 'like'),
                           max_comments=_COMMENT_LIMIT,
                           max_retweeters=_RETWEETER_LIMIT,
-                          max_likers=_LIKER_LIMIT):
-        """Fetch and store the interactions on one fetched post."""
+                          max_likers=_LIKER_LIMIT, provider_code=None):
+        """Fetch and store the interactions on one fetched post.
+
+        ``provider_code`` overrides the account's provider for this run.
+        """
         stream_post.ensure_one()
         tweet_id = stream_post.x_tweet_id
-        account = stream_post.stream_id.account_id
         summary = {'comments': 0, 'retweets': 0, 'likes': 0,
                    'unsupported_notes': []}
         if not tweet_id:
             return summary
 
-        provider = account.get_provider_for_operation('fetch_post_comments')
+        provider = self._resolve_provider(provider_code, 'fetch_post_comments')
         if 'comment' in kinds:
             summary['comments'] = self._sync_kind(
                 stream_post, provider, 'fetch_post_comments', 'comment',
