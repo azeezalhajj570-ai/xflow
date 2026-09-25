@@ -986,28 +986,45 @@ class XChatDecryptor:
             return None
 
     # -------------------------------------------------------------- encrypt
-    def _latest_conversation_key(self, conversation_id):
-        """Raw ``(key_bytes, version)`` for a conversation, newest version.
+    @staticmethod
+    def _version_rank(version):
+        """Sort key for a conversation-key version (millisecond timestamps)."""
+        try:
+            return (1, int(version))
+        except (TypeError, ValueError):
+            return (0, 0)
 
-        Conversation keys are cached on the account as
-        ``{conversation_id: {version: base64}}`` (see
-        :meth:`collect_conversation_keys`); a message must be encrypted under
-        the newest version, so that is the one returned.
-        """
-        cached = (self.account.x_chat_conversation_keys or {}).get(
+    def _cached_versions(self, conversation_id):
+        """``{version: base64 key}`` cached for one conversation."""
+        return (self.account.x_chat_conversation_keys or {}).get(
             str(conversation_id)) or {}
+
+    def _conversation_key(self, conversation_id, version=None):
+        """Raw ``(key_bytes, version)`` to encrypt under.
+
+        With ``version``, that exact version. Without, the newest cached one --
+        a guess only: a key change this account could not verify still lands in
+        the cache, and the Chat service answers a message encrypted under a
+        version it does not recognise with a bare 503. Callers that can retry
+        should walk :meth:`candidate_send_versions` instead of trusting it.
+        """
+        cached = self._cached_versions(conversation_id)
+        if version is not None:
+            encoded = cached.get(str(version))
+            if not encoded:
+                raise ValueError(
+                    'No cached key for conversation %s version %s on account '
+                    '%s.' % (conversation_id, version, self.account.id))
+            return base64.b64decode(str(encoded)), str(version)
         best = None
-        for version, encoded in cached.items():
+        for candidate, encoded in cached.items():
             try:
                 raw = base64.b64decode(str(encoded))
             except Exception:
                 continue
-            try:
-                rank = (1, int(version))
-            except (TypeError, ValueError):
-                rank = (0, 0)
+            rank = self._version_rank(candidate)
             if best is None or rank > best[0]:
-                best = (rank, raw, str(version))
+                best = (rank, raw, str(candidate))
         if best is None:
             raise ValueError(
                 'No conversation key cached for conversation %s on account '
@@ -1015,7 +1032,59 @@ class XChatDecryptor:
                 % (conversation_id, self.account.id))
         return best[1], best[2]
 
-    def encrypt_message(self, conversation_id, text):
+    def _acknowledged_version(self, conversation_id):
+        """The conversation-key version X itself reports, or ``None``.
+
+        The Chat service is the only authority on which version it accepts for
+        a message, and the local cache can hold newer versions it will not. The
+        conversation's key-change chain comes back in the events endpoint's
+        ``meta.conversation_key_events``.
+        """
+        if not self.client:
+            return None
+        try:
+            from .twitter_group_sync import canonical_chat_conversation_id
+            data = self.client.request(
+                'GET',
+                '/2/chat/conversations/%s/events'
+                % canonical_chat_conversation_id(conversation_id),
+                params={'chat_event.fields': 'id', 'max_results': 5})
+            blobs = ((data or {}).get('meta') or {}).get(
+                'conversation_key_events') or []
+            if not blobs:
+                return None
+            extracted = self._chat_instance().extract_conversation_keys(
+                list(blobs))
+            latest = (extracted or {}).get('latest_version')
+            return str(latest) if latest else None
+        except Exception as exc:
+            _LOGGER.warning(
+                'Could not read the key-change chain for conversation %s '
+                '(account %s): %s: %s',
+                conversation_id, self.account.id, type(exc).__name__,
+                str(exc)[:200])
+            return None
+
+    def candidate_send_versions(self, conversation_id):
+        """Key versions to try when sending, best candidate first.
+
+        The version X reports leads, then the cached versions newest first.
+        The cache is not authoritative -- a key change that failed signature
+        verification is still stored -- so the caller encrypts with each
+        candidate in turn rather than trusting the newest label.
+        """
+        conversation_id = str(conversation_id or '').strip()
+        ordered = []
+        acknowledged = self._acknowledged_version(conversation_id)
+        if acknowledged:
+            ordered.append(acknowledged)
+        for version in sorted(self._cached_versions(conversation_id),
+                              key=self._version_rank, reverse=True):
+            if str(version) not in ordered:
+                ordered.append(str(version))
+        return ordered
+
+    def encrypt_message(self, conversation_id, text, version=None):
         """Encrypt and sign a text message for an existing conversation.
 
         Returns the Chat API send body -- ``message_id``,
@@ -1025,7 +1094,8 @@ class XChatDecryptor:
 
         The SDK mints ``message_id`` (a UUID embedded in the signed event);
         never supply one, and reuse the returned payload on a retry so an id
-        is never minted twice for one logical send.
+        is never minted twice for one logical send. ``version`` pins the
+        conversation-key version; without it the newest cached one is used.
         """
         conversation_id = str(conversation_id or '').strip()
         text = text or ''
@@ -1034,7 +1104,7 @@ class XChatDecryptor:
         if not text.strip():
             raise ValueError('text must be non-empty')
         chat = self._chat_instance()
-        key, version = self._latest_conversation_key(conversation_id)
+        key, version = self._conversation_key(conversation_id, version=version)
         payload = chat.encrypt_message(
             conversation_id,
             text,
