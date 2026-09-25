@@ -29,11 +29,14 @@ class SocialStreamPost(models.Model):
     x_interaction_ids = fields.One2many(
         'x.post.interaction', 'stream_post_id', string='X Interactions')
     x_comment_count = fields.Integer(
-        'X Comment Records', compute='_compute_x_interaction_counts')
+        'X Comment Records', compute='_compute_x_interaction_counts',
+        store=True)
     x_like_count = fields.Integer(
-        'X Like Records', compute='_compute_x_interaction_counts')
+        'X Like Records', compute='_compute_x_interaction_counts',
+        store=True)
     x_retweet_count_records = fields.Integer(
-        'X Retweet Records', compute='_compute_x_interaction_counts')
+        'X Retweet Records', compute='_compute_x_interaction_counts',
+        store=True)
 
     @api.depends('x_interaction_ids.kind')
     def _compute_x_interaction_counts(self):
