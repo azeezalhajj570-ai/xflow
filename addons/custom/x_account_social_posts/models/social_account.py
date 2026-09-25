@@ -77,7 +77,8 @@ class SocialAccount(models.Model):
         """Open the account's fetched X posts (kanban first)."""
         self.ensure_one()
         kanban = self.env.ref(
-            'social.social_stream_post_view_kanban', raise_if_not_found=False)
+            'x_account_social_posts.x_social_stream_post_view_kanban',
+            raise_if_not_found=False)
         views = [(kanban.id, 'kanban')] if kanban else []
         views += [(False, 'list'), (False, 'form')]
         return {

@@ -153,13 +153,67 @@
         </field>
     </record>
 
+    <!-- The X Posts action uses its own kanban on purpose: it does NOT carry
+         the feed's js_class (`social_stream_post_kanban_view`), whose load runs
+         social.stream.refresh_all() and would fire automatic X API calls (402
+         Payment Required once credits are depleted). This view only renders
+         what is already stored; fetching is done from the wizard. -->
+    <record id="x_social_stream_post_view_kanban" model="ir.ui.view">
+        <field name="name">x.social.stream.post.view.kanban</field>
+        <field name="model">social.stream.post</field>
+        <field name="arch" type="xml">
+            <kanban create="false" edit="false" quick_create="false">
+                <field name="author_name"/>
+                <field name="published_date"/>
+                <field name="message"/>
+                <field name="post_link"/>
+                <field name="x_tweet_id"/>
+                <field name="x_source_provider"/>
+                <field name="x_favorite_count"/>
+                <field name="x_retweet_count"/>
+                <field name="x_reply_count"/>
+                <field name="x_comment_count"/>
+                <templates>
+                    <t t-name="card">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <strong class="text-truncate">
+                                <field name="author_name"/>
+                            </strong>
+                            <span class="text-muted small ms-2">
+                                <field name="published_date" widget="datetime"/>
+                            </span>
+                        </div>
+                        <div class="mb-2">
+                            <field name="message"/>
+                        </div>
+                        <div class="d-flex gap-3 text-muted small"
+                            t-if="record.x_source_provider.raw_value">
+                            <span title="Likes">
+                                <i class="fa fa-heart me-1"/><field name="x_favorite_count"/>
+                            </span>
+                            <span title="Retweets">
+                                <i class="fa fa-retweet me-1"/><field name="x_retweet_count"/>
+                            </span>
+                            <span title="Replies">
+                                <i class="fa fa-comment me-1"/><field name="x_reply_count"/>
+                            </span>
+                            <span title="Comments stored">
+                                <i class="fa fa-comments me-1"/><field name="x_comment_count"/>
+                            </span>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
     <record id="action_x_social_stream_posts" model="ir.actions.act_window">
         <field name="name">X Posts</field>
         <field name="res_model">social.stream.post</field>
         <field name="view_mode">kanban,list,form</field>
         <field name="domain">[('media_type', '=', 'twitter')]</field>
         <field name="view_ids" eval="[(5, 0, 0),
-            (0, 0, {'view_mode': 'kanban', 'view_id': ref('social.social_stream_post_view_kanban')}),
+            (0, 0, {'view_mode': 'kanban', 'view_id': ref('x_social_stream_post_view_kanban')}),
             (0, 0, {'view_mode': 'list', 'view_id': ref('x_social_stream_post_view_list')}),
             (0, 0, {'view_mode': 'form', 'view_id': ref('x_social_stream_post_view_form')})]"/>
     </record>
