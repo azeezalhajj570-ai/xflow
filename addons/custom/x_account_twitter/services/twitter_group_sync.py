@@ -685,9 +685,16 @@ class TwitterGroupSync:
                     # form too. Reading only 'event' silently matched nothing,
                     # so every decrypted event was dropped as unusable.
                     ev = dm if 'type' in dm else (dm.get('event') or {})
-                    eid = ev.get('id') or ev.get('message_id')
-                    if eid:
-                        by_id[str(eid)] = ev
+                    # The events API identifies an event by its *sequence* id,
+                    # while the SDK puts the message UUID in ``id`` and that
+                    # sequence id in ``sequence_id``. Key on every id the event
+                    # carries: matching only ``id`` never found an encrypted
+                    # event, so every decrypted message was discarded here as
+                    # unusable and the conversation stored nothing.
+                    for key in (ev.get('id'), ev.get('message_id'),
+                                ev.get('sequence_id')):
+                        if key:
+                            by_id.setdefault(str(key), ev)
                 still_encrypted = []
                 for enc in encrypted:
                     ev = by_id.get(str(enc['id']))
