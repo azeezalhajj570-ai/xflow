@@ -984,3 +984,68 @@ class XChatDecryptor:
             return raw
         except Exception:
             return None
+
+    # -------------------------------------------------------------- encrypt
+    def _latest_conversation_key(self, conversation_id):
+        """Raw ``(key_bytes, version)`` for a conversation, newest version.
+
+        Conversation keys are cached on the account as
+        ``{conversation_id: {version: base64}}`` (see
+        :meth:`collect_conversation_keys`); a message must be encrypted under
+        the newest version, so that is the one returned.
+        """
+        cached = (self.account.x_chat_conversation_keys or {}).get(
+            str(conversation_id)) or {}
+        best = None
+        for version, encoded in cached.items():
+            try:
+                raw = base64.b64decode(str(encoded))
+            except Exception:
+                continue
+            try:
+                rank = (1, int(version))
+            except (TypeError, ValueError):
+                rank = (0, 0)
+            if best is None or rank > best[0]:
+                best = (rank, raw, str(version))
+        if best is None:
+            raise ValueError(
+                'No conversation key cached for conversation %s on account '
+                '%s; a key change for it has not been ingested yet.'
+                % (conversation_id, self.account.id))
+        return best[1], best[2]
+
+    def encrypt_message(self, conversation_id, text):
+        """Encrypt and sign a text message for an existing conversation.
+
+        Returns the Chat API send body -- ``message_id``,
+        ``encoded_message_create_event`` and
+        ``encoded_message_event_signature`` -- ready for
+        ``POST /2/chat/conversations/{id}/messages``.
+
+        The SDK mints ``message_id`` (a UUID embedded in the signed event);
+        never supply one, and reuse the returned payload on a retry so an id
+        is never minted twice for one logical send.
+        """
+        conversation_id = str(conversation_id or '').strip()
+        text = text or ''
+        if not conversation_id:
+            raise ValueError('conversation_id is required')
+        if not text.strip():
+            raise ValueError('text must be non-empty')
+        chat = self._chat_instance()
+        key, version = self._latest_conversation_key(conversation_id)
+        payload = chat.encrypt_message(
+            conversation_id,
+            text,
+            sender_id=(str(self.account.twitter_user_id)
+                       if self.account.twitter_user_id else None),
+            signing_key_version=self.account.x_chat_signing_key_version or None,
+            conversation_key=key,
+            conversation_key_version=version,
+        )
+        return {
+            'message_id': payload.message_id,
+            'encoded_message_create_event': payload.encrypted_content,
+            'encoded_message_event_signature': payload.encoded_event_signature,
+        }
