@@ -45,6 +45,15 @@ class SocialStream(models.Model):
         self.ensure_one()
         if self.env.context.get('x_skip_stream_fetch'):
             return False
+        # X stream fetches are manual-only. The feed's automatic refresh
+        # (`social.stream.refresh_all`, run when the feed kanban loads and by
+        # its Refresh button) walks every stream, so it would call the metered
+        # X API for each X account. Once the app's X credits are depleted that
+        # answers 402 Payment Required and surfaces as a feed error. Skip X
+        # streams here; the "Fetch X Posts" wizard drives a fetch explicitly.
+        if (self.media_id.media_type == 'twitter'
+                and not self.env.context.get('x_allow_stream_fetch')):
+            return False
         if not self._is_x_account_stream():
             return super()._fetch_stream_data()
         from ..services.post_sync import XPostSync
