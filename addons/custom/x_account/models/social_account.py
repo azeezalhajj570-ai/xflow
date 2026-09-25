@@ -86,6 +86,7 @@ _EVENT_OPERATIONS = frozenset({
     'unsubscribe_all_events', 'delete_webhook_registration',
     'subscribe_account',
     'send_group_dm',
+    'send_chat_message',
 })
 
 _ACTION_OPERATIONS = frozenset({

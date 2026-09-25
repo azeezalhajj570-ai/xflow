@@ -69,13 +69,17 @@ class XMessageComposer(models.TransientModel):
                 _('No valid X account for conversation %s.') % channel.name,
                 kind='danger')
         if channel._x_is_group_conversation():
-            operation = 'send_group_dm'
             conv_id = channel.x_conversation_id
             if not conv_id:
                 return self._send_result(
                     'Send Message',
                     _('This group conversation has no conversation id.'),
                     kind='danger')
+            # A ``g``-prefixed id is an XChat conversation: only the encrypted
+            # body on /2/chat/conversations/{id}/messages reaches it. A legacy
+            # group DM (single numeric id) still takes plaintext text.
+            operation = ('send_chat_message' if str(conv_id).startswith('g')
+                         else 'send_group_dm')
             kwargs = {'conversation_id': conv_id, 'text': body}
         else:
             operation = 'send_dm'

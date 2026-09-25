@@ -205,6 +205,31 @@ class TwitterProvider:
         return twitter_envelope.TwitterEnvelope.dm_sent(
             envelope, conv_id, text, 'send_group_dm')
 
+    def send_chat_message(self, conversation_id=None, text=None, **kwargs):
+        """Send an end-to-end encrypted message into an XChat conversation.
+
+        XChat conversations (``g``-prefixed group ids) are not served by the
+        legacy ``/2/dm_conversations`` endpoints: the body must be the signed
+        ciphertext the Chat XDK produces, posted to
+        ``POST /2/chat/conversations/{id}/messages``. Requires the account's
+        OAuth 2.0 ``dm.write`` scope and usable XChat key material. Returns the
+        normalized provider result DTO.
+        """
+        conv_id = str(conversation_id or '').strip()
+        text = (text or '').strip()
+        if not conv_id:
+            raise ValueError('conversation_id is required')
+        if not text:
+            raise ValueError('text must be non-empty')
+        body = self._xchat.encrypt_message(conv_id, text)
+        envelope = self._client.request(
+            'POST',
+            '/2/chat/conversations/%s/messages' % conv_id,
+            body=body,
+        )
+        return twitter_envelope.TwitterEnvelope.chat_message_sent(
+            envelope, conv_id, text, body.get('message_id'))
+
     # --------------------------------------------------------------- groups
     def fetch_groups(self, account, limit=100):
         """Sync the account's X group-DM conversations into discuss channels."""

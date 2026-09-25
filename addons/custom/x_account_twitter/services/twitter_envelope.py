@@ -108,3 +108,22 @@ class TwitterEnvelope:
             'conversation_id': str(data.get('dm_conversation_id') or target),
             'text': text,
         }
+
+    @staticmethod
+    def chat_message_sent(envelope, conversation_id, text, message_id):
+        """Return the normalized XChat-send result DTO.
+
+        ``POST /2/chat/conversations/{id}/messages`` answers
+        ``{"data": {"encoded_message_event": ...}}``. Unlike the legacy DM
+        endpoints there is no ``dm_event_id``, so the sent message is
+        identified by the SDK-minted ``message_id`` that was posted.
+        """
+        data = (envelope or {}).get('data') or {}
+        return {
+            'success': bool(data.get('encoded_message_event')),
+            'operation': 'send_chat_message',
+            'platform': 'x',
+            'message_id': str(message_id or ''),
+            'conversation_id': str(conversation_id),
+            'text': text,
+        }
