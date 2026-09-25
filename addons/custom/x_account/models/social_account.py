@@ -53,6 +53,15 @@ _CHAT_KEY_FIELDS = frozenset({
     'x_chat_initialized',
 })
 
+# The subset of the above that is actual key *material* (the PIN or the
+# imported blob). Changing it means the keys held in memory no longer apply and
+# the account must be re-initialized. ``x_chat_initialized`` is deliberately
+# absent: it is the flag itself, and a successful key registration writes it
+# True — clearing it here would immediately undo that write.
+_CHAT_KEY_MATERIAL_FIELDS = frozenset({
+    'x_encryption_code', 'x_chat_key_blob', 'x_chat_key_mode',
+})
+
 # Detailed connection states that mean a required X component is failing. They
 # all collapse into the 'error' value of the aggregated x_connection_status.
 _X_CONNECTION_FAILED_STATES = frozenset({
@@ -361,6 +370,25 @@ class SocialAccount(models.Model):
              're-hitting the endpoint on every batch, because that endpoint\'s '
              '24h budget is shared with key registration. Cleared by a '
              'successful read or a key reconfiguration.',
+    )
+    x_chat_public_keys_cache = fields.Json(
+        string='X Chat Public Keys Cache',
+        copy=False,
+        groups='social.group_social_user',
+        help='Public-key records already read from X, as '
+             '{user_id: {fetched_at, records}}. The public_keys endpoint has one '
+             'limited budget shared with key registration, so records are held '
+             'for a TTL instead of being re-read for every sender on every '
+             'webhook batch. Public material only.',
+    )
+    x_chat_public_key_backoff = fields.Json(
+        string='X Chat Public Key Backoff',
+        copy=False,
+        groups='social.group_social_user',
+        help='Per-user stamps {user_id: fetched_at} set after a failed '
+             'public_keys read for a conversation participant. Kept separate '
+             'from the account\'s own X Chat Key Fetch Failed At so a throttled '
+             'sender never stops the account from reading its own keys.',
     )
 
     x_migration_status = fields.Selection(
@@ -695,8 +723,7 @@ class SocialAccount(models.Model):
         Dispatches to the event provider's ``initialize_x_chat_encryption`` so the
         official-X (blob import / Juicebox unlock) and any other provider can
         implement it with their own key material. Marks ``x_chat_initialized``
-        on success and clears it on failure. Returns a dialog/notification
-        result.
+        on success. Returns a dialog/notification result.
         """
         self.ensure_one()
         if not self._filter_x_accounts():
@@ -711,7 +738,10 @@ class SocialAccount(models.Model):
         try:
             initialize(self)
         except Exception as exc:
-            self.write({'x_chat_initialized': False})
+            # A failed attempt does NOT clear ``x_chat_initialized``: the keys
+            # previously loaded are still the account's keys, and a throttled or
+            # transient failure changes nothing about them. The flag moves only
+            # on a successful load or when the key material itself changes.
             return self._display_notification(
                 'X Chat Encryption',
                 'Initialization failed: %s' % exc, kind='danger')
@@ -729,8 +759,7 @@ class SocialAccount(models.Model):
         Dispatches to the event provider's ``register_x_chat_public_keys``.
         Public-key registration is a rate-limited, one-time write, so this is
         an explicit, user-confirmed action. Marks ``x_chat_initialized`` on
-        success and clears it on failure. Returns a dialog/notification
-        result.
+        success. Returns a dialog/notification result.
         """
         self.ensure_one()
         if not self._filter_x_accounts():
@@ -745,7 +774,10 @@ class SocialAccount(models.Model):
         try:
             register(self)
         except Exception as exc:
-            self.write({'x_chat_initialized': False})
+            # Same rule as initialization: a rejected or throttled registration
+            # attempt leaves the account's existing keys untouched, so it must
+            # not demote the account to "Not Configured" (doing so made a
+            # rate-limited attempt look like a lost connection).
             return self._display_notification(
                 'X Chat Encryption',
                 'Key setup failed: %s' % exc, kind='danger')
@@ -837,13 +869,25 @@ class SocialAccount(models.Model):
             # Reconfiguring the key material is the operator's fix for an
             # account that stopped decrypting: clear the health counters so the
             # alert is armed again and fires if the new key still reads nothing.
+            # Both backoff stamps go too, so reads resume on the next batch
+            # instead of waiting out the throttle the broken key left behind.
             vals = dict(vals)
             vals.update({
                 'x_chat_decrypt_fail_streak': 0,
                 'x_chat_decrypt_stopped': False,
                 'x_chat_decrypt_notified_at': False,
                 'x_chat_key_fetch_failed_at': False,
+                'x_chat_public_key_backoff': {},
             })
+        if _CHAT_KEY_MATERIAL_FIELDS & set(vals):
+            # New key material: whatever was loaded before no longer applies, so
+            # the account is un-initialized until the keys are loaded again.
+            # This is the ONLY place the flag is cleared on a write — a failed
+            # registration or unlock attempt must not demote an account whose
+            # keys are still the ones in use (a rate-limited attempt changes
+            # nothing about them).
+            vals = dict(vals)
+            vals['x_chat_initialized'] = False
         if vals.get('active') in (False, 0):
             # Archiving an account turns its task queue off: cancel queued work
             # so nothing (like/repost/comment/bookmark/DM/webhook ...) runs for

@@ -29,6 +29,23 @@ from .twitter_group_sync import canonical_chat_conversation_id
 
 _logger = logging.getLogger(__name__)
 
+# ``_decrypt_chat_event`` reason for "the account's Chat key record could not be
+# read". Kept out of the decrypt-outcome counters so a throttled read is never
+# reported (or alerted) as a decryption failure.
+_KEY_UNAVAILABLE = 'key_unavailable'
+
+# ``_decrypt_chat_event`` reason for "the delivery decrypted, but into an event
+# that never carries a message body": reactions (the bulk of X chat traffic),
+# reaction removals, read receipts, group changes and message deletes. Also kept
+# out of the counters — a run of reactions on a busy conversation used to cross
+# the unread-delivery threshold and flag a perfectly healthy account as
+# "decryption stopped" within a couple of minutes.
+_NO_MESSAGE_CONTENT = 'no_message_content'
+
+# Outcomes that keep the ``encrypted`` marker but must never move the unread
+# streak or fire its alert (neither one is a decryption failure).
+_NOT_A_DECRYPT_FAILURE = frozenset({_KEY_UNAVAILABLE, _NO_MESSAGE_CONTENT})
+
 # Event types we subscribe to and can process.
 EVENT_TYPES = (
     'dm.received',
@@ -402,13 +419,13 @@ class TwitterActivity:
         if message_id and sender_id and channel:
             author_partner = self.env['res.partner'].sudo().search(
                 [('x_user_id', '=', str(sender_id))], limit=1)
-            body, decrypted = self._decrypt_chat_event(account, payload)
+            body, decrypted, reason = self._decrypt_chat_event(account, payload)
             if not (body or '').strip():
                 # Some deliveries carry the text in the clear even though the
                 # decryptor only understands ``encoded_event``.
                 plain = (payload.get('text') or '').strip()
                 if plain:
-                    body, decrypted = plain, True
+                    body, decrypted, reason = plain, True, None
             if not (body or '').strip():
                 # Nothing readable: storing a body-less row only ever produced
                 # an invisible marker, so skip it. The channel-level sync status
@@ -417,7 +434,20 @@ class TwitterActivity:
                     'x_account_twitter: chat event %s has no plaintext '
                     '(account_id=%s, channel_id=%s); not stored',
                     message_id, account.id, channel.id)
-                self._note_chat_decrypt_outcome(account, stored=False)
+                if reason in _NOT_A_DECRYPT_FAILURE:
+                    # Not a decryption failure, so it must not grow the unread
+                    # streak: either the account's key record could not be read
+                    # (X spent the public_keys budget — counting it reported a
+                    # throttle as "the key material is the problem"), or the
+                    # delivery decrypted into an event that carries no message
+                    # (a reaction, a read receipt, a group change — counting
+                    # those flagged busy accounts as stopped within minutes).
+                    _logger.info(
+                        'x_account_twitter: chat event %s not counted as unread '
+                        '(%s) (account_id=%s)',
+                        message_id, reason, account.id)
+                else:
+                    self._note_chat_decrypt_outcome(account, stored=False)
                 return {'messages': 0, 'encrypted': not decrypted,
                         'skipped': 'no_plaintext', 'channel': channel.id}
             channel._save_x_message(
@@ -682,16 +712,23 @@ class TwitterActivity:
     def _decrypt_chat_event(self, account, payload):
         """Attempt to decrypt a webhook ``encoded_event`` blob.
 
-        Returns ``(body, decrypted)``. When the account has no Chat key blob, or
-        decryption fails/returns no usable message, returns ``('', False)`` so
-        the caller keeps the ``encrypted`` marker — never invent a body.
+        Returns ``(body, decrypted, reason)``. When the account has no Chat key
+        blob, or decryption fails/returns no usable message, returns
+        ``('', False, reason)`` so the caller keeps the ``encrypted`` marker —
+        never invent a body. ``reason`` is ``_KEY_UNAVAILABLE`` when the
+        account's key record could not be read at all, ``_NO_MESSAGE_CONTENT``
+        when the delivery decrypted into an event that carries no message body
+        (a reaction, a read receipt, a group change), and ``None`` for a real
+        decryption failure. Only ``None`` may count against the account's unread
+        streak — see ``_NOT_A_DECRYPT_FAILURE``.
         """
+        decrypted_any = False
         encoded = payload.get('encoded_event')
         if not encoded:
             _logger.warning('x_account_twitter: encrypted chat event missing '
                             'encoded_event account_id=%s event_id=%s',
                             account.id, payload.get('id'))
-            return '', False
+            return '', False, None
         conversation_id = payload.get('conversation_id')
         sender_id = payload.get('sender_id')
         key_change = payload.get('conversation_key_change_event') or ''
@@ -703,7 +740,7 @@ class TwitterActivity:
                                 'account_id=%s event_id=%s key_mode=%s',
                                 account.id, payload.get('id'),
                                 account.x_chat_key_mode or 'key_blob')
-                return '', False
+                return '', False, None
             # Conversation keys recovered on earlier deliveries (persisted on
             # the account) so a message whose key rotated before this delivery
             # can still be decrypted.
@@ -790,6 +827,9 @@ class TwitterActivity:
                 _logger.info('x_account_twitter: msg keys=%s', list(msg.keys()))
                 # The message is the event itself, not nested under 'event'
                 ev = msg if 'type' in msg else (msg.get('event') or {})
+                # The XDK produced an event: anything that yields no text below
+                # is a delivery that carries no message, not an unreadable one.
+                decrypted_any = True
                 _logger.info('x_account_twitter: decrypted event type=%s keys=%s',
                              ev.get('type'), list(ev.keys()))
                 if ev.get('type') == 'Message':
@@ -818,7 +858,7 @@ class TwitterActivity:
                     if url_texts:
                         text = (text + '\n' + '\n'.join(url_texts)).strip() if text else '\n'.join(url_texts)
                     if text:
-                        return text, True
+                        return text, True, None
         except Exception as exc:
             # Log the failure reason (bounded, metadata only — the XDK raises
             # ValueError with descriptive messages such as a wrong PIN or a
@@ -830,7 +870,13 @@ class TwitterActivity:
                 '(keeping encrypted marker)', account.id, payload.get('id'),
                 account.x_chat_key_mode or 'key_blob', type(exc).__name__,
                 str(exc)[:200], exc_info=False)
-        return '', False
+            from odoo.addons.x_account_twitter.services.xchat_decryptor import (
+                XChatKeyUnavailable)
+            reason = _KEY_UNAVAILABLE if isinstance(
+                exc, XChatKeyUnavailable) else None
+            return '', False, reason
+        return '', False, (
+            _NO_MESSAGE_CONTENT if decrypted_any else None)
 
     # --------------------------------------------------------------- helpers
     def _is_fatal_db_error(self, exc):

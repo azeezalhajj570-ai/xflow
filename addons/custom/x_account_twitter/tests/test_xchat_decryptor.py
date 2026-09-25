@@ -86,43 +86,45 @@ class TestXChatDecryptorKeySelection(XAccountTwitterTestBase):
         # Should select 100 (highest numeric), not '9' (highest lexicographic)
         self.assertEqual(selected['public_key_version'], '100')
 
-    def test_select_key_record_persisted_version(self):
-        """Test that persisted version is used when set."""
+    def test_select_key_record_rotated_key_wins_over_persisted_version(self):
+        """A rotated key is used immediately.
+
+        The newest registered row wins even when an older version is still
+        persisted on the account, so decryption follows X's rotation instead of
+        staying pinned to the superseded key (the rotation is persisted after
+        the next successful unlock).
+        """
         records = self._make_records([
-            '1772923727027',
+            '1772923727027',  # persisted, superseded
             '1773107189834',  # latest
         ])
         client = MagicMock()
         client.request.return_value = {'data': records}
         
-        # Set persisted version to the older one
         self.account.x_chat_signing_key_version = '1772923727027'
         
         decryptor = self._make_decryptor(client=client)
         selected = decryptor._select_key_record()
         
-        # Should use the persisted version, not the latest
-        self.assertEqual(selected['public_key_version'], '1772923727027')
-        self.assertEqual(selected['juicebox_config']['config_key'], 'config_0')
+        self.assertEqual(selected['public_key_version'], '1773107189834')
+        self.assertEqual(selected['juicebox_config']['config_key'], 'config_1')
 
-    def test_select_key_record_persisted_version_missing(self):
-        """Test clear error when persisted version not found in API response."""
+    def test_select_key_record_unknown_persisted_version_still_selects(self):
+        """A persisted version X no longer publishes is not fatal.
+
+        The newest registered row is used, so the account keeps decrypting
+        without an operator reconciliation step.
+        """
         records = self._make_records(['1773107189834'])
         client = MagicMock()
         client.request.return_value = {'data': records}
         
-        # Set persisted version that doesn't exist in API response
         self.account.x_chat_signing_key_version = '9999999999999'
         
         decryptor = self._make_decryptor(client=client)
+        selected = decryptor._select_key_record()
         
-        with self.assertRaises(ValueError) as cm:
-            decryptor._select_key_record()
-        
-        error_msg = str(cm.exception)
-        self.assertIn('9999999999999', error_msg)
-        self.assertIn('1773107189834', error_msg)
-        self.assertIn('reconciliation required', error_msg)
+        self.assertEqual(selected['public_key_version'], '1773107189834')
 
     def test_select_key_record_no_records(self):
         """Test handling when no records are returned."""
@@ -167,8 +169,16 @@ class TestXChatDecryptorKeySelection(XAccountTwitterTestBase):
         mock_chat.set_identity.assert_called_once_with('123456789', '1773107189834')
 
     @patch('chat_xdk.Chat')
-    def test_initialize_uses_persisted_version(self, mock_chat_class):
-        """Test that initialize uses persisted version when set."""
+    def test_initialize_uses_latest_config_with_the_persisted_identity(
+            self, mock_chat_class):
+        """The realm config comes from the newest row, the identity from the
+        account.
+
+        The secure-backup config moves with the key rotation, so it is always
+        taken from the newest registered row; ``set_identity`` keeps the
+        account's persisted version until a successful unlock persists the new
+        one.
+        """
         records = self._make_records([
             '1772923727027',
             '1773107189834',
@@ -176,7 +186,6 @@ class TestXChatDecryptorKeySelection(XAccountTwitterTestBase):
         client = MagicMock()
         client.request.return_value = {'data': records}
         
-        # Set persisted version
         self.account.x_chat_signing_key_version = '1772923727027'
         
         mock_chat = MagicMock()
@@ -185,13 +194,46 @@ class TestXChatDecryptorKeySelection(XAccountTwitterTestBase):
         decryptor = self._make_decryptor(client=client)
         decryptor.initialize()
         
-        # Verify Chat was initialized with the persisted version's config
         mock_chat_class.assert_called_once()
         call_args = mock_chat_class.call_args[0][0]
-        self.assertIn('config_0', call_args)  # config from first record
+        self.assertIn('config_1', call_args)  # config from the newest record
         
-        # Verify set_identity was called with the persisted version
-        mock_chat.set_identity.assert_called_once_with('123456789', '1772923727027')
+        mock_chat.set_identity.assert_called_once_with(
+            '123456789', '1772923727027')
+
+    @patch('chat_xdk.Chat')
+    def test_initialize_only_writes_a_changed_signing_version(
+            self, mock_chat_class):
+        """The signing version is written only when it changes.
+
+        It is stable for a healthy account, and rewriting it on every batch took
+        a row lock on ``social_account`` per batch, contending with the UI's own
+        saves on the account (observed as serialization failures).
+        """
+        records = self._make_records(['1773107189834'])
+        client = MagicMock()
+        client.request.return_value = {'data': records}
+        mock_chat_class.return_value = MagicMock()
+
+        writes = []
+        original = type(self.account).write
+
+        def _spy(records_, vals):
+            writes.append(dict(vals))
+            return original(records_, vals)
+
+        with patch.object(type(self.account), 'write', _spy):
+            # First run: nothing was persisted yet, so the version is written.
+            XChatDecryptor(self.env, self.account, client=client).initialize()
+            self.assertEqual(
+                self.account.x_chat_signing_key_version, '1773107189834')
+            # Second run with the same registered version: no write at all.
+            writes.clear()
+            XChatDecryptor(self.env, self.account, client=client).initialize()
+            self.assertFalse(
+                [vals for vals in writes
+                 if 'x_chat_signing_key_version' in vals],
+                'the unchanged signing version must not be rewritten')
 
     @patch('chat_xdk.Chat')
     def test_initialize_unlock_and_set_identity_use_same_version(self, mock_chat_class):
