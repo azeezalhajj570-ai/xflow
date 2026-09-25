@@ -69,7 +69,11 @@ class XChatDecryptor:
         self._public_keys_cache = None
         self._public_key_records_cache = {}
         self._public_key_fetch_error = None
-        self._conversation_keys = None
+        # Key material recovered per conversation, as
+        # ``{conversation_id: {version: bytes}}``. Scoped per conversation
+        # on purpose: one decryptor serves a whole batch, and a flat bucket
+        # wrote one conversation's keys into the next one.
+        self._conversation_keys = {}
 
     # ------------------------------------------------------------------ setup
     @property
@@ -177,7 +181,7 @@ class XChatDecryptor:
             chat.set_identity(str(account.twitter_user_id), signing_key_version)
         chat.set_cache_keys(True)
         self._chat = chat
-        self._conversation_keys = None
+        self._conversation_keys = {}
         return chat
 
     def register_public_keys(self):
@@ -773,26 +777,49 @@ class XChatDecryptor:
         return keys
 
     # ------------------------------------------------------------------ public
-    def _absorb_key_changes(self, chat, signing_keys, key_change_events):
+    def _key_bucket(self, conversation_id):
+        """Key material recovered for one conversation, ``{version: bytes}``.
+
+        Scoped per conversation because one decryptor serves every
+        conversation in a batch: with a single flat bucket, the keys recovered
+        for one conversation were persisted under whichever conversation the
+        batch happened to handle next.
+        """
+        key = str(conversation_id) if conversation_id else None
+        return self._conversation_keys.setdefault(key, {})
+
+    def _stored_keys(self):
+        """The account's persisted key cache, re-read so it cannot be stale.
+
+        Both writers here read-modify-write the whole field, so writing back a
+        value this record cached earlier in the batch can drop another
+        conversation's keys.
+        """
+        self.account.invalidate_recordset(['x_chat_conversation_keys'])
+        return dict(self.account.x_chat_conversation_keys or {})
+
+    def _absorb_key_changes(self, chat, signing_keys, key_change_events,
+                            conversation_id=None):
         """Recover + cache conversation keys from raw key-change events.
 
         Key-change events let us rebuild the conversation-key state so that
         messages in a conversation whose key rotated can still be decrypted
         (``extract_conversation_keys`` caches the current conversation key on
         the SDK instance). Swallows per-event failures so one bad key-change
-        never blocks the rest of the batch.
+        never blocks the rest of the batch. Returns the key bucket of
+        ``conversation_id``.
         """
+        bucket = self._key_bucket(conversation_id)
         if not key_change_events:
-            return self._conversation_keys
-        if self._conversation_keys is None:
-            self._conversation_keys = {}
-        
+            return bucket
+
         # Debug: log signing keys we have
-        signing_versions = [k.get('public_key_version') for k in signing_keys if k.get('public_key_version')]
+        signing_versions = [k.get('public_key_version') for k in signing_keys
+                            if k.get('public_key_version')]
         _LOGGER.info(
             'Key-change absorption for account %s: %d events, signing_versions=%s',
             self.account.id, len(key_change_events), signing_versions[:5])
-        
+
         try:
             # Set signing keys before extracting conversation keys
             if signing_keys and hasattr(chat, 'set_signing_keys'):
@@ -807,14 +834,14 @@ class XChatDecryptor:
                     self.account.id, len(keys), list(keys.keys())[:5])
                 # Chat XDK returns {key_version: raw_key_bytes}; preserve the
                 # direction because decrypt_event accepts exactly that map.
-                self._conversation_keys.update(
+                bucket.update(
                     {str(version): key for version, key in keys.items()})
         except Exception as exc:
             _LOGGER.warning(
                 'Key-change absorption failed for account %s (rotated '
                 'conversation keys may be undecryptable): %s: %s',
                 self.account.id, type(exc).__name__, str(exc)[:200])
-        return self._conversation_keys
+        return bucket
 
     def decrypt_events(self, raw_events, key_change_events=None,
                        sender_ids=None, cached_keys=None, conversation_id=None):
@@ -831,29 +858,34 @@ class XChatDecryptor:
         earlier deliveries (persisted on the account); ``conversation_id`` makes
         freshly recovered keys persisted back for later deliveries.
 
+        Every key stays scoped to ``conversation_id``: a shared decryptor
+        serves a whole batch, so one conversation's keys must never land in
+        another's cache.
+
         Returns ``{'messages': [...], 'errors': [...]}`` where each message is
         the SDK's decrypted event dict. Raises ValueError when no key material
         is configured (caller should keep the ``encrypted`` marker).
         """
         chat = self._chat_instance()
         signing_keys = self._signing_keys(sender_ids)
+        bucket = self._key_bucket(conversation_id)
         # Seed with keys recovered earlier: a webhook delivery carries only its
         # own key-change blob, so a message whose key rotated before it must be
         # decrypted with keys persisted from a previous delivery.
         for version, key in self._conversation_key_material(cached_keys):
-            self._conversation_keys = self._conversation_keys or {}
-            self._conversation_keys[str(version)] = key
-        self._absorb_key_changes(chat, signing_keys, key_change_events)
+            bucket[str(version)] = key
+        self._absorb_key_changes(chat, signing_keys, key_change_events,
+                                 conversation_id)
         # Only decrypt message events, not key change events
         blobs = list(raw_events or [])
         # Use single-event decryption to pass conversation_keys
         messages = []
         errors = {}
         _LOGGER.info('decrypt_events: %d blobs, %d conversation_keys, %d signing_keys',
-                     len(blobs), len(self._conversation_keys or {}), len(signing_keys or []))
+                     len(blobs), len(bucket), len(signing_keys or []))
         for blob in blobs:
             try:
-                result = chat.decrypt_event(blob, self._conversation_keys or None, signing_keys)
+                result = chat.decrypt_event(blob, bucket or None, signing_keys)
                 _LOGGER.info('decrypt_event result: %s', type(result).__name__ if result else 'None')
                 if result:
                     messages.append(result)
@@ -866,22 +898,25 @@ class XChatDecryptor:
         return {'messages': messages, 'errors': errors}
 
     def _persist_conversation_keys(self, conversation_id):
-        """Merge the in-memory conversation keys into the account's cache.
+        """Merge this conversation's in-memory keys into the account's cache.
 
         Webhook deliveries each carry only their own key-change blob, so keys
         recovered now must be stored to decrypt later messages whose key rotated
-        in an event we already saw. No-op when nothing new was recovered.
+        in an event we already saw. Only ``conversation_id``'s own bucket is
+        written: persisting the decryptor's whole key state is what copied one
+        conversation's keys into every conversation handled after it in the
+        same batch. No-op when nothing new was recovered.
         """
         try:
             encoded = {}
-            for version, key in (self._conversation_keys or {}).items():
+            for version, key in self._key_bucket(conversation_id).items():
                 if isinstance(key, (bytes, bytearray)):
                     encoded[str(version)] = base64.b64encode(bytes(key)).decode()
                 else:
                     encoded[str(version)] = str(key)
             if not encoded:
                 return
-            account_cache = dict(self.account.x_chat_conversation_keys or {})
+            account_cache = self._stored_keys()
             merged = dict(account_cache.get(str(conversation_id)) or {})
             merged.update(encoded)
             account_cache[str(conversation_id)] = merged
@@ -891,13 +926,14 @@ class XChatDecryptor:
                 'Failed to persist conversation keys for %s: %s',
                 conversation_id, str(exc)[:200])
 
-    def decrypt_event(self, raw_event, key_change_events=None, sender_id=None):
+    def decrypt_event(self, raw_event, key_change_events=None, sender_id=None,
+                      conversation_id=None):
         """Decrypt a single encoded event (raises on failure)."""
         chat = self._chat_instance()
         signing_keys = self._signing_keys([sender_id] if sender_id else None)
-        self._absorb_key_changes(chat, signing_keys, key_change_events)
-        return chat.decrypt_event(raw_event, self._conversation_keys or None,
-                                  signing_keys)
+        bucket = self._absorb_key_changes(chat, signing_keys,
+                                          key_change_events, conversation_id)
+        return chat.decrypt_event(raw_event, bucket or None, signing_keys)
 
     def collect_conversation_keys(self, conversation_id, key_change_events):
         """Recover conversation keys from raw key-change events and cache them.
@@ -913,19 +949,14 @@ class XChatDecryptor:
             chat = self._chat_instance()
             extracted = chat.extract_conversation_keys(list(key_change_events or []))
             extracted_keys = (extracted or {}).get('keys') or {}
-            cached = {}
-            try:
-                cached = (self.account.x_chat_conversation_keys or {}).get(
-                    str(conversation_id)) or {}
-            except Exception:
-                cached = {}
+            account_cache = self._stored_keys()
+            cached = dict(account_cache.get(str(conversation_id)) or {})
             for version, key in extracted_keys.items():
                 if isinstance(key, (bytes, bytearray)):
                     encoded = base64.b64encode(bytes(key)).decode()
                 else:
                     encoded = str(key)
                 cached[str(version)] = encoded
-            account_cache = dict(self.account.x_chat_conversation_keys or {})
             account_cache[str(conversation_id)] = cached
             self.account.sudo().write({'x_chat_conversation_keys': account_cache})
             merged = cached
