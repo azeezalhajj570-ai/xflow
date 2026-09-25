@@ -1,6 +1,7 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 import logging
+from datetime import timedelta
 
 import pytz
 from markupsafe import escape
@@ -79,6 +80,16 @@ _X_STATUS_TRIGGER_FIELDS = frozenset({
     'x_chat_decrypt_stopped', 'x_encryption_code', 'x_chat_key_blob',
     'x_chat_key_mode',
 })
+
+# A recovery notice is worth sending only when the error it closes actually
+# lasted; a dip that clears within this window is a flap and stays silent.
+_X_STATUS_RECOVERY_MIN_MINUTES = 5
+
+# Minimum gap between two connection-status notices for the same account. A
+# flapping account moves between error and active many times an hour; this
+# keeps it from emailing on every move while still reporting a genuinely new
+# outage once the window has passed.
+_X_STATUS_NOTIFY_COOLDOWN_MINUTES = 30
 
 _EVENT_PROVIDER_REGISTRY_MAP = {
     'official': 'twitter',
@@ -164,6 +175,22 @@ class SocialAccount(models.Model):
         string='Last Error',
         readonly=True,
         help='Last classified error. Never contains credentials.',
+    )
+    x_status_error_started_at = fields.Datetime(
+        string='X Status Error Started At',
+        copy=False,
+        readonly=True,
+        help='When the current X connection error episode began. Set on the '
+             'first move to "error" and cleared on recovery, so a brief flap '
+             'can be told from a real outage.',
+    )
+    x_status_notification_at = fields.Datetime(
+        string='X Status Notice Sent At',
+        copy=False,
+        readonly=True,
+        help='When the last connection-status notice was sent for this '
+             'account. Keeps a flapping account from emailing on every '
+             'transition.',
     )
     x_auto_archive = fields.Boolean(
         string='Archive Daily',
@@ -928,19 +955,102 @@ class SocialAccount(models.Model):
 
         Called after any write that can move it, so the status bar and its
         chatter trail follow the detailed state without every caller having to
-        know the aggregation rules. A move to "error" (a required component is
-        failing) or back to "connected" (recovered) also notifies the account's
-        users, in-app and by mail, once per transition.
+        know the aggregation rules. Only moves worth a notice notify the
+        account's users (see ``_notify_x_status_change``): a healthy account
+        going "connected" is silent, and a flapping one does not email on every
+        dip.
         """
         for account in self:
             status = account._x_overall_connection_status()
             if account.x_connection_status == status:
                 continue
             account.write({'x_connection_status': status})
-            if status == 'error':
-                account._notify_x_status_failed()
-            elif status == 'active':
-                account._notify_x_status_connected()
+            account._notify_x_status_change(status)
+
+    def _notify_x_status_change(self, status):
+        """Decide whether a move of the aggregated status deserves a notice.
+
+        Kept separate from the mail templates so the throttling can be read (and
+        tested) on its own:
+
+        * entering "error" opens an episode and sends its first failure notice
+          at most once per cooldown window;
+        * leaving "error" closes the episode, sending a recovery notice only
+          when the outage lasted at least ``_X_STATUS_RECOVERY_MIN_MINUTES``;
+        * a move to "active" with no error episode on record (a fresh or
+          healthy account) sends nothing.
+        """
+        self.ensure_one()
+        now = fields.Datetime.now()
+        if status == 'error':
+            self._open_x_status_error_episode(now)
+        else:
+            self._close_x_status_error_episode(now, notify=status == 'active')
+
+    def _open_x_status_error_episode(self, now):
+        """Open an error episode and send its first failure notice.
+
+        The episode is opened on the first move to "error" only, so a repeat
+        move to the same failing state cannot send a second notice. The notice
+        itself is held to the cooldown, so a dip inside a recent notice window
+        opens the episode silently.
+        """
+        self.ensure_one()
+        if not self._x_status_update(
+                "UPDATE social_account SET x_status_error_started_at = %s "
+                "WHERE id = %s AND x_status_error_started_at IS NULL",
+                (now, self.id)):
+            return
+        cutoff = now - timedelta(minutes=_X_STATUS_NOTIFY_COOLDOWN_MINUTES)
+        if self._x_status_update(
+                "UPDATE social_account SET x_status_notification_at = %s "
+                "WHERE id = %s AND (x_status_notification_at IS NULL "
+                "OR x_status_notification_at < %s)",
+                (now, self.id, cutoff)):
+            self._notify_x_status_failed()
+
+    def _close_x_status_error_episode(self, now, notify):
+        """Close the error episode, emailing a recovery only when it is real.
+
+        The episode is closed either way: a brief error->active flap is not an
+        outage, so it resets the episode without a notice and lets the next
+        genuine outage be detected. Only a recovery after at least
+        ``_X_STATUS_RECOVERY_MIN_MINUTES`` of failure is worth the connected
+        notice (and the stamp it writes also starts the cooldown).
+        """
+        self.ensure_one()
+        started = self.x_status_error_started_at
+        if not started:
+            return
+        notify = notify and (
+            now - started >= timedelta(minutes=_X_STATUS_RECOVERY_MIN_MINUTES))
+        closed = self._x_status_update(
+            "UPDATE social_account SET x_status_error_started_at = NULL, "
+            "x_status_notification_at = CASE WHEN %s THEN %s "
+            "ELSE x_status_notification_at END "
+            "WHERE id = %s AND x_status_error_started_at = %s",
+            (notify, now, self.id, started))
+        if closed and notify:
+            self._notify_x_status_connected()
+
+    def _x_status_update(self, query, params):
+        """Run one guarded status-notification statement and report if it hit.
+
+        Several workers can observe the same transition (two webhook batches
+        flipping the account), and the ORM read-then-write around the notice is
+        not atomic: both would email. Each claim is a single guarded UPDATE —
+        Postgres serialises the two statements on the row lock and re-checks the
+        guard, so only one of them matches. The timestamp fields are written
+        outside the ORM, so they never re-enter the write hook that triggered
+        this sync; the row lock is the same one the status write already takes.
+        """
+        self.ensure_one()
+        self.env.flush_all()
+        self.env.cr.execute(query, params)
+        matched = self.env.cr.rowcount == 1
+        self.invalidate_recordset([
+            'x_status_error_started_at', 'x_status_notification_at'])
+        return matched
 
     def _transition(self, status):
         self.write({'x_connection_state': status})
