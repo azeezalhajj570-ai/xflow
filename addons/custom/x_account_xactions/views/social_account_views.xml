@@ -7,8 +7,8 @@
         <field name="arch" type="xml">
             <xpath expr="//group[@name='x_account_api']" position="inside">
                 <field name="x_xactions_account_id"
-                    invisible="x_provider != 'xactions'"
-                    placeholder="Linked XActions account id (optional)"/>
+                    placeholder="Linked XActions account id (optional)"
+                    help="Which linked XActions account this X account fetches from (POST /api/posts/report accountId). Left empty, it is resolved from GET /api/accounts by matching the account handle."/>
             </xpath>
         </field>
     </record>
