@@ -85,36 +85,49 @@ class XPostSync:
             per_post_limit=per_post_limit) or {}
         posts = result.get('posts') or []
         Post = self.env['social.stream.post'].sudo()
-        created = updated = 0
-        inline = {'comments': 0, 'retweets': 0, 'likes': 0}
+        # Collapse repeated payload entries first, so the posts land in one
+        # read and one INSERT instead of a lookup per post.
+        unique = {}
         for dto in posts:
             vals = self._post_vals(dto, account)
-            if not vals:
-                continue
-            existing = Post.search([
-                ('stream_id', '=', stream.id),
-                ('x_tweet_id', '=', vals['x_tweet_id']),
-            ], limit=1)
-            if existing:
-                existing.write(vals)
-                post = existing
-                updated += 1
-            else:
-                vals['stream_id'] = stream.id
-                post = Post.create(vals)
-                created += 1
+            if vals:
+                unique[vals['x_tweet_id']] = (vals, dto)
+        created = updated = 0
+        inline = {'comments': 0, 'retweets': 0, 'likes': 0}
+        if unique:
+            by_tweet = {
+                post.x_tweet_id: post
+                for post in Post.search([
+                    ('stream_id', '=', stream.id),
+                    ('x_tweet_id', 'in', list(unique)),
+                ])
+            }
+            to_create = []
+            for tweet_id, (vals, _dto) in unique.items():
+                if tweet_id in by_tweet:
+                    by_tweet[tweet_id].write(vals)
+                    updated += 1
+                else:
+                    to_create.append(dict(vals, stream_id=stream.id))
+            created = len(to_create)
+            if to_create:
+                for post in Post.create(to_create):
+                    by_tweet[post.x_tweet_id] = post
             # Providers whose timeline read returns engagers inline (XActions
             # /api/posts/report) hand them over here, saving a per-post round
             # trip; providers that don't leave `audience` absent.
-            if dto.get('audience'):
-                counts = self._store_inline_audience(post, dto['audience'])
-                for key in inline:
-                    inline[key] += counts[key]
+            for tweet_id, (_vals, dto) in unique.items():
+                audience = dto.get('audience')
+                if audience:
+                    counts = self._store_inline_audience(
+                        by_tweet[tweet_id], audience)
+                    for key in inline:
+                        inline[key] += counts[key]
         _logger.info(
             'X posts sync for account %s: %s post(s) (%s new, %s updated)',
-            account.id, len(posts), created, updated)
+            account.id, len(unique), created, updated)
         return {
-            'created': created, 'updated': updated, 'posts': len(posts),
+            'created': created, 'updated': updated, 'posts': len(unique),
             'unsupported': result.get('unsupported', False),
             # True when the provider returned engagers with the timeline, so
             # the caller need not fetch each post's interactions separately.
@@ -154,9 +167,8 @@ class XPostSync:
         for kind, key, bucket in (('comment', 'commenters', 'comments'),
                                   ('retweet', 'retweeters', 'retweets'),
                                   ('like', 'likers', 'likes')):
-            for dto in audience.get(key) or []:
-                if self._store_interaction(stream_post, kind, dto):
-                    counts[bucket] += 1
+            counts[bucket] = self._store_interactions(
+                stream_post, kind, audience.get(key) or [])
         if any(counts.values()):
             stream_post.sudo().write(
                 {'x_interactions_fetched_at': fields.Datetime.now()})
@@ -209,17 +221,48 @@ class XPostSync:
                     kind, result.get('reason') or 'unsupported'))
             return 0
         items = result.get('comments' if kind == 'comment' else 'users') or []
-        count = 0
-        for dto in items:
-            if self._store_interaction(stream_post, kind, dto):
-                count += 1
-        return count
+        return self._store_interactions(stream_post, kind, items)
 
-    def _store_interaction(self, stream_post, kind, dto):
+    def _store_interactions(self, stream_post, kind, dtos):
+        """Upsert one kind's interactions for a post, in bulk.
+
+        One read to find what exists, one CREATE for the new rows and one for
+        the missing partners — instead of a lookup and an INSERT per engager.
+        """
+        prepared = {}
+        for dto in dtos:
+            vals = self._prepare_interaction(kind, dto)
+            if vals:
+                prepared[vals['external_id']] = vals
+        if not prepared:
+            return 0
+        Interaction = self.env['x.post.interaction'].sudo()
+        existing = {
+            interaction.external_id: interaction
+            for interaction in Interaction.search([
+                ('stream_post_id', '=', stream_post.id),
+                ('kind', '=', kind),
+                ('external_id', 'in', list(prepared)),
+            ])
+        }
+        to_create = []
+        for external_id, vals in prepared.items():
+            if external_id in existing:
+                existing[external_id].write(vals)
+            else:
+                to_create.append(dict(
+                    vals, stream_post_id=stream_post.id, kind=kind))
+        if to_create:
+            self._bind_partners(to_create)
+            Interaction.create(to_create)
+        return len(prepared)
+
+    def _prepare_interaction(self, kind, dto):
+        """Interaction values for one engager DTO, without the post link."""
+        external_id = str(dto.get('id') or '').strip()
+        if not external_id:
+            return {}
         if kind == 'comment':
-            external_id = str(dto.get('id') or '').strip()
-            if not external_id:
-                return False
             vals = {
                 'text': dto.get('text') or '',
                 'external_created_at': _parse_x_datetime(dto.get('created_at')),
@@ -231,52 +274,46 @@ class XPostSync:
                 'author_name': dto.get('author_name') or '',
             }
         else:
-            external_id = str(dto.get('id') or '').strip()
-            if not external_id:
-                return False
             vals = {
                 'author_x_id': external_id,
                 'author_x_username': (dto.get('username') or '').lstrip('@'),
                 'author_name': dto.get('name') or '',
             }
-
-        author_x_id = vals.get('author_x_id')
-        partner = self._resolve_partner(
-            author_x_id, vals.get('author_x_username'), vals.get('author_name'))
-        if partner:
-            vals['author_partner_id'] = partner.id
         vals['raw_metadata'] = dto.get('raw') or {}
         vals['provider'] = self.account.x_provider or ''
+        vals['external_id'] = external_id
+        return vals
 
-        Interaction = self.env['x.post.interaction'].sudo()
-        existing = Interaction.search([
-            ('stream_post_id', '=', stream_post.id),
-            ('kind', '=', kind),
-            ('external_id', '=', external_id),
-        ], limit=1)
-        if existing:
-            existing.write(vals)
-            return True
-        vals.update({
-            'stream_post_id': stream_post.id,
-            'kind': kind,
-            'external_id': external_id,
-        })
-        Interaction.create(vals)
-        return True
+    def _bind_partners(self, vals_list):
+        """Attach ``author_partner_id`` to a batch of interaction values.
 
-    def _resolve_partner(self, x_user_id, username, name):
-        x_user_id = str(x_user_id or '').strip()
-        if not x_user_id:
-            return self.env['res.partner']
+        One search and one CREATE for every distinct author in the batch,
+        instead of a lookup and an INSERT per record.
+        """
+        needed = {}
+        for vals in vals_list:
+            x_user_id = vals.get('author_x_id')
+            if x_user_id and x_user_id not in needed:
+                needed[x_user_id] = vals
+        if not needed:
+            return
         Partner = self.env['res.partner'].sudo()
-        partner = Partner.search([('x_user_id', '=', x_user_id)], limit=1)
-        if partner:
-            return partner
-        return Partner.create({
-            'name': name or username or 'X user %s' % x_user_id,
+        found = {
+            partner.x_user_id: partner
+            for partner in Partner.search([('x_user_id', 'in', list(needed))])
+        }
+        missing = [{
+            'name': vals.get('author_name') or vals.get('author_x_username')
+                    or 'X user %s' % x_user_id,
             'type': 'contact',
             'partner_share': True,
             'x_user_id': x_user_id,
-            'x_username': username or '',
-        })
+            'x_username': vals.get('author_x_username') or '',
+        } for x_user_id, vals in needed.items() if x_user_id not in found]
+        if missing:
+            for partner in Partner.create(missing):
+                found[partner.x_user_id] = partner
+        for vals in vals_list:
+            partner = found.get(vals.get('author_x_id'))
+            if partner:
+                vals['author_partner_id'] = partner.id
