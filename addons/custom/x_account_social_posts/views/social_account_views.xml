@@ -29,6 +29,15 @@
         <field name="model">social.account</field>
         <field name="inherit_id" ref="x_account.x_account_social_account_view_form_standalone"/>
         <field name="arch" type="xml">
+            <xpath expr="//form/sheet" position="inside">
+                <div class="oe_button_box" name="button_box">
+                    <button name="action_open_x_posts" type="object"
+                        class="oe_stat_button" icon="fa-comments">
+                        <field name="x_social_stream_post_count" widget="statinfo"
+                            string="X Posts"/>
+                    </button>
+                </div>
+            </xpath>
             <xpath expr="//header" position="inside">
                 <button name="action_fetch_x_posts" type="object"
                     string="Fetch X Posts" class="btn-primary"/>
