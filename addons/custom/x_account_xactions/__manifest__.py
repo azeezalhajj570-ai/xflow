@@ -3,7 +3,7 @@
     'name': 'X Account XActions Provider',
     'category': 'Marketing/Social Marketing',
     'summary': 'XActions REST provider (own posts + engagement) for the X Account platform',
-    'version': '19.0.1.0.3',
+    'version': '19.0.1.0.4',
     'author': 'Azeez Tech',
     'description': """
 X Account XActions Provider

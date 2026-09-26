@@ -95,6 +95,13 @@ class XPostSync:
         created = updated = 0
         inline = {'comments': 0, 'retweets': 0, 'likes': 0}
         if unique:
+            # Resolve each post author to a partner object, like the author of
+            # an X account message.
+            self._bind_partners(
+                [vals for vals, _dto in unique.values()],
+                x_id_field='x_author_x_id',
+                username_field='x_author_x_username',
+                partner_field='x_author_partner_id')
             by_tweet = {
                 post.x_tweet_id: post
                 for post in Post.search([
@@ -284,15 +291,20 @@ class XPostSync:
         vals['external_id'] = external_id
         return vals
 
-    def _bind_partners(self, vals_list):
-        """Attach ``author_partner_id`` to a batch of interaction values.
+    def _bind_partners(self, vals_list, x_id_field='author_x_id',
+                       username_field='author_x_username',
+                       name_field='author_name',
+                       partner_field='author_partner_id'):
+        """Attach a partner to a batch of values, keyed on the X user id.
 
-        One search and one CREATE for every distinct author in the batch,
-        instead of a lookup and an INSERT per record.
+        The same shape ``x.message`` uses for its author: a ``res.partner``
+        carrying ``x_user_id`` / ``x_username``. One search and one CREATE for
+        every distinct author in the batch, instead of a lookup and an INSERT
+        per record.
         """
         needed = {}
         for vals in vals_list:
-            x_user_id = vals.get('author_x_id')
+            x_user_id = vals.get(x_id_field)
             if x_user_id and x_user_id not in needed:
                 needed[x_user_id] = vals
         if not needed:
@@ -303,17 +315,17 @@ class XPostSync:
             for partner in Partner.search([('x_user_id', 'in', list(needed))])
         }
         missing = [{
-            'name': vals.get('author_name') or vals.get('author_x_username')
+            'name': vals.get(name_field) or vals.get(username_field)
                     or 'X user %s' % x_user_id,
             'type': 'contact',
             'partner_share': True,
             'x_user_id': x_user_id,
-            'x_username': vals.get('author_x_username') or '',
+            'x_username': vals.get(username_field) or '',
         } for x_user_id, vals in needed.items() if x_user_id not in found]
         if missing:
             for partner in Partner.create(missing):
                 found[partner.x_user_id] = partner
         for vals in vals_list:
-            partner = found.get(vals.get('author_x_id'))
+            partner = found.get(vals.get(x_id_field))
             if partner:
-                vals['author_partner_id'] = partner.id
+                vals[partner_field] = partner.id
