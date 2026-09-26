@@ -16,10 +16,6 @@
                     </button>
                 </div>
             </xpath>
-            <xpath expr="//header" position="inside">
-                <button name="action_fetch_x_posts" type="object"
-                    string="Fetch X Posts" class="btn-primary"/>
-            </xpath>
         </field>
     </record>
 
@@ -37,10 +33,6 @@
                             string="X Posts"/>
                     </button>
                 </div>
-            </xpath>
-            <xpath expr="//header" position="inside">
-                <button name="action_fetch_x_posts" type="object"
-                    string="Fetch X Posts" class="btn-primary"/>
             </xpath>
         </field>
     </record>
