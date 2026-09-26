@@ -3,7 +3,7 @@
     'name': 'X Account Social Posts',
     'category': 'Marketing/Social Marketing',
     'summary': 'Fetch X account posts and their interactions into Social Marketing streams',
-    'version': '19.0.1.0.7',
+    'version': '19.0.1.0.8',
     'author': 'Azeez Tech',
     'description': """
 X Account Social Posts
@@ -30,6 +30,7 @@ a likers source is available.
     'data': [
         'security/ir.model.access.csv',
         'data/social_media_data.xml',
+        'data/server_actions.xml',
         'views/social_stream_post_views.xml',
         'views/x_post_interaction_views.xml',
         'views/social_account_views.xml',
