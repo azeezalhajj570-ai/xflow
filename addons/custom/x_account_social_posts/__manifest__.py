@@ -3,7 +3,7 @@
     'name': 'X Account Social Posts',
     'category': 'Marketing/Social Marketing',
     'summary': 'Fetch X account posts and their interactions into Social Marketing streams',
-    'version': '19.0.1.0.3',
+    'version': '19.0.1.0.4',
     'author': 'Azeez Tech',
     'description': """
 X Account Social Posts

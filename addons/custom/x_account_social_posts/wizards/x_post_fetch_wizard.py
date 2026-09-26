@@ -6,7 +6,12 @@ Manual by design: reads are paid on per-call providers, so the operator picks
 the depth (how many posts, which interaction kinds, caps) for each run.
 """
 
+import logging
+
 from odoo import api, fields, models
+from odoo.exceptions import UserError
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class XPostFetchWizard(models.TransientModel):
@@ -96,30 +101,41 @@ class XPostFetchWizard(models.TransientModel):
             self.max_retweeters if self.fetch_retweeters else 0,
             self.max_likers if self.fetch_likers else 0,
         ) or None
-        timeline = sync.sync_timeline(
-            stream, limit=self.limit or 20, per_post_limit=per_post_limit,
-            provider_code=self.provider)
+        try:
+            timeline = sync.sync_timeline(
+                stream, limit=self.limit or 20,
+                per_post_limit=per_post_limit, provider_code=self.provider)
 
-        totals = {'comments': 0, 'retweets': 0, 'likes': 0}
-        notes = []
-        if timeline.get('inline_interactions'):
-            # The provider returned engagers with the timeline read; the posts
-            # already carry their interactions, so don't fetch them again.
-            totals.update(timeline.get('interactions') or {})
-        elif kinds:
-            posts = self.env['social.stream.post'].search(
-                [('stream_id', '=', stream.id)])
-            for post in posts:
-                summary = sync.sync_interactions(
-                    post, kinds=kinds,
-                    max_comments=self.max_comments or 50,
-                    max_retweeters=self.max_retweeters or 100,
-                    max_likers=self.max_likers or 50,
-                    provider_code=self.provider)
-                totals['comments'] += summary['comments']
-                totals['retweets'] += summary['retweets']
-                totals['likes'] += summary['likes']
-                notes.extend(summary['unsupported_notes'])
+            totals = {'comments': 0, 'retweets': 0, 'likes': 0}
+            notes = []
+            if timeline.get('inline_interactions'):
+                # The provider returned engagers with the timeline read; the
+                # posts already carry their interactions, so don't fetch them
+                # again.
+                totals.update(timeline.get('interactions') or {})
+            elif kinds:
+                posts = self.env['social.stream.post'].search(
+                    [('stream_id', '=', stream.id)])
+                for post in posts:
+                    summary = sync.sync_interactions(
+                        post, kinds=kinds,
+                        max_comments=self.max_comments or 50,
+                        max_retweeters=self.max_retweeters or 100,
+                        max_likers=self.max_likers or 50,
+                        provider_code=self.provider)
+                    totals['comments'] += summary['comments']
+                    totals['retweets'] += summary['retweets']
+                    totals['likes'] += summary['likes']
+                    notes.extend(summary['unsupported_notes'])
+        except UserError:
+            raise
+        except Exception as exc:
+            # Provider/API failures are operator-facing, not stack traces.
+            _LOGGER.exception(
+                'X posts fetch failed: account=%s provider=%s',
+                account.id, self.provider)
+            raise UserError(
+                'The %s provider failed: %s' % (self.provider, exc)) from exc
 
         message = (
             '%(posts)s post(s) synced (%(created)s new, %(updated)s updated). '
