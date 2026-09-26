@@ -18,6 +18,10 @@ class SocialStreamPost(models.Model):
     x_tweet_id = fields.Char('X Post ID', index=True, copy=False)
     x_author_x_id = fields.Char('X Author ID')
     x_author_x_username = fields.Char('X Author Username')
+    x_author_partner_id = fields.Many2one(
+        'res.partner', string='X Author', ondelete='set null',
+        help='Partner behind X Author ID, resolved like the author of an '
+             'X account message (res.partner.x_user_id).')
     x_favorite_count = fields.Integer('X Likes')
     x_retweet_count = fields.Integer('X Retweets')
     x_reply_count = fields.Integer('X Replies')

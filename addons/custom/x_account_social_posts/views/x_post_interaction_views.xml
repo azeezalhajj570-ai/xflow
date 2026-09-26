@@ -6,7 +6,8 @@
         <field name="arch" type="xml">
             <list string="X Interactions" create="false" edit="false">
                 <field name="kind"/>
-                <field name="author_name"/>
+                <field name="author_partner_id"/>
+                <field name="author_name" optional="hide"/>
                 <field name="author_x_username"/>
                 <field name="text"/>
                 <field name="like_count" optional="hide"/>
@@ -66,6 +67,7 @@
         <field name="model">x.post.interaction</field>
         <field name="arch" type="xml">
             <search string="X Interactions">
+                <field name="author_partner_id"/>
                 <field name="author_name"/>
                 <field name="author_x_username"/>
                 <field name="text"/>

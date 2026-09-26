@@ -49,7 +49,7 @@ class XActionsProvider:
         self.env = env
         self.account = account
         self._client = XActionsClient(env)
-        self._linked_account_id = None
+        self._linked_account_row = None
 
     def _account_args(self, required=False):
         """Request fields selecting the linked XActions account.
@@ -69,50 +69,78 @@ class XActionsProvider:
                 'ids) so the fetch reads that account only.' % handle)
         return {'accountId': account_id} if account_id else {}
 
-    def _resolve_account_id(self):
-        """The linked XActions account id to act as for this Odoo account.
+    def _linked_account(self):
+        """The linked XActions account row for this X account.
 
-        An explicit ``x_xactions_account_id`` wins. Otherwise the account
-        handle is matched against ``GET /api/accounts`` (case-insensitive,
-        leading ``@`` stripped).
+        ``GET /api/accounts`` carries both the id whose session the server
+        decrypts and the X identity (``twitterUserId``, ``username``,
+        ``displayName``) that names the account's own posts. An explicit
+        ``x_xactions_account_id`` wins; otherwise the handle is matched
+        (case-insensitive, leading ``@`` stripped).
 
-        The result is cached on the provider instance only. Writing it back to
-        the account would stamp ``social_account`` — a row the chat/webhook
-        writers keep busy — and a lost serialization race makes Odoo replay the
-        whole request, re-reading the report and burning the provider quota.
+        Cached on the provider instance only. Writing it back to the account
+        would stamp ``social_account`` — a row the chat/webhook writers keep
+        busy — and a lost serialization race makes Odoo replay the whole
+        request, re-reading the report and burning the provider quota.
         """
-        if self._linked_account_id is not None:
-            return self._linked_account_id
+        if self._linked_account_row is not None:
+            return self._linked_account_row
+        self._linked_account_row = {}
         explicit = getattr(self.account, 'x_xactions_account_id', '') or ''
-        if explicit:
-            self._linked_account_id = explicit
-            return explicit
         handle = (self.account.social_account_handle or '').strip().lstrip('@')
-        if not handle:
-            self._linked_account_id = ''
-            return ''
+        if not explicit and not handle:
+            return {}
         try:
             payload = self._client.get(_ACCOUNTS_PATH)
         except XActionsError as exc:
             _LOGGER.warning(
-                'XActions: could not list accounts to resolve handle %r: %s',
-                handle, exc.message)
-            return ''
+                'XActions: could not list accounts for %s: %s',
+                handle or explicit, exc.message)
+            return {}
         accounts = (
             payload.get('accounts') if isinstance(payload, dict) else payload
         ) or []
-        found = ''
         for candidate in accounts:
-            if (candidate.get('username') or '').lower() == handle.lower():
-                found = candidate.get('id') or ''
+            if explicit and candidate.get('id') == explicit:
+                self._linked_account_row = candidate
                 break
-        if not found:
+            if (not explicit and handle and
+                    (candidate.get('username') or '').lower() == handle.lower()):
+                self._linked_account_row = candidate
+                break
+        if not self._linked_account_row:
             _LOGGER.warning(
-                'XActions: no linked account matches handle %r; set the '
-                'linked XActions account on the X account to fetch its posts.',
-                handle)
-        self._linked_account_id = found
-        return found
+                'XActions: no linked account matches %s; set the linked '
+                'XActions account on the X account to fetch its posts.',
+                handle or explicit)
+        return self._linked_account_row
+
+    def _resolve_account_id(self):
+        """The linked XActions account id to act as for this Odoo account."""
+        return self._linked_account().get('id') or ''
+
+    def _name_own_author(self, posts):
+        """Name the author of the account's own posts.
+
+        The report returns only the acting account's posts and no author, so
+        the author is that linked account. Filling it in lets the sync resolve
+        a partner, the same shape an X message author has.
+        """
+        linked = self._linked_account()
+        if not linked:
+            return
+        author_x_id = str(linked.get('twitterUserId') or '')
+        username = linked.get('username') or ''
+        display_name = linked.get('displayName') or username
+        for dto in posts:
+            # The parser always sets these keys, to '' when the report had no
+            # author, so fill them in rather than setdefault.
+            if not dto.get('author_id'):
+                dto['author_id'] = author_x_id
+            if not dto.get('author_username'):
+                dto['author_username'] = username
+            if not dto.get('author_name'):
+                dto['author_name'] = display_name
 
     def validate_session(self):
         """Verify the token and reachability via a cheap DB-only endpoint."""
@@ -151,6 +179,7 @@ class XActionsProvider:
         body.update(self._account_args(required=True))
         payload = self._client.post(_REPORT_PATH, json=body)
         result = XActionsEnvelopeParser.report(payload)
+        self._name_own_author(result.get('posts') or [])
         if result.get('truncated'):
             _LOGGER.warning(
                 'XActions report for account %s was truncated (rate limit); '

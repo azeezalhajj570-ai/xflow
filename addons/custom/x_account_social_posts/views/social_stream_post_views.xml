@@ -9,7 +9,8 @@
         <field name="arch" type="xml">
             <list string="X Posts" create="false" edit="false">
                 <field name="published_date"/>
-                <field name="author_name"/>
+                <field name="x_author_partner_id"/>
+                <field name="author_name" optional="hide"/>
                 <field name="message"/>
                 <field name="x_favorite_count" string="Likes"/>
                 <field name="x_retweet_count" string="Retweets"/>
@@ -37,6 +38,7 @@
                     <group>
                         <group>
                             <field name="stream_id" readonly="1"/>
+                            <field name="x_author_partner_id" readonly="1"/>
                             <field name="published_date" readonly="1"/>
                             <field name="x_tweet_id" readonly="1"/>
                             <field name="x_source_provider" readonly="1"/>
@@ -58,7 +60,7 @@
                             <field name="x_interaction_ids" readonly="1"
                                 domain="[('kind', '=', 'comment')]">
                                 <list create="false" delete="false">
-                                    <field name="author_name"/>
+                                    <field name="author_partner_id"/>
                                     <field name="author_x_username"/>
                                     <field name="text"/>
                                     <field name="like_count"/>
@@ -70,9 +72,8 @@
                             <field name="x_interaction_ids" readonly="1"
                                 domain="[('kind', '=', 'retweet')]">
                                 <list create="false" delete="false">
-                                    <field name="author_name"/>
-                                    <field name="author_x_username"/>
                                     <field name="author_partner_id"/>
+                                    <field name="author_x_username"/>
                                     <field name="external_created_at"/>
                                 </list>
                             </field>
@@ -81,9 +82,8 @@
                             <field name="x_interaction_ids" readonly="1"
                                 domain="[('kind', '=', 'like')]">
                                 <list create="false" delete="false">
-                                    <field name="author_name"/>
-                                    <field name="author_x_username"/>
                                     <field name="author_partner_id"/>
+                                    <field name="author_x_username"/>
                                 </list>
                             </field>
                         </page>
