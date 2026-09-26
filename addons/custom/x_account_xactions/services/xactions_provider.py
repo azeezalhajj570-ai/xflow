@@ -49,6 +49,7 @@ class XActionsProvider:
         self.env = env
         self.account = account
         self._client = XActionsClient(env)
+        self._linked_account_id = None
 
     def _account_args(self, required=False):
         """Request fields selecting the linked XActions account.
@@ -73,15 +74,22 @@ class XActionsProvider:
 
         An explicit ``x_xactions_account_id`` wins. Otherwise the account
         handle is matched against ``GET /api/accounts`` (case-insensitive,
-        leading ``@`` stripped) and the match is remembered on the account so
-        later runs skip the lookup and the operator can see which XActions
-        account is in use.
+        leading ``@`` stripped).
+
+        The result is cached on the provider instance only. Writing it back to
+        the account would stamp ``social_account`` — a row the chat/webhook
+        writers keep busy — and a lost serialization race makes Odoo replay the
+        whole request, re-reading the report and burning the provider quota.
         """
+        if self._linked_account_id is not None:
+            return self._linked_account_id
         explicit = getattr(self.account, 'x_xactions_account_id', '') or ''
         if explicit:
+            self._linked_account_id = explicit
             return explicit
         handle = (self.account.social_account_handle or '').strip().lstrip('@')
         if not handle:
+            self._linked_account_id = ''
             return ''
         try:
             payload = self._client.get(_ACCOUNTS_PATH)
@@ -93,16 +101,18 @@ class XActionsProvider:
         accounts = (
             payload.get('accounts') if isinstance(payload, dict) else payload
         ) or []
+        found = ''
         for candidate in accounts:
             if (candidate.get('username') or '').lower() == handle.lower():
                 found = candidate.get('id') or ''
-                if found:
-                    self.account.sudo().x_xactions_account_id = found
-                    return found
-        _LOGGER.warning(
-            'XActions: no linked account matches handle %r; set the linked '
-            'XActions account on the X account to fetch its posts.', handle)
-        return ''
+                break
+        if not found:
+            _LOGGER.warning(
+                'XActions: no linked account matches handle %r; set the '
+                'linked XActions account on the X account to fetch its posts.',
+                handle)
+        self._linked_account_id = found
+        return found
 
     def validate_session(self):
         """Verify the token and reachability via a cheap DB-only endpoint."""
